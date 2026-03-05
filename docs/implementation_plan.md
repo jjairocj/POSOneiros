@@ -36,11 +36,25 @@ Se crearán dos ecosistemas principales dentro de `app/`:
 - `actions/shift.ts`: Abrir, consultar y cerrar turnos.
 - `actions/sale.ts`: Creación de la transacción. Debe realizarse en una **transacción de DB** que verifique el stock (si el stock negativo no está permitido), reste el inventario y cree el registro de venta unificado.
 
+### 5. Epic 2: Catálogo de Productos y Carrito Táctil
+El objetivo es permitir al cajero seleccionar productos de forma visual y rápida.
+- **Estado Global (Zustand):** Implementar `useCartStore` para manejar múltiples órdenes abiertas simultáneamente. Se utilizará el middleware `persist` de Zustand para guardar el estado en `localStorage`, garantizando que no se pierda información al cerrar el navegador.
+- **Estructura de Datos del Carrito:** `orders: { [orderId: string]: { items: CartItem[], customerId?: string } }`.
+- **Capa de Datos:**
+  - `actions/category.ts`: Obtener categorías para la barra superior.
+  - `actions/product.ts`: Obtener productos filtrados por categoría o búsqueda.
+- **Componentes UI (app/pos/components/):**
+  - `CategorySelector.tsx`: Barra horizontal de categorías (Snap scrolling).
+  - `ProductGrid.tsx`: Visualización de productos en rejilla responsiva.
+  - `ProductCard.tsx`: Botón táctil con imagen, nombre y precio.
+  - `CartDrawer.tsx`: Panel lateral con el resumen de la venta y controles de cantidad.
+  - `OrderSwitcher.tsx`: Componente para alternar entre múltiples pedidos abiertos (Mesas/Clientes simultáneos).
+
 ## Verification Plan
 
 ### Automated Tests
-- Se utilizarán pruebas automatizadas ligeras con Jest si es requerido, enfocándose en la lógica financiera.
-- **Validación:** Se escribirá un script de nodo aislado para probar la concurrencia: que dos `actions/sale.ts` paralelas no puedan vender el mismo ítem si solo queda 1 en inventario.
+- **Unit Testing (Mandatorio):** Se utilizará **Vitest** para probar la lógica de negocio en Server Actions y utilitarios. Todas las acciones críticas (ventas, stock, turnos) deben tener cobertura de pruebas unitarias.
+- **Integridad de Datos:** Se escribirá un script de nodo aislado para probar la concurrencia: que dos `actions/sale.ts` paralelas no puedan vender el mismo ítem si solo queda 1 en inventario.
 
 ### Manual Verification
 1. **Prueba Mobile View:** Se ejecutará `npm run dev` y se probará todo el Front-office `/pos` usando las DevTools en modo iPhone/iPad para certificar fluidez táctil y distribución Mobile-First.

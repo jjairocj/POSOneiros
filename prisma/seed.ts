@@ -48,6 +48,33 @@ async function main() {
         },
     });
 
+    const catBebidas = await prisma.category.upsert({
+        where: { id: "cat-bebidas" },
+        update: {},
+        create: { id: "cat-bebidas", name: "Bebidas" }
+    });
+
+    const catSnacks = await prisma.category.upsert({
+        where: { id: "cat-snacks" },
+        update: {},
+        create: { id: "cat-snacks", name: "Snacks" }
+    });
+
+    const products = [
+        { name: "Coca Cola 500ml", code: "7701", price: 3500, categoryId: catBebidas.id, stock: 50 },
+        { name: "Agua Cristal 600ml", code: "7702", price: 2000, categoryId: catBebidas.id, stock: 100 },
+        { name: "Papas Margarita Pollo", code: "8801", price: 2500, categoryId: catSnacks.id, stock: 30 },
+        { name: "Chocoramo", code: "8802", price: 2200, categoryId: catSnacks.id, stock: 40 },
+    ];
+
+    for (const p of products) {
+        await prisma.product.upsert({
+            where: { code: p.code },
+            update: p,
+            create: p
+        });
+    }
+
     console.log("Seed complete. Default user:", user.email, "Password: (hashed)");
 }
 

@@ -50,11 +50,31 @@
     display: grid;
     grid-template-columns: 1fr;
     height: 100%;
+    overflow: hidden;
 }
 
 @media (min-width: 1024px) {
     .posGrid {
-        grid-template-columns: 1fr 350px;
+        grid-template-columns: 1fr 380px;
+    }
+}
+
+.catalogArea {
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.cartArea {
+    height: 100%;
+    overflow: hidden;
+    display: none;
+    /* Mobile: Toggle or bottom sheet? */
+}
+
+@media (min-width: 1024px) {
+    .cartArea {
+        display: block;
     }
 }
 

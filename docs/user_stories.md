@@ -7,20 +7,20 @@ La gestión de turnos es obligatoria para garantizar el control del efectivo por
 
 ### US1.1: Autenticación Segura y Basada en Roles (RBAC)
 Como cajero/administrador, quiero iniciar sesión de forma segura para acceder al sistema según mis permisos.
-- [ ] **Tarea 1.1.1: Implementar sistema de Autenticación Front/Back.**
-  - [ ] Subtarea 1.1.1.1: Configurar NextAuth.js o Supabase Auth (según stack final, recomendamos middleware de Next.js).
-  - [ ] Subtarea 1.1.1.2: Diseñar pantalla de Login (Mobile-first, password visibility toggle).
-- [ ] **Tarea 1.1.2: Implementar Control de Acceso Basado en Roles (RBAC).**
+- [x] **Tarea 1.1.1: Implementar sistema de Autenticación Front/Back.**
+  - [x] Subtarea 1.1.1.1: Configurar NextAuth.js o Supabase Auth (según stack final, recomendamos middleware de Next.js).
+  - [x] Subtarea 1.1.1.2: Diseñar pantalla de Login (Mobile-first, password visibility toggle).
+- [x] **Tarea 1.1.2: Implementar Control de Acceso Basado en Roles (RBAC).**
   - [x] Subtarea 1.1.2.1: Crear modelo `Role` y `UserRole` en Prisma (Admin, Cajero, Supervisor).
-  - [ ] Subtarea 1.1.2.2: Proteger rutas del Front-office (`/pos`) y Back-office (`/admin`) en `middleware.ts`.
+  - [x] Subtarea 1.1.2.2: Proteger rutas del Front-office (`/pos`) y Back-office (`/admin`) en `middleware.ts`.
 
 ### US1.2: Apertura de Turno Dinámica
 Como cajero, quiero abrir mi turno registrando la base inicial, para mantener la trazabilidad financiera del día.
-- [ ] **Tarea 1.2.1: Gestión del Modelo de Turnos.**
+- [x] **Tarea 1.2.1: Gestión del Modelo de Turnos.**
   - [x] Subtarea 1.2.1.1: Crear modelo `Shift` (Turno) en DB (UserId, CajaId, BaseAmount, StartTime, EndTime, Status).
-- [ ] **Tarea 1.2.2: Interfaz de Apertura de Turno.**
-  - [ ] Subtarea 1.2.2.1: Componente modal de ingreso de billetes/monedas (Denominaciones) para cálculo rápido de base (Escalabilidad: facilitar el arqueo).
-  - [ ] Subtarea 1.2.2.2: Guardar "Caja activa" en Contexto/Estado Global (Zustand/Jotai) tras apertura exitosa.
+- [x] **Tarea 1.2.2: Interfaz de Apertura de Turno.**
+  - [x] Subtarea 1.2.2.1: Componente modal de ingreso de billetes/monedas (Denominaciones) para cálculo rápido de base (Escalabilidad: facilitar el arqueo).
+  - [x] Subtarea 1.2.2.2: Guardar "Caja activa" en Contexto/Estado Global (Zustand/Jotai) tras apertura exitosa.
 
 ### US1.3: Cierre de Turno y Arqueo (Z-Report)
 Como cajero, quiero cerrar mi turno y que el sistema genere un reporte de descuadre.
@@ -52,6 +52,15 @@ Como cajero, quiero modificar el pedido del cliente ágilmente antes del pago.
 - [ ] **Tarea 2.2.2: UI del Carrito.**
   - [ ] Subtarea 2.2.2.1: Diseño Drawer/Sidebar animado con CSS Transitions.
   - [ ] Subtarea 2.2.2.2: Seleccionador de cliente (Búsqueda rápida o "Consumidor Final" default).
+
+### US2.3: Gestión de Múltiples Cuentas Simultáneas (Mesas/Pedidos Pendientes)
+Como cajero, quiero mantener varias órdenes abiertas al mismo tiempo para atender a diferentes clientes sin perder el progreso de cada una.
+- [ ] **Tarea 2.3.1: Persistencia de Órdenes Suspendidas.**
+  - [ ] Subtarea 2.3.1.1: Modificar `useCartStore` para soportar un array de `orders` con un `activeOrderId`.
+  - [ ] Subtarea 2.3.1.2: Implementar función "Suspender" o "Nueva Cuenta" que guarde el estado actual y limpie el grid.
+- [ ] **Tarea 2.3.2: UI de Navegación entre Cuentas.**
+  - [ ] Subtarea 2.3.2.1: Barra de "Cuentas Abiertas" con indicadores visuales (Ej: Mesa 1, Mesa 2, Cliente 1).
+  - [ ] Subtarea 2.3.2.2: Acceso rápido para alternar entre pedidos y añadir ítems a cualquiera de ellos.
 
 ---
 
