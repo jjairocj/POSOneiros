@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { openShift } from "../../actions/shift";
-import styles from "./shift-modal.module.css";
+import { openShift } from "../../../actions/shift";
+import styles from "./shift.module.css";
 
 export default function ShiftOpeningModal() {
   const [baseAmount, setBaseAmount] = useState(0);
