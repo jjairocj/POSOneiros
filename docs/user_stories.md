@@ -48,7 +48,7 @@ Como cajero, quiero ver el catálogo rápidamente y poder buscar productos sin l
 Como cajero, quiero modificar el pedido del cliente ágilmente antes del pago.
 - [x] **Tarea 2.2.1: Estado Global del Carrito (Zustand).**
   - [x] Subtarea 2.2.1.1: Acciones: `addItem`, `removeItem`, `updateQuantity`, `applyDiscount`.
-  - [x] Subtarea 2.2.1.2: Cálculo reactivo de Subtotal, Impuestos (Multi-tasa) y Total.
+  - [x] Subtarea 2.2.1.2: Cálculo reactivo de Subtotal, Impuestos Dinámicos (IVA configurable por producto, ICA, ImpoConsumo) y Total.
 - [x] **Tarea 2.2.2: UI del Carrito.**
   - [x] Subtarea 2.2.2.1: Diseño Drawer/Sidebar animado con CSS Transitions.
   - [x] Subtarea 2.2.2.2: Seleccionador de cliente (Búsqueda rápida o "Consumidor Final" default).
@@ -61,6 +61,8 @@ Como cajero, quiero mantener varias órdenes abiertas al mismo tiempo para atend
 - [x] **Tarea 2.3.2: UI de Navegación entre Cuentas.**
   - [x] Subtarea 2.3.2.1: Barra de "Cuentas Abiertas" con indicadores visuales (Ej: Mesa 1, Mesa 2, Cliente 1).
   - [x] Subtarea 2.3.2.2: Acceso rápido para alternar entre pedidos y añadir ítems a cualquiera de ellos.
+- [ ] **Tarea 2.3.3: Navegación del Cajero sin Turno Activo.**
+  - [ ] Subtarea 2.3.3.1: Permitir al cajero navegar por el TPV, catálogos y armar órdenes sin estar bloqueado por el modal de apertura de turno. El bloqueo estricto de turno activo solo debe aplicar al intentar **Procesar Pago**.
 
 ---
 
@@ -68,10 +70,12 @@ Como cajero, quiero mantener varias órdenes abiertas al mismo tiempo para atend
 Garantizar la integridad de los datos financieros al momento de concretar la orden.
 
 ### US3.1: Checkout Flexibles y Multi-Método
-Como cajero, quiero procesar pagos combinados (Ej: Mitad efectivo, mitad tarjeta) de forma segura.
-- [ ] **Tarea 3.1.1: UI de Pagos.**
-  - [ ] Subtarea 3.1.1.1: Modal de confirmación de pago con calculador de cambio (Efectivo).
-  - [ ] Subtarea 3.1.1.2: Selector dinámico para añadir múltiples métodos de pago a una misma transacción.
+Como cajero, quiero procesar pagos combinados (Ej: Mitad efectivo, mitad transferencia) de forma segura, siempre y cuando tenga un turno de caja abierto.
+- [ ] **Tarea 3.1.1: Validación de Turno y Seguridad.**
+  - [ ] Subtarea 3.1.1.1: Validar (cliente y servidor) que exista un turno `OPEN` asignado antes de permitir abrir el modal de pagos o ejecutar la venta.
+- [ ] **Tarea 3.1.2: UI de Pagos.**
+  - [ ] Subtarea 3.1.2.1: Modal de confirmación de pago con calculador de cambio (Efectivo).
+  - [ ] Subtarea 3.1.2.2: Soporte explícito e interfaz para añadir múltiples métodos de pago a una misma transacción: **Efectivo**, **Pagos con Tarjetas (Datafono)**, y **Transferencias**.
 - [ ] **Tarea 3.1.2: Transacción de Base de Datos (ACID).**
   - [ ] Subtarea 3.1.2.1: Escribir Server Action `processSale` usando Prisma Transactions.
   - [ ] Subtarea 3.1.2.2: Si hay error (ej. falta de stock de último minuto), hacer *rollback* completo y notificar a UI.

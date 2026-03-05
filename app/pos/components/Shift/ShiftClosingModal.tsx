@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { closeShift } from "@/app/actions/shift";
-import styles from "./shift.module.css";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { LogOut, Receipt, CheckCircle2, AlertCircle } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
-// Reuse glassmorphism from shift.module.css
 export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeShiftId: string, onCancel: () => void }) {
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
@@ -42,90 +44,112 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
 
     if (summary) {
         return (
-            <div className={styles.modalOverlay}>
-                <div className={styles.modalContainer}>
-                    <div className={styles.modalHeader}>
-                        <h2>Reporte de Cierre Z</h2>
-                    </div>
-                    <div className={styles.modalBody}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Total Ventas:</span>
-                                <strong>${summary.totalSales.toLocaleString()}</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Esperado en Caja:</span>
-                                <strong>${summary.expected.toLocaleString()}</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Declarado:</span>
-                                <strong>${summary.declared.toLocaleString()}</strong>
-                            </div>
-                            <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                color: summary.difference < 0 ? '#ff4d4f' : (summary.difference > 0 ? '#52c41a' : 'inherit'),
-                                marginTop: '1rem',
-                                paddingTop: '1rem',
-                                borderTop: '1px solid var(--glass-border)'
-                            }}>
-                                <span>Diferencia (Descuadre):</span>
-                                <strong>${summary.difference.toLocaleString()}</strong>
-                            </div>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border">
+                    <div className="flex flex-col items-center text-center space-y-2 mb-6">
+                        <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mb-2">
+                            <Receipt className="w-8 h-8 text-success" />
                         </div>
-                        <button 
-                            className={styles.submitBtn} 
-                            onClick={handleAcknowledge}
-                        >
-                            Confirmar y Salir
-                        </button>
+                        <h2 className="text-2xl font-bold tracking-tight">Reporte de Cierre Z</h2>
+                        <p className="text-muted-foreground text-sm">Resumen del cuadre de caja.</p>
                     </div>
+
+                    <div className="space-y-4 mb-8 bg-muted/50 p-6 rounded-2xl border border-border/50">
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground font-medium">Total Ventas:</span>
+                            <strong className="text-lg">${summary.totalSales.toLocaleString()}</strong>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground font-medium">Esperado en Caja:</span>
+                            <strong className="text-lg">${summary.expected.toLocaleString()}</strong>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground font-medium">Monto Declarado:</span>
+                            <strong className="text-lg">${summary.declared.toLocaleString()}</strong>
+                        </div>
+                        
+                        <Separator className="my-2" />
+                        
+                        <div className={`flex justify-between items-center pt-2 ${
+                                summary.difference < 0 ? 'text-destructive' : 
+                                (summary.difference > 0 ? 'text-success' : 'text-foreground')
+                            }`}>
+                            <span className="font-semibold flex items-center gap-2">
+                                Diferencia (Descuadre):
+                            </span>
+                            <strong className="text-xl">${summary.difference.toLocaleString()}</strong>
+                        </div>
+                    </div>
+                    
+                    <Button 
+                        onClick={handleAcknowledge}
+                        className="w-full h-12 rounded-2xl text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"
+                    >
+                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                        Confirmar y Salir
+                    </Button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className={styles.modalOverlay}>
-            <div className={styles.modalContainer}>
-                <div className={styles.modalHeader}>
-                    <h2>Cerrar Turno Actual</h2>
-                    <p>Ingresa el dinero total en caja para realizar el arqueo.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-card w-full max-w-sm rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border">
+                <div className="flex flex-col items-center text-center space-y-2 mb-8">
+                    <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-2">
+                        <LogOut className="w-8 h-8 text-destructive" />
+                    </div>
+                    <h2 className="text-2xl font-bold tracking-tight">Cerrar Turno</h2>
+                    <p className="text-muted-foreground text-sm">
+                        Ingresa el dinero total en caja para realizar el arqueo.
+                    </p>
                 </div>
                 
-                <form onSubmit={handleCloseShift} className={styles.modalBody}>
-                    <div className={styles.inputGroup}>
-                        <label htmlFor="closeAmount">Monto Total ($)</label>
-                        <input
-                            id="closeAmount"
-                            type="number"
-                            min="0"
-                            step="100"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            placeholder="Ej. 150000"
-                            required
-                        />
+                <form onSubmit={handleCloseShift} className="space-y-6">
+                    <div className="space-y-2">
+                        <label htmlFor="closeAmount" className="text-sm font-semibold text-foreground ml-1">Monto Total en Caja ($)</label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                            <Input
+                                id="closeAmount"
+                                type="number"
+                                min="0"
+                                step="100"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder="Ej. 150000"
+                                required
+                                className="pl-8 h-12 text-lg rounded-2xl bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background transition-colors"
+                            />
+                        </div>
                     </div>
                     
-                    {error && <div className={styles.errorAlert}>{error}</div>}
+                    {error && (
+                        <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                            <p>{error}</p>
+                        </div>
+                    )}
                     
-                    <div style={{ display: "flex", gap: "1rem" }}>
-                        <button 
+                    <div className="flex gap-3">
+                        <Button 
                             type="button" 
-                            className={styles.cancelBtn}
+                            variant="outline"
                             onClick={onCancel}
                             disabled={loading}
+                            className="flex-1 h-12 rounded-2xl font-semibold"
                         >
                             Cancelar
-                        </button>
-                        <button 
+                        </Button>
+                        <Button 
                             type="submit" 
-                            className={styles.submitBtn}
+                            variant="destructive"
                             disabled={loading || !amount}
+                            className="flex-1 h-12 rounded-2xl font-semibold shadow-lg shadow-destructive/20 hover:-translate-y-0.5 transition-all"
                         >
                             {loading ? "Calculando..." : "Cerrar Turno"}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </div>

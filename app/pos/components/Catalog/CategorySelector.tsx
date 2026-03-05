@@ -1,5 +1,5 @@
 "use client";
-import styles from "./catalog.module.css";
+import { Badge } from "@/components/ui/badge";
 
 interface CategorySelectorProps {
     categories: any[];
@@ -13,21 +13,25 @@ export default function CategorySelector({
     onSelect 
 }: CategorySelectorProps) {
     return (
-        <div className={styles.categorySelector}>
-            <button 
-                className={`${styles.categoryBtn} ${activeCategoryId === 'all' ? styles.activeCategory : ""}`}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+            <Badge 
+                variant={activeCategoryId === 'all' ? "default" : "secondary"}
+                className={`cursor-pointer px-4 py-1.5 text-sm whitespace-nowrap transition-colors
+                           ${activeCategoryId !== 'all' && 'hover:bg-primary/20 hover:text-primary'}`}
                 onClick={() => onSelect('all')}
             >
                 🔥 Todo
-            </button>
+            </Badge>
             {categories.map((cat) => (
-                <button
+                <Badge
                     key={cat.id}
-                    className={`${styles.categoryBtn} ${activeCategoryId === cat.id ? styles.activeCategory : ""}`}
+                    variant={activeCategoryId === cat.id ? "default" : "secondary"}
+                    className={`cursor-pointer px-4 py-1.5 text-sm whitespace-nowrap transition-colors
+                               ${activeCategoryId !== cat.id && 'hover:bg-primary/20 hover:text-primary'}`}
                     onClick={() => onSelect(cat.id)}
                 >
                     {cat.name}
-                </button>
+                </Badge>
             ))}
         </div>
     );

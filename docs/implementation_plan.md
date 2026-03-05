@@ -7,7 +7,7 @@ El Stack técnico a utilizar será:
 - **Framework:** Next.js (App Router) actuando como Backend (Server Actions / API) y Frontend.
 - **Base de Datos:** PostgreSQL en **Neon**.
 - **ORM:** Prisma (recomendado por el soporte de tipado y migraciones).
-- **Estándar Visual:** **Vanilla CSS** con paletas de colores ricas y modernas (Dark mode, glassmorphism, micro-animaciones). **No se utilizará TailwindCSS** según las directrices estéticas.
+- **Estándar Visual:** **Tailwind CSS + Shadcn UI** para garantizar un diseño profesional, limpio y rápido tipo E-commerce, facilitando la creación de componentes premium (Dark mode, micro-animaciones).
 - **Despliegue:** Vercel.
 
 ## Proposed Changes

@@ -1,7 +1,4 @@
 import { getActiveShift } from "../actions/shift";
-import { redirect } from "next/navigation";
-import styles from "./pos.module.css";
-import ShiftOpeningModal from "./components/ShiftOpeningModal";
 import ShiftHeader from "./components/Shift/ShiftHeader";
 import ProductGrid from "./components/Catalog/ProductGrid";
 import CartDrawer from "./components/Catalog/CartDrawer";
@@ -10,30 +7,21 @@ export default async function POSPage() {
   const activeShift = await getActiveShift();
 
   return (
-    <div className={styles.posContainer}>
-      {!activeShift && <ShiftOpeningModal />}
-      
-      <header className={styles.header}>
+    <div className="flex flex-col h-screen bg-background">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-background/70 backdrop-blur-xl border-b shadow-sm">
         <ShiftHeader activeShift={activeShift} />
       </header>
 
-      <main className={styles.mainContent}>
-        {activeShift ? (
-          <div className={styles.posGrid}>
-            <section className={styles.catalogSection}>
-              <ProductGrid />
-            </section>
-            
-            <aside className={styles.cartSection}>
-              <CartDrawer />
-            </aside>
-          </div>
-        ) : (
-          <div className={styles.emptyState}>
-            <h2>No hay un turno abierto</h2>
-            <p>Debes abrir un turno para comenzar a vender.</p>
-          </div>
-        )}
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] h-full overflow-hidden">
+          <section className="h-full overflow-hidden relative pt-6 pl-6">
+            <ProductGrid />
+          </section>
+          
+          <aside className="h-full hidden lg:block overflow-hidden relative">
+            <CartDrawer activeShiftId={activeShift?.id} />
+          </aside>
+        </div>
       </main>
     </div>
   );
