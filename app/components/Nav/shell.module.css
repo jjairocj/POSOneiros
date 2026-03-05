@@ -1,0 +1,30 @@
+.shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    transition: padding 0.3s ease;
+}
+
+/* Mobile: Space for Bottom Nav */
+@media (max-width: 1023px) {
+    .main:not(.loginMode) {
+        padding-bottom: 64px;
+    }
+}
+
+/* Desktop: Space for Sidebar */
+@media (min-width: 1024px) {
+    .main:not(.loginMode) {
+        padding-left: 260px;
+    }
+}
+
+.loginMode {
+    padding: 0 !important;
+}

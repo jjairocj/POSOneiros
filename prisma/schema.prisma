@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  shifts    Shift[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // ADMIN, CASHIER, SUPERVISOR
+  permissions String[] 
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Branch {
+  id        String     @id @default(uuid())
+  name      String
+  address   String?
+  users     User[]
+  registers Register[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Register {
+  id        String   @id @default(uuid())
+  name      String   // e.g. "Caja Principal"
+  prefix    String?  // Facturation prefix
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  shifts    Shift[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Shift {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  registerId  String
+  register    Register  @relation(fields: [registerId], references: [id])
+  baseAmount  Float     @default(0)
+  closeAmount Float?    
+  status      String    @default("OPEN") // OPEN, CLOSED
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  sales       Sale[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  code        String      @unique
+  description String?
+  price       Float
+  cost        Float       @default(0)
+  stock       Float       @default(0)
+  categoryId  String?
+  category    Category?   @relation(fields: [categoryId], references: [id])
+  imageUrl    String?
+  saleDetails SaleDetail[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  documentId  String?  @unique
+  fullName    String
+  email       String?
+  phone       String?
+  sales       Sale[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Sale {
+  id            String        @id @default(uuid())
+  shiftId       String
+  shift         Shift         @relation(fields: [shiftId], references: [id])
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  total         Float
+  status        String        @default("COMPLETED") // COMPLETED, SUSPENDED, CANCELLED
+  details       SaleDetail[]
+  payments      Payment[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model SaleDetail {
+  id        String   @id @default(uuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Float
+  unitPrice Float
+  subtotal  Float
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id           String   @id @default(uuid())
+  saleId       String
+  sale         Sale     @relation(fields: [saleId], references: [id])
+  method       String   // CASH, CARD, TRANSFER
+  amount       Float
+  status       String   @default("PAID")
+  createdAt    DateTime @default(now())
+}
+
+model SystemConfig {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}

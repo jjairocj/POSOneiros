@@ -1,0 +1,132 @@
+.container {
+    display: flex;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--background);
+    padding: 1rem;
+}
+
+.card {
+    width: 100%;
+    max-width: 400px;
+    background-color: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 2.5rem;
+    box-shadow: var(--glass-shadow);
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
+.header p {
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+}
+
+.error {
+    background-color: color-mix(in srgb, var(--destructive) 10%, transparent);
+    color: var(--destructive);
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    border: 1px solid color-mix(in srgb, var(--destructive) 20%, transparent);
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.inputGroup label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--foreground);
+}
+
+.input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--input);
+    background-color: transparent;
+    color: var(--foreground);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
+}
+
+.input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.passwordWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.togglePassword {
+    position: absolute;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    padding: 0;
+}
+
+.togglePassword:hover {
+    color: var(--foreground);
+}
+
+.submitBtn {
+    margin-top: 0.5rem;
+    width: 100%;
+    padding: 0.875rem;
+    border-radius: var(--radius);
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 600;
+    font-size: 1rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.submitBtn:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.submitBtn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
