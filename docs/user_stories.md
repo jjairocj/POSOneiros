@@ -24,11 +24,11 @@ Como cajero, quiero abrir mi turno registrando la base inicial, para mantener la
 
 ### US1.3: Cierre de Turno y Arqueo (Z-Report)
 Como cajero, quiero cerrar mi turno y que el sistema genere un reporte de descuadre.
-- [ ] **Tarea 1.3.1: Algoritmo de Consolidación de Ventas.**
-  - [ ] Subtarea 1.3.1.1: Server Action para sumarizar Ventas en Efectivo, Tarjeta y Transferencia del Turno actual.
-- [ ] **Tarea 1.3.2: Flujo de Cierre de Caja.**
-  - [ ] Subtarea 1.3.2.1: UI para ingreso de denominaciones de cierre (Arqueo ciego opcional para evitar fraudes).
-  - [ ] Subtarea 1.3.2.2: Registrar evento en audit log y marcar turno como `CLOSED`.
+- [x] **Tarea 1.3.1: Algoritmo de Consolidación de Ventas.**
+  - [x] Subtarea 1.3.1.1: Server Action para sumarizar Ventas en Efectivo, Tarjeta y Transferencia del Turno actual.
+- [x] **Tarea 1.3.2: Flujo de Cierre de Caja.**
+  - [x] Subtarea 1.3.2.1: UI para ingreso de denominaciones de cierre (Arqueo ciego opcional para evitar fraudes).
+  - [x] Subtarea 1.3.2.2: Registrar evento en audit log y marcar turno como `CLOSED`.
 
 ---
 
