@@ -53,3 +53,53 @@ export async function getActiveShift() {
         },
     });
 }
+
+/**
+ * Server Action to close an active shift.
+ */
+export async function closeShift(shiftId: string, closeAmount: number) {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user) {
+        throw new Error("No autenticado");
+    }
+
+    const userId = (session.user as any).id;
+
+    const shift = await prisma.shift.findUnique({
+        where: { id: shiftId },
+        include: { sales: true }
+    });
+
+    if (!shift || shift.userId !== userId || shift.status !== "OPEN") {
+        throw new Error("Turno inválido o no activo");
+    }
+
+    // Calcular el total esperado (Base + Sumatoria de Ventas en efectivo)
+    // Asumiendo que las ventas en sales[] tienen un campo 'total' y que 
+    // todas las ventas actuales van al efectivo. (Filtros de Payment method 
+    // se agregarán en la Epic 3).
+    const totalSales = shift.sales.reduce((acc, sale) => acc + sale.total, 0);
+    const expectedAmount = shift.baseAmount + totalSales;
+    const difference = closeAmount - expectedAmount;
+
+    const closedShift = await prisma.shift.update({
+        where: { id: shiftId },
+        data: {
+            status: "CLOSED",
+            closeAmount,
+            endTime: new Date(),
+        },
+    });
+
+    revalidatePath("/pos");
+    return {
+        shift: closedShift,
+        summary: {
+            expected: expectedAmount,
+            declared: closeAmount,
+            difference,
+            totalSales,
+        }
+    };
+}

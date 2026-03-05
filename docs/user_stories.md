@@ -37,30 +37,30 @@ La interfaz principal (Front-office) debe ser extremadamente veloz, priorizando 
 
 ### US2.1: Catálogo de Productos Optimizado
 Como cajero, quiero ver el catálogo rápidamente y poder buscar productos sin latencia notable.
-- [ ] **Tarea 2.1.1: API y Caché de Catálogo.**
-  - [ ] Subtarea 2.1.1.1: Implementar Infinite Scrolling o Paginado en Server Actions para el inventario.
-  - [ ] Subtarea 2.1.1.2: Implementar capa de caché (React Query o SWR) para acceso veloz.
-- [ ] **Tarea 2.1.2: Interfaz Táctil (Grid & Swipe).**
-  - [ ] Subtarea 2.1.2.1: Componente `ProductCard` táctil (Imagen optimizada `next/image`, precio, badge de stock).
-  - [ ] Subtarea 2.1.2.2: Implementar barra de búsqueda con *Debounce* y lectura rápida de código de barras (HID input listener).
+- [x] **Tarea 2.1.1: API y Caché de Catálogo.**
+  - [x] Subtarea 2.1.1.1: Implementar Infinite Scrolling o Paginado en Server Actions para el inventario.
+  - [x] Subtarea 2.1.1.2: Implementar capa de caché (React Query o SWR) para acceso veloz.
+- [x] **Tarea 2.1.2: Interfaz Táctil (Grid & Swipe).**
+  - [x] Subtarea 2.1.2.1: Componente `ProductCard` táctil (Imagen optimizada `next/image`, precio, badge de stock).
+  - [x] Subtarea 2.1.2.2: Implementar barra de búsqueda con *Debounce* y lectura rápida de código de barras (HID input listener).
 
 ### US2.2: Gestión de Carrito (Panel Flotante/Lateral)
 Como cajero, quiero modificar el pedido del cliente ágilmente antes del pago.
-- [ ] **Tarea 2.2.1: Estado Global del Carrito (Zustand).**
-  - [ ] Subtarea 2.2.1.1: Acciones: `addItem`, `removeItem`, `updateQuantity`, `applyDiscount`.
-  - [ ] Subtarea 2.2.1.2: Cálculo reactivo de Subtotal, Impuestos (Multi-tasa) y Total.
-- [ ] **Tarea 2.2.2: UI del Carrito.**
-  - [ ] Subtarea 2.2.2.1: Diseño Drawer/Sidebar animado con CSS Transitions.
-  - [ ] Subtarea 2.2.2.2: Seleccionador de cliente (Búsqueda rápida o "Consumidor Final" default).
+- [x] **Tarea 2.2.1: Estado Global del Carrito (Zustand).**
+  - [x] Subtarea 2.2.1.1: Acciones: `addItem`, `removeItem`, `updateQuantity`, `applyDiscount`.
+  - [x] Subtarea 2.2.1.2: Cálculo reactivo de Subtotal, Impuestos (Multi-tasa) y Total.
+- [x] **Tarea 2.2.2: UI del Carrito.**
+  - [x] Subtarea 2.2.2.1: Diseño Drawer/Sidebar animado con CSS Transitions.
+  - [x] Subtarea 2.2.2.2: Seleccionador de cliente (Búsqueda rápida o "Consumidor Final" default).
 
 ### US2.3: Gestión de Múltiples Cuentas Simultáneas (Mesas/Pedidos Pendientes)
 Como cajero, quiero mantener varias órdenes abiertas al mismo tiempo para atender a diferentes clientes sin perder el progreso de cada una.
-- [ ] **Tarea 2.3.1: Persistencia de Órdenes Suspendidas.**
-  - [ ] Subtarea 2.3.1.1: Modificar `useCartStore` para soportar un array de `orders` con un `activeOrderId`.
-  - [ ] Subtarea 2.3.1.2: Implementar función "Suspender" o "Nueva Cuenta" que guarde el estado actual y limpie el grid.
-- [ ] **Tarea 2.3.2: UI de Navegación entre Cuentas.**
-  - [ ] Subtarea 2.3.2.1: Barra de "Cuentas Abiertas" con indicadores visuales (Ej: Mesa 1, Mesa 2, Cliente 1).
-  - [ ] Subtarea 2.3.2.2: Acceso rápido para alternar entre pedidos y añadir ítems a cualquiera de ellos.
+- [x] **Tarea 2.3.1: Persistencia de Órdenes Suspendidas.**
+  - [x] Subtarea 2.3.1.1: Modificar `useCartStore` para soportar un array de `orders` con un `activeOrderId`.
+  - [x] Subtarea 2.3.1.2: Implementar función "Suspender" o "Nueva Cuenta" que guarde el estado actual y limpie el grid.
+- [x] **Tarea 2.3.2: UI de Navegación entre Cuentas.**
+  - [x] Subtarea 2.3.2.1: Barra de "Cuentas Abiertas" con indicadores visuales (Ej: Mesa 1, Mesa 2, Cliente 1).
+  - [x] Subtarea 2.3.2.2: Acceso rápido para alternar entre pedidos y añadir ítems a cualquiera de ellos.
 
 ---
 
