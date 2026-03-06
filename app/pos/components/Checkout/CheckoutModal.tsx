@@ -2,8 +2,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Receipt, X, Banknote, CreditCard, ArrowRightLeft } from "lucide-react";
+import { Receipt as ReceiptIcon, X, Banknote, CreditCard, ArrowRightLeft, CheckCircle2, Printer } from "lucide-react";
 import { processSale } from "../../../actions/sale";
+import Receipt from "./Receipt";
 
 export default function CheckoutModal({
     activeShiftId,
@@ -23,6 +24,7 @@ export default function CheckoutModal({
     const [card, setCard] = useState("");
     const [transfer, setTransfer] = useState("");
     const [error, setError] = useState("");
+    const [completedSale, setCompletedSale] = useState<any>(null);
 
     const cashAmount = parseFloat(cash) || 0;
     const cardAmount = parseFloat(card) || 0;
@@ -64,11 +66,57 @@ export default function CheckoutModal({
                 payments.push({ method: "CASH", amount: amountToCover });
             }
 
-            await processSale(activeShiftId, items, payments);
-            onSuccess();
+            const sale = await processSale(activeShiftId, items, payments);
+            setCompletedSale(sale);
         } catch (err: any) {
             setError(err.message || "Error procesando el pago");
             setLoading(false);
+        }
+    };
+
+    const handlePrintTicket = () => {
+        const receiptNode = document.getElementById("print-receipt");
+        if (!receiptNode) return;
+        
+        const iframe = document.createElement("iframe");
+        iframe.style.display = "none";
+        document.body.appendChild(iframe);
+        
+        // Include common Tailwind styles from the main document
+        const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+            .map(node => node.outerHTML)
+            .join('');
+            
+        const content = receiptNode.cloneNode(true) as HTMLElement;
+        content.classList.remove("hidden");
+        content.classList.add("block");
+        
+        const doc = iframe.contentWindow?.document;
+        if (doc) {
+            doc.open();
+            doc.write(`
+                <html>
+                    <head>
+                        ${styles}
+                        <style>
+                            @page { margin: 0; }
+                            body { margin: 0; padding: 0; background: white; }
+                        </style>
+                    </head>
+                    <body>
+                        ${content.outerHTML}
+                    </body>
+                </html>
+            `);
+            doc.close();
+            
+            iframe.contentWindow?.focus();
+            setTimeout(() => {
+                iframe.contentWindow?.print();
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 1000);
+            }, 500);
         }
     };
 
@@ -76,110 +124,147 @@ export default function CheckoutModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-card w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-border flex flex-col max-h-[90vh]">
                 
-                <div className="bg-primary/5 p-6 border-b border-border/50 relative flex flex-col items-center">
-                    <button 
-                        onClick={onCancel} 
-                        className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors bg-background hover:bg-muted p-2 rounded-full shadow-sm border border-border"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                    <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                        <Receipt className="w-7 h-7 text-primary" />
+                {completedSale ? (
+                    <div className="p-8 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center animate-bounce">
+                            <CheckCircle2 className="w-12 h-12 text-green-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-black text-foreground mb-2">¡Venta Exitosa!</h2>
+                            <p className="text-muted-foreground">
+                                El cambio a entregar es: <strong className="text-xl text-primary block mt-1">${change.toLocaleString()}</strong>
+                            </p>
+                        </div>
+                        
+                        <div className="flex w-full gap-4 mt-8 pt-6 border-t border-border">
+                            <Button 
+                                variant="outline"
+                                className="flex-1 h-14 rounded-2xl text-base font-bold"
+                                onClick={onSuccess}
+                            >
+                                Cerrar
+                            </Button>
+                            <Button 
+                                className="flex-1 h-14 rounded-2xl text-base font-bold shadow-lg"
+                                onClick={handlePrintTicket}
+                            >
+                                <Printer className="w-5 h-5 mr-2" />
+                                Imprimir Ticket
+                            </Button>
+                        </div>
+
+                        {/* Hidden thermal ticket for printing window */}
+                        <Receipt sale={completedSale} />
+
                     </div>
-                    <h2 className="text-2xl font-black tracking-tight">Checkout</h2>
-                    <p className="text-muted-foreground text-sm font-medium mt-1">
-                        Total a cobrar: <span className="text-foreground text-xl font-bold ml-1">${orderTotal.toLocaleString()}</span>
-                    </p>
-                </div>
-
-                <div className="p-6 overflow-y-auto space-y-5">
-                    {/* Payment Methods */}
-                    <div className="space-y-4">
-                        <div className="bg-accent/30 p-4 rounded-3xl border border-border">
-                            <label className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
-                                <Banknote className="w-5 h-5 text-green-600 dark:text-green-500" />
-                                Efectivo
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                                <Input 
-                                    type="number" 
-                                    value={cash} 
-                                    onChange={(e) => setCash(e.target.value)}
-                                    placeholder="0"
-                                    className="pl-8 h-12 text-lg rounded-2xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
-                                />
+                ) : (
+                    <>
+                        {/* Original Checkout View */}
+                        <div className="bg-primary/5 p-6 border-b border-border/50 relative flex flex-col items-center">
+                            <button 
+                                onClick={onCancel} 
+                                className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors bg-background hover:bg-muted p-2 rounded-full shadow-sm border border-border"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                            <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-3">
+                                <ReceiptIcon className="w-7 h-7 text-primary" />
                             </div>
+                            <h2 className="text-2xl font-black tracking-tight">Checkout</h2>
+                            <p className="text-muted-foreground text-sm font-medium mt-1">
+                                Total a cobrar: <span className="text-foreground text-xl font-bold ml-1">${orderTotal.toLocaleString()}</span>
+                            </p>
                         </div>
 
-                        <div className="bg-accent/30 p-4 rounded-3xl border border-border">
-                            <label className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
-                                <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-500" />
-                                Tarjeta / Datáfono
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                                <Input 
-                                    type="number" 
-                                    value={card} 
-                                    onChange={(e) => setCard(e.target.value)}
-                                    placeholder="0"
-                                    className="pl-8 h-12 text-lg rounded-2xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
-                                />
+                        <div className="p-6 overflow-y-auto space-y-5">
+                            {/* Payment Methods */}
+                            <div className="space-y-4">
+                                <div className="bg-accent/30 p-4 rounded-3xl border border-border">
+                                    <label className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
+                                        <Banknote className="w-5 h-5 text-green-600 dark:text-green-500" />
+                                        Efectivo
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                                        <Input 
+                                            type="number" 
+                                            value={cash} 
+                                            onChange={(e) => setCash(e.target.value)}
+                                            placeholder="0"
+                                            className="pl-8 h-12 text-lg rounded-2xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="bg-accent/30 p-4 rounded-3xl border border-border">
+                                    <label className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
+                                        <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+                                        Tarjeta / Datáfono
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                                        <Input 
+                                            type="number" 
+                                            value={card} 
+                                            onChange={(e) => setCard(e.target.value)}
+                                            placeholder="0"
+                                            className="pl-8 h-12 text-lg rounded-2xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="bg-accent/30 p-4 rounded-3xl border border-border">
+                                    <label className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
+                                        <ArrowRightLeft className="w-5 h-5 text-purple-600 dark:text-purple-500" />
+                                        Transferencia (Nequi/Daviplata/Bancolombia)
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                                        <Input 
+                                            type="number" 
+                                            value={transfer} 
+                                            onChange={(e) => setTransfer(e.target.value)}
+                                            placeholder="0"
+                                            className="pl-8 h-12 text-lg rounded-2xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
+                                        />
+                                    </div>
+                                </div>
                             </div>
+
+                            {error && (
+                                <div className="text-sm text-destructive font-medium bg-destructive/10 p-3 rounded-xl border border-destructive/20 text-center">
+                                    {error}
+                                </div>
+                            )}
                         </div>
 
-                        <div className="bg-accent/30 p-4 rounded-3xl border border-border">
-                            <label className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
-                                <ArrowRightLeft className="w-5 h-5 text-purple-600 dark:text-purple-500" />
-                                Transferencia (Nequi/Daviplata/Bancolombia)
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                                <Input 
-                                    type="number" 
-                                    value={transfer} 
-                                    onChange={(e) => setTransfer(e.target.value)}
-                                    placeholder="0"
-                                    className="pl-8 h-12 text-lg rounded-2xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
-                                />
+                        {/* Footer Totals */}
+                        <div className="p-6 bg-muted/30 border-t border-border mt-auto">
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
+                                    <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Restante</span>
+                                    <span className={`text-xl font-black ${remaining > 0 ? 'text-destructive' : 'text-success'}`}>
+                                        ${remaining.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
+                                    <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Vuelto / Cambio</span>
+                                    <span className="text-xl font-black text-primary">
+                                        ${change.toLocaleString()}
+                                    </span>
+                                </div>
                             </div>
+                            
+                            <Button 
+                                onClick={handleCheckout} 
+                                disabled={loading || !canSubmit}
+                                className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all"
+                            >
+                                {loading ? "PROCESANDO..." : "FINALIZAR VENTA"}
+                            </Button>
                         </div>
-                    </div>
-
-                    {error && (
-                        <div className="text-sm text-destructive font-medium bg-destructive/10 p-3 rounded-xl border border-destructive/20 text-center">
-                            {error}
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer Totals */}
-                <div className="p-6 bg-muted/30 border-t border-border mt-auto">
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
-                            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Restante</span>
-                            <span className={`text-xl font-black ${remaining > 0 ? 'text-destructive' : 'text-success'}`}>
-                                ${remaining.toLocaleString()}
-                            </span>
-                        </div>
-                        <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
-                            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Vuelto / Cambio</span>
-                            <span className="text-xl font-black text-primary">
-                                ${change.toLocaleString()}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <Button 
-                        onClick={handleCheckout} 
-                        disabled={loading || !canSubmit}
-                        className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all"
-                    >
-                        {loading ? "PROCESANDO..." : "FINALIZAR VENTA"}
-                    </Button>
-                </div>
-
+                    </>
+                )}
             </div>
         </div>
     );

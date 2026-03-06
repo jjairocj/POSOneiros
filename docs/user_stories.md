@@ -61,8 +61,8 @@ Como cajero, quiero mantener varias órdenes abiertas al mismo tiempo para atend
 - [x] **Tarea 2.3.2: UI de Navegación entre Cuentas.**
   - [x] Subtarea 2.3.2.1: Barra de "Cuentas Abiertas" con indicadores visuales (Ej: Mesa 1, Mesa 2, Cliente 1).
   - [x] Subtarea 2.3.2.2: Acceso rápido para alternar entre pedidos y añadir ítems a cualquiera de ellos.
-- [ ] **Tarea 2.3.3: Navegación del Cajero sin Turno Activo.**
-  - [ ] Subtarea 2.3.3.1: Permitir al cajero navegar por el TPV, catálogos y armar órdenes sin estar bloqueado por el modal de apertura de turno. El bloqueo estricto de turno activo solo debe aplicar al intentar **Procesar Pago**.
+- [x] **Tarea 2.3.3: Navegación del Cajero sin Turno Activo.**
+  - [x] Subtarea 2.3.3.1: Permitir al cajero navegar por el TPV, catálogos y armar órdenes sin estar bloqueado por el modal de apertura de turno. El bloqueo estricto de turno activo solo debe aplicar al intentar **Procesar Pago**.
 
 ---
 
@@ -71,20 +71,20 @@ Garantizar la integridad de los datos financieros al momento de concretar la ord
 
 ### US3.1: Checkout Flexibles y Multi-Método
 Como cajero, quiero procesar pagos combinados (Ej: Mitad efectivo, mitad transferencia) de forma segura, siempre y cuando tenga un turno de caja abierto.
-- [ ] **Tarea 3.1.1: Validación de Turno y Seguridad.**
-  - [ ] Subtarea 3.1.1.1: Validar (cliente y servidor) que exista un turno `OPEN` asignado antes de permitir abrir el modal de pagos o ejecutar la venta.
-- [ ] **Tarea 3.1.2: UI de Pagos.**
-  - [ ] Subtarea 3.1.2.1: Modal de confirmación de pago con calculador de cambio (Efectivo).
-  - [ ] Subtarea 3.1.2.2: Soporte explícito e interfaz para añadir múltiples métodos de pago a una misma transacción: **Efectivo**, **Pagos con Tarjetas (Datafono)**, y **Transferencias**.
-- [ ] **Tarea 3.1.2: Transacción de Base de Datos (ACID).**
-  - [ ] Subtarea 3.1.2.1: Escribir Server Action `processSale` usando Prisma Transactions.
-  - [ ] Subtarea 3.1.2.2: Si hay error (ej. falta de stock de último minuto), hacer *rollback* completo y notificar a UI.
+- [x] **Tarea 3.1.1: Validación de Turno y Seguridad.**
+  - [x] Subtarea 3.1.1.1: Validar (cliente y servidor) que exista un turno `OPEN` asignado antes de permitir abrir el modal de pagos o ejecutar la venta.
+- [x] **Tarea 3.1.2: UI de Pagos.**
+  - [x] Subtarea 3.1.2.1: Modal de confirmación de pago con calculador de cambio (Efectivo).
+  - [x] Subtarea 3.1.2.2: Soporte explícito e interfaz para añadir múltiples métodos de pago a una misma transacción: **Efectivo**, **Pagos con Tarjetas (Datafono)**, y **Transferencias**.
+- [x] **Tarea 3.1.3: Transacción de Base de Datos (ACID).**
+  - [x] Subtarea 3.1.3.1: Escribir Server Action `processSale` usando Prisma Transactions.
+  - [x] Subtarea 3.1.3.2: Si hay error (ej. falta de stock de último minuto), hacer *rollback* completo y notificar a UI.
 
 ### US3.2: Generación y Entrega de Comprobante
 Como cliente, quiero mi comprobante de compra digital o físico.
-- [ ] **Tarea 3.2.1: Generación de Ticket.**
-  - [ ] Subtarea 3.2.1.1: Diseñar plantilla HTML/CSS para ticket (80mm/58mm standard ESC/POS friendly).
-  - [ ] Subtarea 3.2.1.2: Lógica para disparar `window.print()` oculto u ofrecer descarga de PDF.
+- [x] **Tarea 3.2.1: Generación de Ticket.**
+  - [x] Subtarea 3.2.1.1: Diseñar plantilla HTML/CSS para ticket (80mm/58mm standard ESC/POS friendly).
+  - [x] Subtarea 3.2.1.2: Lógica para disparar `window.print()` oculto u ofrecer descarga de PDF.
 
 ---
 

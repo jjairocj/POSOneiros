@@ -9,6 +9,7 @@ import { LogIn, X } from "lucide-react";
 export default function ShiftOpeningModal({ onClose }: { onClose?: () => void }) {
   const [baseAmount, setBaseAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // In a real app, we'd fetch registers for the branch. 
   // For now, we use the one created in seed.
@@ -20,9 +21,9 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
     try {
       await openShift(amount, registerId);
       if (onClose) onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Error al abrir turno");
+      setError(err?.message || "Error al abrir turno");
     } finally {
       setLoading(false);
     }
@@ -63,6 +64,12 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
                 />
             </div>
           </div>
+
+          {error && (
+            <div className="text-sm text-destructive font-medium bg-destructive/10 p-3 rounded-xl border border-destructive/20 text-center">
+              {error}
+            </div>
+          )}
 
           <Button 
             onClick={handleOpenShift} 

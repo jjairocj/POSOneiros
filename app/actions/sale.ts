@@ -72,6 +72,14 @@ export async function processSale(
                         amount: p.amount
                     }))
                 }
+            },
+            include: {
+                details: {
+                    include: {
+                        product: true
+                    }
+                },
+                payments: true
             }
         });
 

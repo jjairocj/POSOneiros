@@ -69,6 +69,7 @@ model Shift {
 model Category {
   id        String    @id @default(uuid())
   name      String
+  sortOrder Int       @default(0) // New: For POS custom ordering left-to-right
   products  Product[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -87,7 +88,8 @@ model Product {
   taxImpoConsumo Float    @default(0) // Percentage (e.g., 0, 8)
   categoryId  String?
   category    Category?   @relation(fields: [categoryId], references: [id])
-  imageUrl    String?
+  imageUrl    String?     // Already existed
+  isFavorite  Boolean     @default(false) // New: For "Favorites" POS default view
   saleDetails SaleDetail[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
