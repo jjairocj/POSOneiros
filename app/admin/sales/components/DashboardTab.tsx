@@ -49,7 +49,7 @@ export function DashboardTab({ data }: { data: DashboardData }) {
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Traffic Light KPI */}
-                <div className={`p-6 rounded-3xl border flex flex-col justify-between ${getTrafficLightClass(data.trafficLight.status)}`}>
+                <div className={`p-6 rounded-3xl border flex flex-col justify-between min-h-[160px] ${getTrafficLightClass(data.trafficLight.status)}`}>
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="font-semibold opacity-80 text-sm">Salud de Ventas (Semáforo)</p>
@@ -59,14 +59,14 @@ export function DashboardTab({ data }: { data: DashboardData }) {
                                  data.trafficLight.status === 'red' ? 'Bajo' : 'Sin Datos'}
                             </h3>
                         </div>
-                        <Activity className="w-6 h-6" />
+                        <Activity className="w-6 h-6 shrink-0" />
                     </div>
-                    <div className="mt-4 text-xs font-semibold">
+                    <div className="mt-4 text-xs font-semibold pt-4">
                         Promedio Histórico: {formatCurrency(data.trafficLight.historicalAverage)}/día
                     </div>
                 </div>
 
-                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm flex flex-col justify-between">
+                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm flex flex-col justify-between min-h-[160px]">
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-muted-foreground font-semibold text-sm">Ingresos Totales</p>
@@ -74,15 +74,15 @@ export function DashboardTab({ data }: { data: DashboardData }) {
                                 {formatCurrency(data.kpis.totalRevenue)}
                             </h3>
                         </div>
-                        <div className="p-2 bg-primary/10 rounded-xl text-primary"><DollarSign className="w-5 h-5" /></div>
+                        <div className="p-2 bg-primary/10 rounded-xl text-primary shrink-0"><DollarSign className="w-5 h-5" /></div>
                     </div>
-                    <div className="mt-4 text-xs text-muted-foreground font-semibold">
+                    <div className="mt-4 text-xs text-muted-foreground font-semibold pt-4">
                         {data.kpis.totalSalesCount} transacciones en el periodo
                     </div>
                 </div>
                 
                 {/* Payment Methods Breakdown */}
-                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm col-span-1 lg:col-span-2">
+                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm col-span-1 lg:col-span-2 flex flex-col justify-center min-h-[160px]">
                     <div className="flex justify-between items-center mb-4">
                         <p className="text-muted-foreground font-semibold text-sm">Desglose de Ingresos</p>
                     </div>
@@ -111,10 +111,10 @@ export function DashboardTab({ data }: { data: DashboardData }) {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Trend Chart */}
-                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm lg:col-span-2">
+                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm lg:col-span-2 relative">
                     <h3 className="font-bold text-lg mb-6 tracking-tight">Tendencia de Ingresos</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="w-full relative min-h-[300px]" style={{ height: "300px" }}>
+                        <ResponsiveContainer width="99%" minWidth={1} minHeight={1}>
                             <AreaChart data={data.charts.trendingSales} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
@@ -142,11 +142,11 @@ export function DashboardTab({ data }: { data: DashboardData }) {
                 </div>
 
                 {/* Category Breakdown */}
-                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm">
+                <div className="bg-card p-6 rounded-3xl border border-border shadow-sm relative">
                     <h3 className="font-bold text-lg mb-6 tracking-tight">Ventas por Categoría</h3>
-                    <div className="h-[300px] w-full flex flex-col items-center justify-center">
+                    <div className="w-full relative min-h-[300px]" style={{ height: "300px" }}>
                         {data.charts.categorySales.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="99%" minWidth={1} minHeight={1}>
                                 <PieChart>
                                     <Pie
                                         data={data.charts.categorySales}

@@ -154,7 +154,9 @@ export default function CheckoutModal({
                         </div>
 
                         {/* Hidden thermal ticket for printing window */}
-                        <Receipt sale={completedSale} />
+                        <div className="hidden">
+                            <Receipt sale={completedSale} />
+                        </div>
 
                     </div>
                 ) : (

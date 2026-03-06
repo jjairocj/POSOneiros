@@ -194,3 +194,35 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
         return [];
     }
 }
+
+export async function getSaleForPrint(saleId: string) {
+    try {
+        const sale = await prisma.sale.findUnique({
+            where: { id: saleId },
+            include: {
+                details: {
+                    include: { product: true }
+                },
+                payments: true
+            }
+        });
+
+        if (!sale) return { success: false, error: "Factura no encontrada" };
+
+        return {
+            success: true,
+            sale: {
+                ...sale,
+                createdAt: sale.createdAt.toISOString(),
+                updatedAt: sale.updatedAt.toISOString(),
+                details: sale.details.map(d => ({
+                    ...d,
+                    createdAt: d.createdAt.toISOString()
+                }))
+            }
+        };
+    } catch (err: any) {
+        console.error(err);
+        return { success: false, error: err.message };
+    }
+}

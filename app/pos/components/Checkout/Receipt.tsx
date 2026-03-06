@@ -5,7 +5,7 @@ export default function Receipt({ sale }: { sale: any }) {
     if (!sale) return null;
 
     return (
-        <div id="print-receipt" className="hidden text-black bg-white w-[80mm] p-4 text-sm font-mono mx-auto">
+        <div id="print-receipt" className="text-black bg-white w-[80mm] p-4 text-sm font-mono mx-auto">
             {/* Header */}
             <div className="text-center mb-4">
                 <h1 className="text-xl font-bold uppercase mb-1">Oneiros POS</h1>

@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Printer, Maximize2, ReceiptText } from "lucide-react";
+import Receipt from "@/app/pos/components/Checkout/Receipt";
+import { getSaleForPrint } from "@/app/actions/report";
 
 interface HistoryData {
     id: string;
@@ -36,19 +38,67 @@ interface HistoryData {
 
 export function HistoryTab({ data }: { data: HistoryData[] }) {
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [printingSale, setPrintingSale] = useState<any>(null);
+    const [isPrinting, setIsPrinting] = useState(false);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount);
     };
 
     const handleReprint = async (saleId: string) => {
-        // En un futuro, este Server Action regeneraría el HTML térmico 
-        // basado en la venta histórica. Para el MVP simularemos generar un ticket.
-        const mockTicketUrl = `/api/ticket/${saleId}`; 
-        
-        // As a quick UX feature, we trigger the print modal.
-        // In a real scenario we might fetch the raw HTML.
-        alert(`Impresión de ticket ${saleId} simulada por ahora.`);
+        if (isPrinting) return;
+        setIsPrinting(true);
+        try {
+            const res = await getSaleForPrint(saleId);
+            if (res.success && res.sale) {
+                setPrintingSale(res.sale);
+                // Wait for state update to render hidden receipt
+                setTimeout(() => {
+                    const receiptNode = document.getElementById("print-receipt");
+                    if (!receiptNode) {
+                        setIsPrinting(false);
+                        return;
+                    }
+                    
+                    const iframe = document.createElement("iframe");
+                    iframe.style.display = "none";
+                    document.body.appendChild(iframe);
+                    
+                    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+                        .map(node => node.outerHTML)
+                        .join('');
+                        
+                    const doc = iframe.contentWindow?.document;
+                    if (doc) {
+                        doc.open();
+                        doc.write(`
+                            <html>
+                                <head>${styles}</head>
+                                <body style="margin:0;">${receiptNode.outerHTML}</body>
+                            </html>
+                        `);
+                        doc.close();
+                        
+                        iframe.onload = () => {
+                            iframe.contentWindow?.focus();
+                            iframe.contentWindow?.print();
+                            // Cleanup
+                            setTimeout(() => {
+                                document.body.removeChild(iframe);
+                                setPrintingSale(null);
+                                setIsPrinting(false);
+                            }, 1000);
+                        };
+                    }
+                }, 100);
+            } else {
+                alert("Error: " + res.error);
+                setIsPrinting(false);
+            }
+        } catch (error) {
+            console.error(error);
+            setIsPrinting(false);
+        }
     };
 
     const columns: ColumnDef<HistoryData>[] = [
@@ -274,6 +324,10 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                 </div>
             </div>
             
+            {/* Hidden Receipt for Printing */}
+            <div className="hidden">
+                {printingSale && <Receipt sale={printingSale} />}
+            </div>
         </div>
     );
 }
