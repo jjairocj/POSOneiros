@@ -66,7 +66,42 @@ export function DataTable<TData, TValue>({
         />
         {/* Placeholder for future Category filters or advanced filters */}
       </div>
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      {/* Mobile Card View */}
+      <div className="grid grid-cols-1 gap-4 md:hidden">
+        {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <div key={row.id} className="bg-card/80 backdrop-blur-sm border border-border rounded-3xl p-5 shadow-sm space-y-3 flex flex-col">
+                {row.getVisibleCells().map((cell) => {
+                  const isAction = cell.column.id === "actions";
+                  // Get header as string if possible
+                  const headerName = typeof cell.column.columnDef.header === 'string' 
+                    ? cell.column.columnDef.header 
+                    : cell.column.id.charAt(0).toUpperCase() + cell.column.id.slice(1);
+                  
+                  return (
+                    <div key={cell.id} className={`flex ${isAction ? 'justify-end mt-2 pt-3 border-t border-border/50' : 'justify-between items-center gap-4'}`}>
+                      {!isAction && (
+                        <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                          {headerName}
+                        </span>
+                      )}
+                      <div className={`text-sm ${!isAction ? 'font-bold text-right' : ''}`}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+        ) : (
+            <div className="bg-card border rounded-2xl p-8 text-center text-muted-foreground">
+                No se encontraron datos.
+            </div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -104,7 +139,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-40 text-center text-muted-foreground">
-                  No se encontraron productos. Añade uno nuevo o ajusta los filtros.
+                  No se encontraron productos o categorías. Añade uno nuevo o ajusta los filtros.
                 </TableCell>
               </TableRow>
             )}
