@@ -10,7 +10,7 @@ import { Loader2 } from "lucide-react";
 export default function ProductGrid() {
     const [products, setProducts] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
-    const [activeCategoryId, setActiveCategoryId] = useState('all');
+    const [activeCategoryId, setActiveCategoryId] = useState('favorites');
     const [isPending, startTransition] = useTransition();
     const [initialized, setInitialized] = useState(false);
 
@@ -19,7 +19,7 @@ export default function ProductGrid() {
             try {
                 // Ensure we handle potential errors in server actions
                 const [p, c] = await Promise.all([
-                    getProducts().catch(() => []),
+                    getProducts('favorites').catch(() => []),
                     getCategories().catch(() => [])
                 ]);
                 setProducts(p || []);

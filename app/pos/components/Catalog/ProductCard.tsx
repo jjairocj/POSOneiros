@@ -2,6 +2,9 @@
 import { useCartStore } from "@/app/store/useCartStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Star } from "lucide-react";
+import { toggleProductFavorite } from "@/app/actions/product";
+import { useState, useTransition } from "react";
 
 interface ProductCardProps {
     product: any;
@@ -9,13 +12,29 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
     const addItem = useCartStore((state) => state.addItem);
+    const [isFavorite, setIsFavorite] = useState(product.isFavorite || false);
+    const [isPending, startTransition] = useTransition();
+
+    const handleToggleFavorite = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newState = !isFavorite;
+        setIsFavorite(newState);
+        startTransition(async () => {
+            try {
+                await toggleProductFavorite(product.id, newState);
+            } catch (error) {
+                console.error("Error toggling favorite:", error);
+                setIsFavorite(!newState); // revert on error
+            }
+        });
+    };
 
     return (
         <Card 
             className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
             onClick={() => addItem(product)}
         >
-            <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
+            <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden relative">
                 {product.imageUrl ? (
                     <img 
                         src={product.imageUrl} 
@@ -25,8 +44,24 @@ export default function ProductCard({ product }: ProductCardProps) {
                 ) : (
                     <span className="text-4xl opacity-20">📦</span>
                 )}
+                
+                {/* Favorite Toggle Button */}
+                <button 
+                    onClick={handleToggleFavorite}
+                    disabled={isPending}
+                    className="absolute top-2 left-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm border shadow-sm hover:scale-110 active:scale-95 transition-all z-10"
+                >
+                    <Star 
+                        className={`w-5 h-5 transition-colors ${
+                            isFavorite 
+                                ? "fill-yellow-400 text-yellow-500" 
+                                : "text-muted-foreground hover:text-foreground"
+                        }`} 
+                    />
+                </button>
+
                 {product.stock <= 5 && (
-                    <Badge variant="destructive" className="absolute top-2 right-2 shadow-sm">
+                    <Badge variant="destructive" className="absolute top-2 right-2 shadow-sm z-10">
                         ¡Poco Stock!
                     </Badge>
                 )}

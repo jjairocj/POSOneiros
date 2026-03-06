@@ -7,7 +7,8 @@ export async function getProducts(categoryId?: string, search?: string) {
         const products = await prisma.product.findMany({
             where: {
                 AND: [
-                    categoryId && categoryId !== 'all' ? { categoryId } : {},
+                    categoryId && categoryId !== 'favorites' ? { categoryId } : {},
+                    categoryId === 'favorites' ? { isFavorite: true } : {},
                     search ? {
                         OR: [
                             { name: { contains: search, mode: 'insensitive' } },
@@ -125,5 +126,20 @@ export async function deleteProduct(id: string) {
     } catch (error: any) {
         console.error("Error deleting product:", error);
         return { success: false, error: "No se puede eliminar un producto con ventas asociadas." };
+    }
+}
+
+export async function toggleProductFavorite(id: string, isFavorite: boolean) {
+    try {
+        await prisma.product.update({
+            where: { id },
+            data: { isFavorite }
+        });
+        revalidatePath("/admin/inventory");
+        revalidatePath("/pos");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error toggling favorite:", error);
+        return { success: false, error: error.message };
     }
 }

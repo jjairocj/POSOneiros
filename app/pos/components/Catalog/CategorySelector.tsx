@@ -15,12 +15,12 @@ export default function CategorySelector({
     return (
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
             <Badge 
-                variant={activeCategoryId === 'all' ? "default" : "secondary"}
+                variant={activeCategoryId === 'favorites' ? "default" : "secondary"}
                 className={`cursor-pointer px-4 py-1.5 text-sm whitespace-nowrap transition-colors
-                           ${activeCategoryId !== 'all' && 'hover:bg-primary/20 hover:text-primary'}`}
-                onClick={() => onSelect('all')}
+                           ${activeCategoryId !== 'favorites' && 'hover:bg-primary/20 hover:text-primary'}`}
+                onClick={() => onSelect('favorites')}
             >
-                🔥 Todo
+                ⭐ Favoritos
             </Badge>
             {categories.map((cat) => (
                 <Badge

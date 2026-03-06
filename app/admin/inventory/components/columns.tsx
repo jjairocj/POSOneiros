@@ -24,6 +24,8 @@ export type ProductColumn = {
   taxIva?: number | null;
   taxIca?: number | null;
   taxImpoConsumo?: number | null;
+  imageUrl?: string | null;
+  isFavorite?: boolean;
 };
 
 export const columns: ColumnDef<ProductColumn>[] = [

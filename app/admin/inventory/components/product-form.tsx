@@ -12,8 +12,9 @@ import {
   DialogTrigger,
   DialogDescription
 } from "@/components/ui/dialog";
-import { PackagePlus, Save, Loader2 } from "lucide-react";
+import { PackagePlus, Save, Loader2, Star, Image as ImageIcon } from "lucide-react";
 import { ProductColumn } from "./columns";
+import { Switch } from "@/components/ui/switch";
 
 interface ProductFormProps {
     product?: ProductColumn;
@@ -107,6 +108,37 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     className="rounded-xl h-12 bg-muted/50" 
                                     placeholder="Ej: Chocoramo"
                                 />
+                            </div>
+                        </div>
+
+                        {/* Image URL and Favorite */}
+                        <div className="grid grid-cols-[1fr_auto] gap-4 items-end">
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold ml-1 flex items-center gap-1.5">
+                                    <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                                    URL de la Imagen (Opcional - Cacheada en POS)
+                                </label>
+                                <Input 
+                                    name="imageUrl" 
+                                    defaultValue={product?.imageUrl || ""} 
+                                    className="rounded-xl h-12 bg-muted/50" 
+                                    placeholder="https://ejemplo.com/imagen.jpg"
+                                />
+                            </div>
+                            <div className="flex items-center space-x-2 h-12 px-4 rounded-xl border bg-card">
+                                <Switch 
+                                    id="isFavorite" 
+                                    name="isFavorite" 
+                                    value="true"
+                                    defaultChecked={product?.isFavorite} 
+                                />
+                                <label
+                                    htmlFor="isFavorite"
+                                    className="text-sm font-semibold cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                    Favorito POS
+                                </label>
                             </div>
                         </div>
 
