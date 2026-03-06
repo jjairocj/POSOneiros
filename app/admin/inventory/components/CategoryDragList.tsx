@@ -134,30 +134,32 @@ export function CategoryDragList({ initialCategories }: CategoryDragListProps) {
     const { active, over } = event;
 
     if (active.id !== over?.id) {
-      setCategories((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over?.id);
+      const oldIndex = categories.findIndex((item) => item.id === active.id);
+      const newIndex = categories.findIndex((item) => item.id === over?.id);
 
-        const newItems = arrayMove(items, oldIndex, newIndex);
+      const newItems = arrayMove(categories, oldIndex, newIndex);
         
-        // Compute new order payload
-        const updates = newItems.map((item, index) => ({
-          id: item.id,
-          sortOrder: index, // New order matches array index
-        }));
+      // Optimistically update sortOrder in UI state
+      const optimisticItems = newItems.map((item, index) => ({ ...item, sortOrder: index }));
+      setCategories(optimisticItems);
 
-        // Optimize visual state immediately, then send to DB
-        startTransition(async () => {
-           try {
-               await updateCategoryOrders(updates);
-           } catch (e) {
-               console.error("Failed to update orders");
-               setCategories(items); // revert on failure
-           }
-        });
+      // Compute new order payload
+      const updates = newItems.map((item, index) => ({
+        id: item.id,
+        sortOrder: index, // New order matches array index
+      }));
 
-        // Optimistically update sortOrder in UI state for children
-        return newItems.map((item, index) => ({ ...item, sortOrder: index }));
+      // Fire side effect and DB update outside of setState
+      startTransition(async () => {
+         try {
+             const result = await updateCategoryOrders(updates);
+             if (!result.success) {
+                 throw new Error(result.error);
+             }
+         } catch (e) {
+             console.error("Failed to update orders");
+             setCategories(categories); // revert on failure
+         }
       });
     }
   };
