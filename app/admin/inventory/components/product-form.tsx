@@ -69,7 +69,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                 )}
             </DialogTrigger>
             
-            <DialogContent className="sm:max-w-[500px] rounded-[2rem] p-6 bg-card border-border shadow-2xl">
+            <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto rounded-[2rem] p-4 sm:p-6 bg-card border-border shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Producto" : "Nuevo Producto"}
@@ -88,7 +88,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
 
                     <div className="space-y-6">
                         {/* Basic Info */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1">Código / SKU</label>
                                 <Input 
@@ -112,7 +112,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </div>
 
                         {/* Image URL and Favorite */}
-                        <div className="grid grid-cols-[1fr_auto] gap-4 items-end">
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 sm:items-end">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1 flex items-center gap-1.5">
                                     <ImageIcon className="w-4 h-4 text-muted-foreground" />
@@ -147,7 +147,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                             <div className="flex items-center justify-between mb-2">
                                 <h3 className="font-bold text-primary">Calculadora de Precios</h3>
                             </div>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold ml-1">Costo Base ($)</label>
                                     <Input 
@@ -184,7 +184,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-4 pt-2 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 text-sm">
                                 <div className="bg-background p-3 rounded-xl border border-border flex justify-between items-center">
                                     <span className="text-muted-foreground">Precio Sugerido:</span>
                                     <span className="font-mono font-bold text-lg">${suggestedPrice.toFixed(0)}</span>
@@ -200,7 +200,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </div>
 
                         {/* Stock and Taxes */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1">Inventario Inicial</label>
                                 <Input 

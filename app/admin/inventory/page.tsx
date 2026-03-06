@@ -7,6 +7,7 @@ import { DataTable } from './components/data-table';
 import { PackageOpen, FolderTree } from 'lucide-react';
 import { ProductForm } from './components/product-form';
 import { CategoryForm } from './components/category-form';
+import { CategoryDragList } from './components/CategoryDragList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const metadata: Metadata = {
@@ -29,10 +30,6 @@ export default async function InventoryPage() {
                         <p className="text-muted-foreground mt-1 text-lg">Administra el catálogo de productos y el orden del POS.</p>
                     </div>
                 </div>
-                <div className="flex gap-3">
-                    <CategoryForm />
-                    <ProductForm />
-                </div>
             </header>
 
             <Tabs defaultValue="products" className="space-y-6">
@@ -45,13 +42,19 @@ export default async function InventoryPage() {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="products" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
+                <TabsContent value="products" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none space-y-4">
+                    <div className="flex justify-end">
+                        <ProductForm />
+                    </div>
                     <DataTable columns={columns} data={products} />
                 </TabsContent>
 
-                <TabsContent value="categories" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
-                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                        <DataTable columns={categoryColumns} data={categories} />
+                <TabsContent value="categories" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none space-y-4">
+                    <div className="flex justify-end">
+                        <CategoryForm />
+                    </div>
+                    <div className="bg-transparent border-none p-0 shadow-none">
+                        <CategoryDragList initialCategories={categories} />
                     </div>
                 </TabsContent>
             </Tabs>

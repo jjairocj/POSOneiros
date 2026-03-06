@@ -74,3 +74,24 @@ export async function deleteCategory(id: string) {
         return { success: false, error: "No se puede eliminar una categoría que contiene productos." };
     }
 }
+
+export async function updateCategoryOrders(updates: { id: string, sortOrder: number }[]) {
+    try {
+        // Use a transaction to update all sorting orders atomically
+        await prisma.$transaction(
+            updates.map((update) =>
+                prisma.category.update({
+                    where: { id: update.id },
+                    data: { sortOrder: update.sortOrder }
+                })
+            )
+        );
+
+        revalidatePath("/admin/inventory");
+        revalidatePath("/pos");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error updating category orders:", error);
+        return { success: false, error: "Error al reordenar las categorías." };
+    }
+}
