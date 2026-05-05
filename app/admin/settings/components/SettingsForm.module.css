@@ -1,0 +1,203 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 6rem;
+}
+
+/* Toast */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  animation: slideDown 0.3s ease;
+}
+
+.toast.success {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+
+.toast.error {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #ef4444;
+  border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
+}
+
+.toastIcon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Card */
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.iconBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.875rem;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  flex-shrink: 0;
+}
+
+.icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--color-primary);
+}
+
+.cardTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  line-height: 1.3;
+}
+
+.cardDesc {
+  font-size: 0.85rem;
+  color: var(--color-muted-foreground);
+  margin-top: 0.2rem;
+}
+
+/* Grid */
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .grid2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.colSpan2 {
+  grid-column: 1 / -1;
+}
+
+/* Field */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Textarea */
+.textarea {
+  width: 100%;
+  min-height: 5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--color-input);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-size: 0.9rem;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.textarea:focus {
+  border-color: var(--color-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ring) 20%, transparent);
+}
+
+.textarea::placeholder {
+  color: var(--color-muted-foreground);
+  opacity: 0.6;
+}
+
+/* Switch row */
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--color-muted) 40%, transparent);
+  border: 1px solid var(--color-border);
+}
+
+.switchInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.switchLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.switchDesc {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+/* Submit bar */
+.submitBar {
+  position: sticky;
+  bottom: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  z-index: 10;
+}
+
+.submitBtn {
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: 1rem;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.submitBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px color-mix(in srgb, var(--color-primary) 40%, transparent);
+}
+
+.submitBtn:active:not(:disabled) {
+  transform: translateY(0);
+}
