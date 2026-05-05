@@ -15,6 +15,7 @@ import {
 import { PackagePlus, Save, Loader2, Star, Image as ImageIcon } from "lucide-react";
 import { ProductColumn } from "./columns";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 interface ProductFormProps {
     product?: ProductColumn;
@@ -25,7 +26,6 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const isEditing = !!product;
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
 
     // Costing Calculator State
     const [cost, setCost] = useState<number>(product?.cost || 0);
@@ -39,20 +39,19 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
 
     const handleAction = async (formData: FormData) => {
         setLoading(true);
-        setError("");
-        
         try {
-            const result = isEditing 
+            const result = isEditing
                 ? await updateProduct(product.id, formData)
                 : await createProduct(formData);
 
             if (result.success) {
+                toast.success(isEditing ? "Producto actualizado" : "Producto creado");
                 setOpen(false);
             } else {
-                setError(result.error || "Ocurrió un error inesperado.");
+                toast.error(result.error || "Ocurrió un error inesperado.");
             }
-        } catch (err: any) {
-            setError(err.message || "Error de comunicación con el servidor");
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Error de comunicación con el servidor");
         } finally {
             setLoading(false);
         }
@@ -79,13 +78,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                     </DialogDescription>
                 </DialogHeader>
 
-                <form action={handleAction} className="space-y-4 mt-4">
-                    {error && (
-                        <div className="bg-destructive/10 text-destructive text-sm font-semibold p-3 rounded-xl border border-destructive/20">
-                            {error}
-                        </div>
-                    )}
-
+                <form action={handleAction} className="space-y-6 mt-4">
                     <div className="space-y-6">
                         {/* Basic Info */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -200,7 +193,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </div>
 
                         {/* Stock and Taxes */}
-                        <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1">Inventario Inicial</label>
                                 <Input 

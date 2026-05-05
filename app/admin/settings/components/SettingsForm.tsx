@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveSettings, type SettingsData } from "@/app/actions/settings";
-import { Building2, Settings2, Receipt, CheckCircle2, AlertCircle } from "lucide-react";
+import { Building2, Settings2, Receipt } from "lucide-react";
+import { toast } from "sonner";
 import styles from "./SettingsForm.module.css";
 
 interface SettingsFormProps {
@@ -22,7 +23,6 @@ interface SettingsFormProps {
 export function SettingsForm({ initialData }: SettingsFormProps) {
   const [isPending, startTransition] = useTransition();
   const [data, setData] = useState<SettingsData>(initialData);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   function updateField(key: keyof SettingsData, value: string) {
     setData((prev) => ({ ...prev, [key]: value }));
@@ -33,28 +33,15 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
     startTransition(async () => {
       const result = await saveSettings(data);
       if (result.success) {
-        setToast({ type: "success", message: "Configuración guardada correctamente." });
+        toast.success("Configuración guardada correctamente.");
       } else {
-        setToast({ type: "error", message: result.error ?? "Error al guardar." });
+        toast.error(result.error ?? "Error al guardar.");
       }
-      setTimeout(() => setToast(null), 4000);
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
-      {/* Toast */}
-      {toast && (
-        <div className={`${styles.toast} ${styles[toast.type]}`} role="alert">
-          {toast.type === "success" ? (
-            <CheckCircle2 className={styles.toastIcon} />
-          ) : (
-            <AlertCircle className={styles.toastIcon} />
-          )}
-          <span>{toast.message}</span>
-        </div>
-      )}
-
       {/* Sección 1 — Información del negocio */}
       <section className={styles.card}>
         <div className={styles.cardHeader}>

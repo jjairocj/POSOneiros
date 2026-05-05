@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { MonitorSmartphone, Save, Loader2 } from "lucide-react";
 import type { RegisterColumn } from "./register-columns";
+import { toast } from "sonner";
 
 interface RegisterFormModalProps {
     register?: RegisterColumn;
@@ -25,12 +26,10 @@ export function RegisterFormModal({ register, branches, trigger }: RegisterFormM
     const isEditing = !!register;
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
 
     const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
-        setError("");
 
         const form = e.currentTarget;
         const fd = new FormData(form);
@@ -46,12 +45,13 @@ export function RegisterFormModal({ register, branches, trigger }: RegisterFormM
                 : await createRegister(data);
 
             if (result.success) {
+                toast.success(isEditing ? "Caja actualizada" : "Caja creada");
                 setOpen(false);
             } else {
-                setError(result.error || "Ocurrió un error inesperado.");
+                toast.error(result.error || "Ocurrió un error inesperado.");
             }
-        } catch (err: any) {
-            setError(err.message || "Error de comunicación con el servidor.");
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "Error de comunicación con el servidor.");
         } finally {
             setLoading(false);
         }
@@ -81,12 +81,6 @@ export function RegisterFormModal({ register, branches, trigger }: RegisterFormM
                 </DialogHeader>
 
                 <form onSubmit={handleAction} className="space-y-4 mt-4">
-                    {error && (
-                        <div className="bg-destructive/10 text-destructive text-sm font-semibold p-3 rounded-xl border border-destructive/20">
-                            {error}
-                        </div>
-                    )}
-
                     <div className="space-y-4">
                         <div className="space-y-1.5">
                             <label className="text-sm font-semibold ml-1">Nombre de la caja</label>

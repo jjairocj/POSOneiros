@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Providers } from "./providers";
 import AppShell from "./components/Nav/AppShell";
+import { Toaster } from "sonner";
 
 export default function RootLayout({
   children,
@@ -12,6 +13,7 @@ export default function RootLayout({
       <body>
         <Providers>
           <AppShell>{children}</AppShell>
+          <Toaster richColors position="top-right" />
         </Providers>
       </body>
     </html>
