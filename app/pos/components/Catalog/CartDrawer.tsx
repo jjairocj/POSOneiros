@@ -103,10 +103,12 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                         <span>Subtotal</span>
                         <span className="text-foreground font-semibold">${subtotal.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between">
-                        <span>IVA (19%)</span>
-                        <span className="text-foreground font-semibold">${tax.toLocaleString()}</span>
-                    </div>
+                    {tax > 0 && (
+                        <div className="flex justify-between">
+                            <span>IVA</span>
+                            <span className="text-foreground font-semibold">${Math.round(tax).toLocaleString()}</span>
+                        </div>
+                    )}
                 </div>
 
                 <Separator className="mb-4 opacity-50" />
