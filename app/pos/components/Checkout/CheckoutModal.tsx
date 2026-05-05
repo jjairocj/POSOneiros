@@ -1,3 +1,31 @@
+/**
+ * @file CheckoutModal.tsx
+ * @description Full-screen modal that handles payment collection and confirms
+ * a completed sale. It has two internal stages:
+ *
+ * PAYMENT STAGE
+ *   Three independent payment method inputs (cash, card, transfer). The
+ *   component calculates `remaining` and `change` in real time:
+ *   - remaining = max(0, orderTotal − totalPaid)
+ *   - change    = max(0, totalPaid − orderTotal)  [cash overpayment only]
+ *   "FINALIZAR VENTA" stays disabled until totalPaid ≥ orderTotal. On click
+ *   the component calls `processSale` and transitions to the success stage.
+ *
+ * SUCCESS STAGE — climax visual (Sprint 1)
+ *   An emerald-green checkmark with an `animate-ping` pulse ring delivers the
+ *   emotional peak of the cashier's workflow. The stage shows:
+ *   - "¡Venta Exitosa!" heading
+ *   - Change amount (only when > 0); otherwise "Pago exacto recibido."
+ *   - "Cerrar" → calls onSuccess (parent clears the cart)
+ *   - "Imprimir Ticket" → clones the hidden Receipt into a print iframe
+ *
+ * @param activeShiftId - ID of the open shift; forwarded to processSale.
+ * @param orderTotal    - Total amount due for the current order.
+ * @param items         - Cart items; forwarded to processSale.
+ * @param onSuccess     - Called after the user dismisses the success stage.
+ * @param onCancel      - Called when the user closes the modal before paying.
+ */
+
 "use client";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -125,26 +153,34 @@ export default function CheckoutModal({
             <div className="bg-card w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-border flex flex-col max-h-[90vh]">
                 
                 {completedSale ? (
-                    <div className="p-8 flex flex-col items-center justify-center text-center space-y-6">
-                        <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center animate-bounce">
-                            <CheckCircle2 className="w-12 h-12 text-green-500" />
+                    <div className="p-8 flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
+                        {/* Climax visual: pulsing ring + checkmark */}
+                        <div className="relative flex items-center justify-center">
+                            <span className="absolute w-28 h-28 rounded-full bg-emerald-500/20 animate-ping" style={{ animationDuration: '1s', animationIterationCount: 2 }} />
+                            <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-in zoom-in duration-300">
+                                <CheckCircle2 className="w-14 h-14 text-white" />
+                            </div>
                         </div>
                         <div>
                             <h2 className="text-3xl font-black text-foreground mb-2">¡Venta Exitosa!</h2>
-                            <p className="text-muted-foreground">
-                                El cambio a entregar es: <strong className="text-xl text-primary block mt-1">${change.toLocaleString()}</strong>
-                            </p>
+                            {change > 0 ? (
+                                <p className="text-muted-foreground">
+                                    Cambio a entregar: <strong className="text-2xl text-emerald-500 block mt-1">${change.toLocaleString()}</strong>
+                                </p>
+                            ) : (
+                                <p className="text-muted-foreground">Pago exacto recibido.</p>
+                            )}
                         </div>
-                        
+
                         <div className="flex w-full gap-4 mt-8 pt-6 border-t border-border">
-                            <Button 
+                            <Button
                                 variant="outline"
                                 className="flex-1 h-14 rounded-2xl text-base font-bold"
                                 onClick={onSuccess}
                             >
                                 Cerrar
                             </Button>
-                            <Button 
+                            <Button
                                 className="flex-1 h-14 rounded-2xl text-base font-bold shadow-lg"
                                 onClick={handlePrintTicket}
                             >

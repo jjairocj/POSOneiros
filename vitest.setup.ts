@@ -9,3 +9,7 @@ vi.mock('next/cache', () => ({
 vi.mock('next-auth/next', () => ({
     getServerSession: vi.fn(),
 }));
+
+vi.mock('next-auth/react', () => ({
+    signOut: vi.fn(),
+}));

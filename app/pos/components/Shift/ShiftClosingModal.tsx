@@ -1,3 +1,33 @@
+/**
+ * @file ShiftClosingModal.tsx
+ * @description Two-stage modal for closing a cashier's shift.
+ *
+ * STAGE 1 — Cash reconciliation form
+ *   The cashier enters the physical cash total in the drawer. On submit the
+ *   `closeShift` server action is called. The button is disabled while the
+ *   field is empty to prevent accidental empty submissions.
+ *
+ * STAGE 2 — Narrative Z-report summary
+ *   After a successful close the modal transitions to a storytelling view that
+ *   shows the cashier how their shift went, following the "desenlace" arc from
+ *   the design spec:
+ *
+ *   - Personalised closing message ("¡Buen turno, [first name]!")
+ *   - Transaction count and total revenue (the main numbers)
+ *   - Product estrella (top product by quantity — shown only when > 0 sales)
+ *   - Hora pico in 12h format (shown only when > 0 sales)
+ *   - Cash reconciliation: expected vs declared vs difference
+ *     - difference < 0 → red (shortage)
+ *     - difference > 0 → amber (surplus, unusual)
+ *     - difference = 0 → green (perfect match)
+ *
+ * "Confirmar y Salir" calls router.refresh() then window.location.reload() to
+ * force ShiftGuard to re-evaluate (the shift is now CLOSED server-side).
+ *
+ * @param activeShiftId - ID of the shift to close.
+ * @param onCancel      - Called when the user dismisses stage 1 without closing.
+ */
+
 "use client";
 
 import { useState } from "react";
@@ -5,10 +35,17 @@ import { closeShift } from "@/app/actions/shift";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Receipt, CheckCircle2, AlertCircle } from "lucide-react";
+import { LogOut, CheckCircle2, AlertCircle, Trophy, Clock, ShoppingBag, TrendingUp } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
-export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeShiftId: string, onCancel: () => void }) {
+/** Converts a 0–23 hour integer to a human-readable 12h string. */
+function formatHour(h: number) {
+    const period = h >= 12 ? "pm" : "am";
+    const display = h % 12 === 0 ? 12 : h % 12;
+    return `${display}:00 ${period}`;
+}
+
+export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeShiftId: string; onCancel: () => void }) {
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -18,7 +55,7 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
     const handleCloseShift = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        
+
         const closeAmount = parseFloat(amount);
         if (isNaN(closeAmount) || closeAmount < 0) {
             setError("Monto inválido");
@@ -29,7 +66,6 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
         try {
             const res = await closeShift(activeShiftId, closeAmount);
             setSummary(res.summary);
-            // Don't auto-refresh yet, let user see the Z-Report summary
         } catch (err: any) {
             setError(err.message || "Error al cerrar turno");
             setLoading(false);
@@ -37,51 +73,92 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
     };
 
     const handleAcknowledge = () => {
-        // Force refresh to trigger ShiftGuard (which will demand a new shift)
         router.refresh();
         window.location.reload();
     };
 
     if (summary) {
+        const differenceColor =
+            summary.difference < 0
+                ? "text-destructive"
+                : summary.difference > 0
+                ? "text-amber-500"
+                : "text-emerald-500";
+
+        const closingMessage = summary.userName
+            ? `¡Buen turno, ${summary.userName.split(" ")[0]}!`
+            : "¡Buen turno!";
+
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border">
+                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border overflow-y-auto max-h-[90vh]">
+                    {/* Header */}
                     <div className="flex flex-col items-center text-center space-y-2 mb-6">
-                        <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mb-2">
-                            <Receipt className="w-8 h-8 text-success" />
+                        <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-2">
+                            <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                         </div>
-                        <h2 className="text-2xl font-bold tracking-tight">Reporte de Cierre Z</h2>
-                        <p className="text-muted-foreground text-sm">Resumen del cuadre de caja.</p>
+                        <h2 className="text-2xl font-bold tracking-tight">{closingMessage}</h2>
+                        <p className="text-muted-foreground text-sm">Aquí está el resumen de tu turno.</p>
                     </div>
 
-                    <div className="space-y-4 mb-8 bg-muted/50 p-6 rounded-2xl border border-border/50">
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground font-medium">Total Ventas:</span>
-                            <strong className="text-lg">${summary.totalSales.toLocaleString()}</strong>
+                    {/* Narrative stats */}
+                    <div className="grid grid-cols-2 gap-3 mb-5">
+                        <div className="bg-muted/50 rounded-2xl p-4 border border-border/50 flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                                <ShoppingBag className="w-3.5 h-3.5" />
+                                Transacciones
+                            </div>
+                            <span className="text-2xl font-black text-foreground">{summary.transactionCount}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground font-medium">Esperado en Caja:</span>
-                            <strong className="text-lg">${summary.expected.toLocaleString()}</strong>
+                        <div className="bg-muted/50 rounded-2xl p-4 border border-border/50 flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                                <TrendingUp className="w-3.5 h-3.5" />
+                                Total Ventas
+                            </div>
+                            <span className="text-2xl font-black text-foreground">${summary.totalSales.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground font-medium">Monto Declarado:</span>
-                            <strong className="text-lg">${summary.declared.toLocaleString()}</strong>
+                        {summary.topProduct && (
+                            <div className="bg-amber-500/10 rounded-2xl p-4 border border-amber-500/20 flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-xs font-semibold uppercase tracking-wider">
+                                    <Trophy className="w-3.5 h-3.5" />
+                                    Producto estrella
+                                </div>
+                                <span className="text-sm font-bold text-foreground leading-tight">{summary.topProduct}</span>
+                            </div>
+                        )}
+                        {summary.peakHour !== null && (
+                            <div className="bg-primary/10 rounded-2xl p-4 border border-primary/20 flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5 text-primary text-xs font-semibold uppercase tracking-wider">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    Hora pico
+                                </div>
+                                <span className="text-sm font-bold text-foreground">{formatHour(summary.peakHour)}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Cash reconciliation */}
+                    <div className="space-y-3 mb-6 bg-muted/50 p-5 rounded-2xl border border-border/50">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground font-medium">Esperado en Caja</span>
+                            <strong>${summary.expected.toLocaleString()}</strong>
                         </div>
-                        
-                        <Separator className="my-2" />
-                        
-                        <div className={`flex justify-between items-center pt-2 ${
-                                summary.difference < 0 ? 'text-destructive' : 
-                                (summary.difference > 0 ? 'text-success' : 'text-foreground')
-                            }`}>
-                            <span className="font-semibold flex items-center gap-2">
-                                Diferencia (Descuadre):
-                            </span>
-                            <strong className="text-xl">${summary.difference.toLocaleString()}</strong>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground font-medium">Monto Declarado</span>
+                            <strong>${summary.declared.toLocaleString()}</strong>
+                        </div>
+                        <Separator />
+                        <div className={`flex justify-between items-center ${differenceColor}`}>
+                            <span className="font-semibold text-sm">Diferencia</span>
+                            <strong className="text-lg">
+                                {summary.difference < 0
+                                    ? `-$${Math.abs(summary.difference).toLocaleString()}`
+                                    : `+$${summary.difference.toLocaleString()}`}
+                            </strong>
                         </div>
                     </div>
-                    
-                    <Button 
+
+                    <Button
                         onClick={handleAcknowledge}
                         className="w-full h-12 rounded-2xl text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"
                     >
@@ -105,7 +182,7 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                         Ingresa el dinero total en caja para realizar el arqueo.
                     </p>
                 </div>
-                
+
                 <form onSubmit={handleCloseShift} className="space-y-6">
                     <div className="space-y-2">
                         <label htmlFor="closeAmount" className="text-sm font-semibold text-foreground ml-1">Monto Total en Caja ($)</label>
@@ -124,17 +201,17 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                             />
                         </div>
                     </div>
-                    
+
                     {error && (
                         <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20">
                             <AlertCircle className="w-4 h-4 flex-shrink-0" />
                             <p>{error}</p>
                         </div>
                     )}
-                    
+
                     <div className="flex gap-3">
-                        <Button 
-                            type="button" 
+                        <Button
+                            type="button"
                             variant="outline"
                             onClick={onCancel}
                             disabled={loading}
@@ -142,8 +219,8 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                         >
                             Cancelar
                         </Button>
-                        <Button 
-                            type="submit" 
+                        <Button
+                            type="submit"
                             variant="destructive"
                             disabled={loading || !amount}
                             className="flex-1 h-12 rounded-2xl font-semibold shadow-lg shadow-destructive/20 hover:-translate-y-0.5 transition-all"

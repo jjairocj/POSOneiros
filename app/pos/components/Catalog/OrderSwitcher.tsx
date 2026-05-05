@@ -49,15 +49,13 @@ export default function OrderSwitcher() {
                     </div>
                 );
             })}
-            <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-full shadow-sm ml-2 flex-shrink-0"
+            <button
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-primary/40 transition-all ml-2 flex-shrink-0 shadow-sm"
                 onClick={() => setIsAddOpen(true)}
             >
-                <Plus className="w-4 h-4 mr-1" />
+                <Plus className="w-3.5 h-3.5" />
                 Nueva
-            </Button>
+            </button>
 
             {/* Modal para Nueva Orden */}
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

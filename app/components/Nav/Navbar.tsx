@@ -9,8 +9,8 @@ export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Don't show Nav on login page
-  if (pathname === "/login") return null;
+  // POS has its own isolated dark layout — no sidebar/bottom nav needed
+  if (pathname === "/login" || pathname.startsWith("/pos")) return null;
 
   const navItems = [
     { name: "Venta", href: "/pos", icon: "🛒" },
