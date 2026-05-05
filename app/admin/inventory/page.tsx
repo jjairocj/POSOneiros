@@ -1,10 +1,11 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { getProducts } from '@/app/actions/product';
 import { getCategories } from '@/app/actions/category';
 import { columns } from './components/columns';
 import { categoryColumns } from './components/category-columns';
 import { DataTable } from './components/data-table';
-import { PackageOpen, FolderTree } from 'lucide-react';
+import { PackageOpen, FolderTree, FileSpreadsheet } from 'lucide-react';
 import { ProductForm } from './components/product-form';
 import { CategoryForm } from './components/category-form';
 import { CategoryDragList } from './components/CategoryDragList';
@@ -30,6 +31,13 @@ export default async function InventoryPage() {
                         <p className="text-muted-foreground mt-1 text-lg">Administra el catálogo de productos y el orden del POS.</p>
                     </div>
                 </div>
+                <Link
+                    href="/admin/inventory/import"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-sm transition-colors"
+                >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Importar desde Siigo
+                </Link>
             </header>
 
             <Tabs defaultValue="products" className="space-y-6">

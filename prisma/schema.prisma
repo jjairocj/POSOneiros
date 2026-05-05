@@ -89,7 +89,8 @@ model Product {
   categoryId  String?
   category    Category?   @relation(fields: [categoryId], references: [id])
   imageUrl    String?     // Already existed
-  isFavorite  Boolean     @default(false) // New: For "Favorites" POS default view
+  isFavorite  Boolean     @default(false)
+  isActive    Boolean     @default(true)
   saleDetails SaleDetail[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
