@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { LogOut, LayoutDashboard, BarChart2, ChevronDown, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -15,6 +15,8 @@ export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const dark = theme === "dark";
   const isAdmin = userRole === "ADMIN";
   const initial = userName?.charAt(0).toUpperCase() ?? "U";
@@ -72,19 +74,21 @@ export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
                 className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
               >
                 <span className="text-sm font-medium text-foreground">
-                  {dark ? "Modo oscuro" : "Modo claro"}
+                  {mounted ? (dark ? "Modo oscuro" : "Modo claro") : "Tema"}
                 </span>
-                <span className="w-8 h-5 rounded-full relative flex-shrink-0 transition-colors" style={{ background: dark ? "hsl(var(--primary))" : "#e2e8f0" }}>
-                  <span
-                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all flex items-center justify-center"
-                    style={{ left: dark ? "14px" : "2px" }}
-                  >
-                    {dark
-                      ? <Moon className="w-2.5 h-2.5 text-primary" />
-                      : <Sun className="w-2.5 h-2.5 text-amber-500" />
-                    }
+                {mounted && (
+                  <span className="w-8 h-5 rounded-full relative flex-shrink-0 transition-colors" style={{ background: dark ? "hsl(var(--primary))" : "#e2e8f0" }}>
+                    <span
+                      className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all flex items-center justify-center"
+                      style={{ left: dark ? "14px" : "2px" }}
+                    >
+                      {dark
+                        ? <Moon className="w-2.5 h-2.5 text-primary" />
+                        : <Sun className="w-2.5 h-2.5 text-amber-500" />
+                      }
+                    </span>
                   </span>
-                </span>
+                )}
               </button>
             </div>
 

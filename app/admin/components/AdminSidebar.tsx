@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Package, Receipt, Users, Settings, LogOut, LineChart, Sun, Moon } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
     { name: "Resumen", href: "/admin", icon: LineChart },
@@ -16,6 +17,8 @@ const NAV_ITEMS = [
 export default function AdminSidebar() {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
     const dark = theme === "dark";
 
     const handleLogout = async () => {
@@ -68,8 +71,8 @@ export default function AdminSidebar() {
                     onClick={() => setTheme(dark ? "light" : "dark")}
                     className="flex w-full items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-accent transition-colors font-medium text-sm text-muted-foreground border border-transparent hover:border-border"
                 >
-                    {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                    <span>{dark ? "Modo claro" : "Modo oscuro"}</span>
+                    {mounted && (dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />)}
+                    <span>{mounted ? (dark ? "Modo claro" : "Modo oscuro") : "Tema"}</span>
                 </button>
 
                 <Link

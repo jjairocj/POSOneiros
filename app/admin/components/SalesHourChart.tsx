@@ -2,6 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { formatMoney } from "@/app/lib/money";
 import type { HourlySale } from "@/app/actions/dashboard";
 
@@ -11,7 +12,9 @@ interface Props {
 
 export function SalesHourChart({ data }: Props) {
     const { theme } = useTheme();
-    const dark = theme === "dark";
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+    const dark = mounted && theme === "dark";
 
     const tooltipStyle = {
         borderRadius: "12px",
