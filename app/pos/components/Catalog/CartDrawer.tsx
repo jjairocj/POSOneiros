@@ -1,28 +1,99 @@
 "use client";
 import { useState } from "react";
-import { useCartStore } from "@/app/store/useCartStore";
+import { Minus, Plus, ShoppingCart, ArrowLeft, Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, Minus, Plus, ShoppingCart, ArrowLeft } from "lucide-react";
+import { useCartStore, type CartItem } from "@/app/store/useCartStore";
+import { formatMoney } from "@/app/lib/money";
 import ShiftOpeningModal from "../Shift/ShiftOpeningModal";
 import CheckoutModal from "../Checkout/CheckoutModal";
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function CartItemRow({ item, onChangeQty }: { item: CartItem; onChangeQty: (q: number) => void }) {
+    return (
+        <div className="flex justify-between items-center bg-muted/30 px-4 py-3 rounded-2xl border border-border/40">
+            <div className="flex flex-col flex-1 truncate pr-3">
+                <span className="font-semibold text-sm truncate text-foreground">{item.name}</span>
+                <span className="text-muted-foreground text-xs font-medium mt-0.5">
+                    {formatMoney(item.price)}
+                </span>
+            </div>
+            <div className="flex items-center bg-background border border-border rounded-xl overflow-hidden">
+                <button
+                    type="button"
+                    aria-label="Reducir cantidad"
+                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    onClick={() => onChangeQty(item.quantity - 1)}
+                >
+                    <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="w-8 text-center font-black text-sm text-foreground">{item.quantity}</span>
+                <button
+                    type="button"
+                    aria-label="Aumentar cantidad"
+                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    onClick={() => onChangeQty(item.quantity + 1)}
+                >
+                    <Plus className="w-3.5 h-3.5" />
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function TaxLineRow({ label, amount }: { label: string; amount: number }) {
+    if (amount <= 0) return null;
+    return (
+        <div className="flex justify-between">
+            <span>{label}</span>
+            <span className="text-foreground font-semibold">{formatMoney(amount)}</span>
+        </div>
+    );
+}
+
+function EmptyCart() {
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-20 gap-4">
+            <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center">
+                <ShoppingCart className="w-10 h-10 opacity-30" strokeWidth={1.5} />
+            </div>
+            <div className="text-center">
+                <p className="text-base font-semibold text-foreground/60">Bandeja vacía</p>
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1 justify-center">
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Selecciona productos del catálogo
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 interface CartDrawerProps {
-  activeShiftId?: string;
-  /** Called after a successful checkout — used by MobileCartBar to close the sheet */
-  onCheckoutSuccess?: () => void;
+    activeShiftId?: string;
+    onCheckoutSuccess?: () => void;
 }
 
 export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDrawerProps) {
     const { orders, activeOrderId, updateQuantity, clearActiveOrder } = useCartStore();
     const [isOpeningShift, setIsOpeningShift] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-    const activeOrder = orders[activeOrderId];
 
+    const activeOrder = orders[activeOrderId];
     if (!activeOrder) return null;
 
     const { items, subtotal, taxIva, taxIca, taxImpoConsumo, total } = activeOrder;
     const hasItems = items.length > 0;
+
+    const handleCheckout = () => {
+        if (!activeShiftId) {
+            setIsOpeningShift(true);
+        } else {
+            setIsCheckoutOpen(true);
+        }
+    };
 
     return (
         <div className="flex flex-col h-full bg-card border-l border-border shadow-2xl rounded-l-3xl overflow-hidden">
@@ -34,6 +105,7 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                 </h2>
                 {hasItems && (
                     <button
+                        type="button"
                         onClick={clearActiveOrder}
                         className="flex items-center gap-1.5 text-xs font-semibold text-destructive hover:text-destructive/80 px-2 py-1 rounded-lg hover:bg-destructive/10 transition-colors"
                     >
@@ -45,54 +117,18 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
 
             {/* Item list */}
             <ScrollArea className="flex-1 px-4">
-                {!hasItems ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-20 gap-4">
-                        <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center">
-                            <ShoppingCart className="w-10 h-10 opacity-30" strokeWidth={1.5} />
-                        </div>
-                        <div className="text-center">
-                            <p className="text-base font-semibold text-foreground/60">Bandeja vacía</p>
-                            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1 justify-center">
-                                <ArrowLeft className="w-3.5 h-3.5" />
-                                Selecciona productos del catálogo
-                            </p>
-                        </div>
-                    </div>
-                ) : (
+                {hasItems ? (
                     <div className="flex flex-col gap-3 py-4">
                         {items.map((item) => (
-                            <div
+                            <CartItemRow
                                 key={item.id}
-                                className="flex justify-between items-center bg-muted/30 px-4 py-3 rounded-2xl border border-border/40"
-                            >
-                                <div className="flex flex-col flex-1 truncate pr-3">
-                                    <span className="font-semibold text-sm truncate text-foreground">{item.name}</span>
-                                    <span className="text-muted-foreground text-xs font-medium mt-0.5">
-                                        ${item.price.toLocaleString()}
-                                    </span>
-                                </div>
-
-                                {/* Quantity stepper — visible in dark mode */}
-                                <div className="flex items-center gap-0 bg-background border border-border rounded-xl overflow-hidden">
-                                    <button
-                                        className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors font-bold text-lg"
-                                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                    >
-                                        <Minus className="w-3.5 h-3.5" />
-                                    </button>
-                                    <span className="w-8 text-center font-black text-sm text-foreground">
-                                        {item.quantity}
-                                    </span>
-                                    <button
-                                        className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                    >
-                                        <Plus className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-                            </div>
+                                item={item}
+                                onChangeQty={(q) => updateQuantity(item.id, q)}
+                            />
                         ))}
                     </div>
+                ) : (
+                    <EmptyCart />
                 )}
             </ScrollArea>
 
@@ -101,26 +137,11 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                 <div className="space-y-2 mb-4 text-sm font-medium text-muted-foreground">
                     <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span className="text-foreground font-semibold">${subtotal.toLocaleString()}</span>
+                        <span className="text-foreground font-semibold">{formatMoney(subtotal)}</span>
                     </div>
-                    {taxIva > 0 && (
-                        <div className="flex justify-between">
-                            <span>IVA</span>
-                            <span className="text-foreground font-semibold">${Math.round(taxIva).toLocaleString()}</span>
-                        </div>
-                    )}
-                    {taxIca > 0 && (
-                        <div className="flex justify-between">
-                            <span>ICA</span>
-                            <span className="text-foreground font-semibold">${Math.round(taxIca).toLocaleString()}</span>
-                        </div>
-                    )}
-                    {taxImpoConsumo > 0 && (
-                        <div className="flex justify-between">
-                            <span>Impo. Consumo</span>
-                            <span className="text-foreground font-semibold">${Math.round(taxImpoConsumo).toLocaleString()}</span>
-                        </div>
-                    )}
+                    <TaxLineRow label="IVA" amount={taxIva} />
+                    <TaxLineRow label="ICA" amount={taxIca} />
+                    <TaxLineRow label="Impo. Consumo" amount={taxImpoConsumo} />
                 </div>
 
                 <Separator className="mb-4 opacity-50" />
@@ -128,19 +149,14 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                 <div className="flex justify-between items-center mb-5">
                     <span className="text-lg font-bold text-foreground">Total</span>
                     <span className={`text-2xl font-black transition-colors ${hasItems ? "text-primary" : "text-muted-foreground"}`}>
-                        ${total.toLocaleString()}
+                        {formatMoney(total)}
                     </span>
                 </div>
 
                 <button
+                    type="button"
                     disabled={!hasItems}
-                    onClick={() => {
-                        if (!activeShiftId) {
-                            setIsOpeningShift(true);
-                        } else {
-                            setIsCheckoutOpen(true);
-                        }
-                    }}
+                    onClick={handleCheckout}
                     className={[
                         "w-full py-4 text-lg font-bold rounded-2xl transition-all duration-200",
                         hasItems

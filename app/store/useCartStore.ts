@@ -1,30 +1,10 @@
 "use client";
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { CartItem, Order, ProductInput } from "@/app/types/cart";
+import { calculateOrderTotals, toDecimalRate, ZERO_TOTALS } from "@/app/lib/tax";
 
-export interface CartItem {
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-    taxIva: number;         // decimal (e.g. 0, 0.05, 0.19)
-    taxIca: number;         // decimal (e.g. 0, 0.01)
-    taxImpoConsumo: number; // decimal (e.g. 0, 0.08)
-    imageUrl?: string | null;
-    categoryId?: string | null;
-}
-
-export interface Order {
-    id: string;
-    name: string;
-    items: CartItem[];
-    subtotal: number;
-    taxIva: number;
-    taxIca: number;
-    taxImpoConsumo: number;
-    total: number;
-    createdAt: number;
-}
+export type { CartItem, Order } from "@/app/types/cart";
 
 interface CartStore {
     orders: Record<string, Order>;
@@ -33,136 +13,105 @@ interface CartStore {
     setActiveOrder: (orderId: string) => void;
     addOrder: (name: string) => string;
     removeOrder: (orderId: string) => void;
-
-    addItem: (product: any) => void;
+    addItem: (product: ProductInput) => void;
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearActiveOrder: () => void;
 }
 
-const toRate = (v: unknown) => (typeof v === 'number' ? v : 0);
+const makeOrder = (id: string, name: string): Order => ({
+    id,
+    name,
+    items: [],
+    ...ZERO_TOTALS,
+    createdAt: Date.now(),
+});
 
-const calculateTotals = (items: CartItem[]) => {
-    let subtotal = 0, taxIva = 0, taxIca = 0, taxImpoConsumo = 0;
-    for (const item of items) {
-        const base = item.price * item.quantity;
-        subtotal += base;
-        taxIva += base * toRate(item.taxIva);
-        taxIca += base * toRate(item.taxIca);
-        taxImpoConsumo += base * toRate(item.taxImpoConsumo);
-    }
-    return { subtotal, taxIva, taxIca, taxImpoConsumo, total: subtotal + taxIva + taxIca + taxImpoConsumo };
-};
-
-const EMPTY_ORDER_TOTALS = { subtotal: 0, taxIva: 0, taxIca: 0, taxImpoConsumo: 0, total: 0 };
+const DEFAULT_ORDER_ID = "default";
 
 export const useCartStore = create<CartStore>()(
     persist(
         (set, get) => ({
-            orders: {
-                'default': {
-                    id: 'default',
-                    name: 'Orden Principal',
-                    items: [],
-                    ...EMPTY_ORDER_TOTALS,
-                    createdAt: Date.now()
-                }
-            },
-            activeOrderId: 'default',
+            orders: { [DEFAULT_ORDER_ID]: makeOrder(DEFAULT_ORDER_ID, "Orden Principal") },
+            activeOrderId: DEFAULT_ORDER_ID,
 
             setActiveOrder: (orderId) => set({ activeOrderId: orderId }),
 
             addOrder: (name) => {
                 const id = `order-${Date.now()}`;
                 set((state) => ({
-                    orders: {
-                        ...state.orders,
-                        [id]: { id, name, items: [], ...EMPTY_ORDER_TOTALS, createdAt: Date.now() }
-                    },
-                    activeOrderId: id
+                    orders: { ...state.orders, [id]: makeOrder(id, name) },
+                    activeOrderId: id,
                 }));
                 return id;
             },
 
             removeOrder: (orderId) => {
                 set((state) => {
-                    const newOrders = { ...state.orders };
-                    delete newOrders[orderId];
+                    const remaining = { ...state.orders };
+                    delete remaining[orderId];
 
-                    let nextActive = state.activeOrderId;
-                    if (state.activeOrderId === orderId || Object.keys(newOrders).length === 0) {
-                        if (Object.keys(newOrders).length === 0) {
-                            const defaultId = 'default';
-                            newOrders[defaultId] = {
-                                id: defaultId,
-                                name: 'Orden Principal',
-                                items: [],
-                                ...EMPTY_ORDER_TOTALS,
-                                createdAt: Date.now()
-                            };
-                            nextActive = defaultId;
-                        } else {
-                            nextActive = Object.keys(newOrders)[0];
-                        }
+                    if (Object.keys(remaining).length === 0) {
+                        remaining[DEFAULT_ORDER_ID] = makeOrder(DEFAULT_ORDER_ID, "Orden Principal");
                     }
 
-                    return { orders: newOrders, activeOrderId: nextActive };
+                    const nextActive =
+                        state.activeOrderId === orderId
+                            ? Object.keys(remaining)[0]
+                            : state.activeOrderId;
+
+                    return { orders: remaining, activeOrderId: nextActive };
                 });
             },
 
             addItem: (product) => {
                 set((state) => {
-                    const activeOrder = state.orders[state.activeOrderId];
-                    if (!activeOrder) return state;
+                    const order = state.orders[state.activeOrderId];
+                    if (!order) return state;
 
-                    // Taxes are stored as percentages (0, 5, 19) — convert to decimal
-                    const taxIva = (product.taxIva ?? 0) / 100;
-                    const taxIca = (product.taxIca ?? 0) / 100;
-                    const taxImpoConsumo = (product.taxImpoConsumo ?? 0) / 100;
-
-                    const existingItem = activeOrder.items.find((item) => item.id === product.id);
-                    let newItems: CartItem[];
-                    if (existingItem) {
-                        newItems = activeOrder.items.map((item) =>
-                            item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                        );
-                    } else {
-                        newItems = [...activeOrder.items, {
-                            id: product.id,
-                            name: product.name,
-                            price: product.price,
-                            taxIva,
-                            taxIca,
-                            taxImpoConsumo,
-                            imageUrl: product.imageUrl,
-                            categoryId: product.categoryId,
-                            quantity: 1
-                        }];
-                    }
+                    const existing = order.items.find((i) => i.id === product.id);
+                    const newItems: CartItem[] = existing
+                        ? order.items.map((i) =>
+                              i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
+                          )
+                        : [
+                              ...order.items,
+                              {
+                                  id: product.id,
+                                  name: product.name,
+                                  price: product.price,
+                                  quantity: 1,
+                                  taxIva: toDecimalRate(product.taxIva),
+                                  taxIca: toDecimalRate(product.taxIca),
+                                  taxImpoConsumo: toDecimalRate(product.taxImpoConsumo),
+                                  imageUrl: product.imageUrl,
+                                  categoryId: product.categoryId,
+                              },
+                          ];
 
                     return {
                         orders: {
                             ...state.orders,
                             [state.activeOrderId]: {
-                                ...activeOrder,
+                                ...order,
                                 items: newItems,
-                                ...calculateTotals(newItems)
-                            }
-                        }
+                                ...calculateOrderTotals(newItems),
+                            },
+                        },
                     };
                 });
             },
 
             removeItem: (productId) => {
                 set((state) => {
-                    const activeOrder = state.orders[state.activeOrderId];
-                    if (!activeOrder) return state;
-                    const newItems = activeOrder.items.filter((item) => item.id !== productId);
+                    const order = state.orders[state.activeOrderId];
+                    if (!order) return state;
+                    const newItems = order.items.filter((i) => i.id !== productId);
                     return {
                         orders: {
                             ...state.orders,
-                            [state.activeOrderId]: { ...activeOrder, items: newItems, ...calculateTotals(newItems) }
-                        }
+                            [state.activeOrderId]: { ...order, items: newItems, ...calculateOrderTotals(newItems) },
+                        },
                     };
                 });
             },
@@ -170,33 +119,33 @@ export const useCartStore = create<CartStore>()(
             updateQuantity: (productId, quantity) => {
                 if (quantity <= 0) { get().removeItem(productId); return; }
                 set((state) => {
-                    const activeOrder = state.orders[state.activeOrderId];
-                    if (!activeOrder) return state;
-                    const newItems = activeOrder.items.map((item) =>
-                        item.id === productId ? { ...item, quantity } : item
+                    const order = state.orders[state.activeOrderId];
+                    if (!order) return state;
+                    const newItems = order.items.map((i) =>
+                        i.id === productId ? { ...i, quantity } : i
                     );
                     return {
                         orders: {
                             ...state.orders,
-                            [state.activeOrderId]: { ...activeOrder, items: newItems, ...calculateTotals(newItems) }
-                        }
+                            [state.activeOrderId]: { ...order, items: newItems, ...calculateOrderTotals(newItems) },
+                        },
                     };
                 });
             },
 
             clearActiveOrder: () => {
                 set((state) => {
-                    const activeOrder = state.orders[state.activeOrderId];
-                    if (!activeOrder) return state;
+                    const order = state.orders[state.activeOrderId];
+                    if (!order) return state;
                     return {
                         orders: {
                             ...state.orders,
-                            [state.activeOrderId]: { ...activeOrder, items: [], ...EMPTY_ORDER_TOTALS }
-                        }
+                            [state.activeOrderId]: { ...order, items: [], ...ZERO_TOTALS },
+                        },
                     };
                 });
-            }
+            },
         }),
-        { name: 'oneiros-multi-cart' }
+        { name: "oneiros-multi-cart" }
     )
 );
