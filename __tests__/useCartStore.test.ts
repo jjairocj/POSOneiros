@@ -1,18 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCartStore } from '../app/store/useCartStore';
 
+const EMPTY_TOTALS = { subtotal: 0, taxIva: 0, taxIca: 0, taxImpoConsumo: 0, total: 0 };
+
 describe('useCartStore Multi-Order Logic', () => {
     beforeEach(() => {
-        // Reset the store before each test
         useCartStore.setState({
             orders: {
                 'default': {
                     id: 'default',
                     name: 'Orden Principal',
                     items: [],
-                    subtotal: 0,
-                    tax: 0,
-                    total: 0,
+                    ...EMPTY_TOTALS,
                     createdAt: Date.now()
                 }
             },
@@ -22,10 +21,9 @@ describe('useCartStore Multi-Order Logic', () => {
 
     it('should add an item to the active order', () => {
         const store = useCartStore.getState();
-        store.addItem({ id: '1', name: 'Product A', price: 100 });
+        store.addItem({ id: '1', name: 'Product A', price: 100, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 });
 
-        const updatedStore = useCartStore.getState();
-        const activeOrder = updatedStore.orders[updatedStore.activeOrderId];
+        const activeOrder = useCartStore.getState().orders['default'];
         expect(activeOrder.items.length).toBe(1);
         expect(activeOrder.items[0].name).toBe('Product A');
         expect(activeOrder.subtotal).toBe(100);
@@ -33,7 +31,7 @@ describe('useCartStore Multi-Order Logic', () => {
 
     it('should switch between orders independently', () => {
         const store = useCartStore.getState();
-        store.addItem({ id: '1', name: 'Product A', price: 100 });
+        store.addItem({ id: '1', name: 'Product A', price: 100, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 });
 
         const newOrderId = store.addOrder('Mesa 2');
         useCartStore.getState().setActiveOrder(newOrderId);
@@ -42,7 +40,7 @@ describe('useCartStore Multi-Order Logic', () => {
         expect(currentStore.activeOrderId).toBe(newOrderId);
         expect(currentStore.orders[newOrderId].items.length).toBe(0);
 
-        currentStore.addItem({ id: '2', name: 'Product B', price: 200 });
+        currentStore.addItem({ id: '2', name: 'Product B', price: 200, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 });
 
         const finalStore = useCartStore.getState();
         expect(finalStore.orders[newOrderId].items.length).toBe(1);
@@ -50,13 +48,37 @@ describe('useCartStore Multi-Order Logic', () => {
         expect(finalStore.orders['default'].items[0].name).toBe('Product A');
     });
 
-    it('should calculate taxes correctly', () => {
+    it('should calculate IVA tax per product correctly', () => {
         const store = useCartStore.getState();
-        store.addItem({ id: '2', name: 'Product B', price: 1000 });
+        store.addItem({ id: '1', name: 'Product A', price: 1000, taxIva: 19, taxIca: 0, taxImpoConsumo: 0 });
 
         const activeOrder = useCartStore.getState().orders['default'];
         expect(activeOrder.subtotal).toBe(1000);
-        expect(activeOrder.tax).toBe(190); // 19%
-        expect(activeOrder.total).toBe(1190);
+        expect(activeOrder.taxIva).toBeCloseTo(190);
+        expect(activeOrder.taxIca).toBe(0);
+        expect(activeOrder.taxImpoConsumo).toBe(0);
+        expect(activeOrder.total).toBeCloseTo(1190);
+    });
+
+    it('should not add tax for products with 0% rates', () => {
+        const store = useCartStore.getState();
+        store.addItem({ id: '2', name: 'Product B', price: 1000, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 });
+
+        const activeOrder = useCartStore.getState().orders['default'];
+        expect(activeOrder.taxIva).toBe(0);
+        expect(activeOrder.taxIca).toBe(0);
+        expect(activeOrder.taxImpoConsumo).toBe(0);
+        expect(activeOrder.total).toBe(1000);
+    });
+
+    it('should accumulate multiple tax types correctly', () => {
+        const store = useCartStore.getState();
+        store.addItem({ id: '3', name: 'Product C', price: 1000, taxIva: 19, taxIca: 1, taxImpoConsumo: 8 });
+
+        const activeOrder = useCartStore.getState().orders['default'];
+        expect(activeOrder.taxIva).toBeCloseTo(190);
+        expect(activeOrder.taxIca).toBeCloseTo(10);
+        expect(activeOrder.taxImpoConsumo).toBeCloseTo(80);
+        expect(activeOrder.total).toBeCloseTo(1280);
     });
 });

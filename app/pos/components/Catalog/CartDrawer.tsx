@@ -21,7 +21,7 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
 
     if (!activeOrder) return null;
 
-    const { items, subtotal, tax, total } = activeOrder;
+    const { items, subtotal, taxIva, taxIca, taxImpoConsumo, total } = activeOrder;
     const hasItems = items.length > 0;
 
     return (
@@ -103,10 +103,22 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                         <span>Subtotal</span>
                         <span className="text-foreground font-semibold">${subtotal.toLocaleString()}</span>
                     </div>
-                    {tax > 0 && (
+                    {taxIva > 0 && (
                         <div className="flex justify-between">
                             <span>IVA</span>
-                            <span className="text-foreground font-semibold">${Math.round(tax).toLocaleString()}</span>
+                            <span className="text-foreground font-semibold">${Math.round(taxIva).toLocaleString()}</span>
+                        </div>
+                    )}
+                    {taxIca > 0 && (
+                        <div className="flex justify-between">
+                            <span>ICA</span>
+                            <span className="text-foreground font-semibold">${Math.round(taxIca).toLocaleString()}</span>
+                        </div>
+                    )}
+                    {taxImpoConsumo > 0 && (
+                        <div className="flex justify-between">
+                            <span>Impo. Consumo</span>
+                            <span className="text-foreground font-semibold">${Math.round(taxImpoConsumo).toLocaleString()}</span>
                         </div>
                     )}
                 </div>

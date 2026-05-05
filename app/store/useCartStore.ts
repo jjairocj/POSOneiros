@@ -7,7 +7,9 @@ export interface CartItem {
     name: string;
     price: number;
     quantity: number;
-    taxRate: number; // taxIva as decimal (e.g. 0, 0.05, 0.19)
+    taxIva: number;         // decimal (e.g. 0, 0.05, 0.19)
+    taxIca: number;         // decimal (e.g. 0, 0.01)
+    taxImpoConsumo: number; // decimal (e.g. 0, 0.08)
     imageUrl?: string | null;
     categoryId?: string | null;
 }
@@ -17,7 +19,9 @@ export interface Order {
     name: string;
     items: CartItem[];
     subtotal: number;
-    tax: number;
+    taxIva: number;
+    taxIca: number;
+    taxImpoConsumo: number;
     total: number;
     createdAt: number;
 }
@@ -36,20 +40,21 @@ interface CartStore {
     clearActiveOrder: () => void;
 }
 
+const toRate = (v: unknown) => (typeof v === 'number' ? v : 0);
+
 const calculateTotals = (items: CartItem[]) => {
-    let subtotal = 0;
-    let tax = 0;
+    let subtotal = 0, taxIva = 0, taxIca = 0, taxImpoConsumo = 0;
     for (const item of items) {
-        const itemSubtotal = item.price * item.quantity;
-        // taxRate may be undefined in carts persisted before this fix — default to 0
-        const rate = typeof item.taxRate === 'number' ? item.taxRate : 0;
-        subtotal += itemSubtotal;
-        tax += itemSubtotal * rate;
+        const base = item.price * item.quantity;
+        subtotal += base;
+        taxIva += base * toRate(item.taxIva);
+        taxIca += base * toRate(item.taxIca);
+        taxImpoConsumo += base * toRate(item.taxImpoConsumo);
     }
-    return { subtotal, tax, total: subtotal + tax };
+    return { subtotal, taxIva, taxIca, taxImpoConsumo, total: subtotal + taxIva + taxIca + taxImpoConsumo };
 };
 
-const EMPTY_ORDER_TOTALS = { subtotal: 0, tax: 0, total: 0 };
+const EMPTY_ORDER_TOTALS = { subtotal: 0, taxIva: 0, taxIca: 0, taxImpoConsumo: 0, total: 0 };
 
 export const useCartStore = create<CartStore>()(
     persist(
@@ -110,8 +115,10 @@ export const useCartStore = create<CartStore>()(
                     const activeOrder = state.orders[state.activeOrderId];
                     if (!activeOrder) return state;
 
-                    // taxIva is stored as a percentage (0, 5, 19) — convert to decimal
-                    const taxRate = typeof product.taxIva === 'number' ? product.taxIva / 100 : 0;
+                    // Taxes are stored as percentages (0, 5, 19) — convert to decimal
+                    const taxIva = (product.taxIva ?? 0) / 100;
+                    const taxIca = (product.taxIca ?? 0) / 100;
+                    const taxImpoConsumo = (product.taxImpoConsumo ?? 0) / 100;
 
                     const existingItem = activeOrder.items.find((item) => item.id === product.id);
                     let newItems: CartItem[];
@@ -124,7 +131,9 @@ export const useCartStore = create<CartStore>()(
                             id: product.id,
                             name: product.name,
                             price: product.price,
-                            taxRate,
+                            taxIva,
+                            taxIca,
+                            taxImpoConsumo,
                             imageUrl: product.imageUrl,
                             categoryId: product.categoryId,
                             quantity: 1
