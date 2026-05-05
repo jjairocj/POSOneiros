@@ -68,7 +68,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                 )}
             </DialogTrigger>
             
-            <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto rounded-[2rem] p-4 sm:p-6 bg-card border-border shadow-2xl">
+            <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[92vh] overflow-y-auto rounded-[2rem] p-5 sm:p-8 bg-card border-border shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Producto" : "Nuevo Producto"}
@@ -105,79 +105,78 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </div>
 
                         {/* Image URL and Favorite */}
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 sm:items-end">
+                        <div className="space-y-3">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1 flex items-center gap-1.5">
                                     <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                                    URL de la Imagen (Opcional - Cacheada en POS)
+                                    URL de la Imagen
+                                    <span className="text-xs font-normal text-muted-foreground">(Opcional)</span>
                                 </label>
-                                <Input 
-                                    name="imageUrl" 
-                                    defaultValue={product?.imageUrl || ""} 
-                                    className="rounded-xl h-12 bg-muted/50" 
+                                <Input
+                                    name="imageUrl"
+                                    defaultValue={product?.imageUrl || ""}
+                                    className="rounded-xl h-11 bg-muted/50"
                                     placeholder="https://ejemplo.com/imagen.jpg"
                                 />
                             </div>
-                            <div className="flex items-center space-x-2 h-12 px-4 rounded-xl border bg-card">
-                                <Switch 
-                                    id="isFavorite" 
-                                    name="isFavorite" 
+                            <div className="flex items-center gap-3 h-11 px-4 rounded-xl border bg-muted/30 w-fit">
+                                <Switch
+                                    id="isFavorite"
+                                    name="isFavorite"
                                     value="true"
-                                    defaultChecked={product?.isFavorite} 
+                                    defaultChecked={product?.isFavorite}
                                 />
                                 <label
                                     htmlFor="isFavorite"
                                     className="text-sm font-semibold cursor-pointer flex items-center gap-1.5"
                                 >
                                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                                    Favorito POS
+                                    Marcar como Favorito en POS
                                 </label>
                             </div>
                         </div>
 
                         {/* Costing Engine */}
-                        <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 space-y-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="font-bold text-primary">Calculadora de Precios</h3>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-primary/5 p-5 rounded-2xl border border-primary/10 space-y-4">
+                            <h3 className="font-bold text-primary">Calculadora de Precios</h3>
+                            <div className="grid grid-cols-3 gap-3">
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold ml-1">Costo Base ($)</label>
-                                    <Input 
-                                        name="cost" 
-                                        type="number" 
+                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Costo Base ($)</label>
+                                    <Input
+                                        name="cost"
+                                        type="number"
                                         step="0.01"
-                                        required 
+                                        required
                                         value={cost}
                                         onChange={(e) => setCost(Number(e.target.value))}
-                                        className="rounded-xl h-12 bg-background border-primary/20" 
+                                        className="rounded-xl h-11 bg-background border-primary/20"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold ml-1">Ganancia Esperada (%)</label>
-                                    <Input 
-                                        type="number" 
+                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Margen objetivo (%)</label>
+                                    <Input
+                                        type="number"
                                         step="0.1"
                                         value={expectedMargin}
                                         onChange={(e) => setExpectedMargin(Number(e.target.value))}
-                                        className="rounded-xl h-12 bg-background border-primary/20 text-primary font-bold" 
+                                        className="rounded-xl h-11 bg-background border-primary/20 text-primary font-bold"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold ml-1">Precio Final ($)</label>
-                                    <Input 
-                                        name="price" 
-                                        type="number" 
+                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Precio Final ($)</label>
+                                    <Input
+                                        name="price"
+                                        type="number"
                                         step="0.01"
-                                        required 
+                                        required
                                         value={price}
                                         onChange={(e) => setPrice(Number(e.target.value))}
-                                        className="rounded-xl h-12 bg-background border-primary/20 font-bold" 
+                                        className="rounded-xl h-11 bg-background border-primary/20 font-bold"
                                     />
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 text-sm">
+                            <div className="grid grid-cols-2 gap-3 pt-1 text-sm">
                                 <div className="bg-background p-3 rounded-xl border border-border flex justify-between items-center">
                                     <span className="text-muted-foreground">Precio Sugerido:</span>
                                     <span className="font-mono font-bold text-lg">${suggestedPrice.toFixed(0)}</span>
@@ -193,48 +192,52 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </div>
 
                         {/* Stock and Taxes */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="space-y-3">
                             <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">Inventario Inicial</label>
-                                <Input 
-                                    name="stock" 
-                                    type="number" 
+                                <label className="text-sm font-semibold ml-1">Inventario</label>
+                                <Input
+                                    name="stock"
+                                    type="number"
                                     step="0.01"
-                                    required 
-                                    defaultValue={product?.stock ?? 0} 
-                                    className="rounded-xl h-12 bg-muted/50" 
+                                    required
+                                    defaultValue={product?.stock ?? 0}
+                                    className="rounded-xl h-11 bg-muted/50"
                                 />
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">IVA (%)</label>
-                                <Input 
-                                    name="taxIva" 
-                                    type="number" 
-                                    step="0.01"
-                                    defaultValue={product?.taxIva ?? 0} 
-                                    className="rounded-xl h-12 bg-muted/50" 
-                                />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">ICA (%)</label>
-                                <Input 
-                                    name="taxIca" 
-                                    type="number" 
-                                    step="0.01"
-                                    defaultValue={product?.taxIca ?? 0} 
-                                    className="rounded-xl h-12 bg-muted/50" 
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">ImpoConsumo (%)</label>
-                                <Input 
-                                    name="taxImpoConsumo" 
-                                    type="number" 
-                                    step="0.01"
-                                    defaultValue={product?.taxImpoConsumo ?? 0} 
-                                    className="rounded-xl h-12 bg-muted/50" 
-                                />
+                            <div>
+                                <p className="text-sm font-semibold ml-1 mb-2">Impuestos</p>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">IVA (%)</label>
+                                        <Input
+                                            name="taxIva"
+                                            type="number"
+                                            step="0.01"
+                                            defaultValue={product?.taxIva ?? 0}
+                                            className="rounded-xl h-11 bg-muted/50"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">ICA (%)</label>
+                                        <Input
+                                            name="taxIca"
+                                            type="number"
+                                            step="0.01"
+                                            defaultValue={product?.taxIca ?? 0}
+                                            className="rounded-xl h-11 bg-muted/50"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">ImpoConsumo (%)</label>
+                                        <Input
+                                            name="taxImpoConsumo"
+                                            type="number"
+                                            step="0.01"
+                                            defaultValue={product?.taxImpoConsumo ?? 0}
+                                            className="rounded-xl h-11 bg-muted/50"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
