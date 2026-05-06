@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-export default function Receipt({ sale }: { sale: any }) {
+export default function Receipt({ sale, subAccountLabel }: { sale: any; subAccountLabel?: string }) {
     if (!sale) return null;
 
     return (
@@ -16,6 +16,7 @@ export default function Receipt({ sale }: { sale: any }) {
 
             <div className="border-t border-b border-black py-2 mb-4 text-xs">
                 <p><strong>Factura:</strong> #{sale.id.slice(0, 8).toUpperCase()}</p>
+                {subAccountLabel && <p><strong>Subcuenta:</strong> {subAccountLabel}</p>}
                 <p><strong>Fecha:</strong> {new Date(sale.createdAt).toLocaleString()}</p>
                 <p><strong>Caja:</strong> {sale.shiftId.slice(0, 8)}</p>
             </div>

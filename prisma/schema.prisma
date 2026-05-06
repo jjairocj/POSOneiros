@@ -51,19 +51,20 @@ model Register {
 }
 
 model Shift {
-  id          String    @id @default(uuid())
+  id          String       @id @default(uuid())
   userId      String
-  user        User      @relation(fields: [userId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
   registerId  String
-  register    Register  @relation(fields: [registerId], references: [id])
-  baseAmount  Float     @default(0)
-  closeAmount Float?    
-  status      String    @default("OPEN") // OPEN, CLOSED
-  startTime   DateTime  @default(now())
+  register    Register     @relation(fields: [registerId], references: [id])
+  baseAmount  Float        @default(0)
+  closeAmount Float?
+  status      String       @default("OPEN") // OPEN, CLOSED
+  startTime   DateTime     @default(now())
   endTime     DateTime?
   sales       Sale[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  subAccounts SubAccount[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Category {
@@ -117,8 +118,22 @@ model Sale {
   status        String        @default("COMPLETED") // COMPLETED, SUSPENDED, CANCELLED
   details       SaleDetail[]
   payments      Payment[]
+  subAccount    SubAccount?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+model SubAccount {
+  id        String   @id @default(uuid())
+  shiftId   String
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+  label     String
+  items     Json
+  total     Float
+  paid      Boolean  @default(false)
+  saleId    String?  @unique
+  sale      Sale?    @relation(fields: [saleId], references: [id])
+  createdAt DateTime @default(now())
 }
 
 model SaleDetail {

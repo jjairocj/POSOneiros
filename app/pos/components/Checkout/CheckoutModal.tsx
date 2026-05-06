@@ -165,12 +165,14 @@ export default function CheckoutModal({
     items,
     onSuccess,
     onCancel,
+    subAccountLabel,
 }: {
     activeShiftId: string;
     orderTotal: number;
     items: any[];
     onSuccess: () => void;
     onCancel: () => void;
+    subAccountLabel?: string;
 }) {
     const [loading, setLoading] = useState(false);
     const [cash, setCash] = useState("");
@@ -208,7 +210,7 @@ export default function CheckoutModal({
             if (cashAmount > 0 && amountToCover > 0) {
                 payments.push({ method: "CASH", amount: amountToCover });
             }
-            const sale = await processSale(activeShiftId, items, payments, customerId ?? undefined);
+            const sale = await processSale(activeShiftId, items, payments, customerId ?? undefined, subAccountLabel);
             playSaleSound();
             setCompletedSale(sale);
         } catch (err: any) {
@@ -274,7 +276,7 @@ export default function CheckoutModal({
                             </Button>
                         </div>
                         <div className="hidden" id="print-receipt">
-                            <Receipt sale={completedSale} />
+                            <Receipt sale={completedSale} subAccountLabel={subAccountLabel} />
                         </div>
                     </div>
                 ) : (
@@ -287,7 +289,9 @@ export default function CheckoutModal({
                             <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-3">
                                 <ReceiptIcon className="w-7 h-7 text-primary" />
                             </div>
-                            <h2 className="text-2xl font-black tracking-tight">Checkout</h2>
+                            <h2 className="text-2xl font-black tracking-tight">
+                                {subAccountLabel ? subAccountLabel : "Checkout"}
+                            </h2>
                             <p className="text-muted-foreground text-sm font-medium mt-1">
                                 Total a cobrar:{" "}
                                 <span className="text-foreground text-xl font-bold ml-1">${orderTotal.toLocaleString()}</span>

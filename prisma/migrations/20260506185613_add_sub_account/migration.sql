@@ -1,0 +1,37 @@
+-- AlterTable
+ALTER TABLE "Category" ADD COLUMN     "sortOrder" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "isFavorite" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "taxIca" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "taxImpoConsumo" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "taxIva" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "SaleDetail" ADD COLUMN     "taxIcaAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "taxImpoConsumoAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "taxIvaAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+-- CreateTable
+CREATE TABLE "SubAccount" (
+    "id" TEXT NOT NULL,
+    "shiftId" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "items" JSONB NOT NULL,
+    "total" DOUBLE PRECISION NOT NULL,
+    "paid" BOOLEAN NOT NULL DEFAULT false,
+    "saleId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "SubAccount_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SubAccount_saleId_key" ON "SubAccount"("saleId");
+
+-- AddForeignKey
+ALTER TABLE "SubAccount" ADD CONSTRAINT "SubAccount_shiftId_fkey" FOREIGN KEY ("shiftId") REFERENCES "Shift"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SubAccount" ADD CONSTRAINT "SubAccount_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale"("id") ON DELETE SET NULL ON UPDATE CASCADE;

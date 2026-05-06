@@ -282,6 +282,7 @@ function SubAccountCard({
                     activeShiftId={activeShiftId}
                     orderTotal={sa.customAmount ?? sa.total}
                     items={sa.items}
+                    subAccountLabel={sa.label}
                     onSuccess={() => {
                         setCheckoutOpen(false);
                         onPaid();

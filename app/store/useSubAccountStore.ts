@@ -127,13 +127,13 @@ export const useSubAccountStore = create<SubAccountStore>((set, get) => ({
         const n = subAccounts.length;
         if (n === 0) return;
 
-        // Divide total amount equally, rounded to nearest $50. Last person absorbs remainder.
+        // Divide total amount equally, rounded to nearest $50. First person absorbs remainder.
         const perPerson = roundTo50(cartTotal / n);
-        const lastAmount = cartTotal - perPerson * (n - 1);
+        const firstAmount = cartTotal - perPerson * (n - 1);
 
         set({
             subAccounts: subAccounts.map((sa, i) =>
-                recalc({ ...sa, items, customAmount: i === n - 1 ? lastAmount : perPerson })
+                recalc({ ...sa, items, customAmount: i === 0 ? firstAmount : perPerson })
             ),
             pendingItemId: null,
         });

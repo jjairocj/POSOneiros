@@ -7,7 +7,8 @@ export async function processSale(
     activeShiftId: string,
     items: any[],
     payments: { method: string, amount: number }[],
-    customerId?: string
+    customerId?: string,
+    subAccountLabel?: string
 ) {
     // Validate shift
     const shift = await prisma.shift.findUnique({ where: { id: activeShiftId } });
@@ -63,25 +64,32 @@ export async function processSale(
                 shiftId: activeShiftId,
                 customerId,
                 total: finalTotal,
-                details: {
-                    create: saleDetails
-                },
+                details: { create: saleDetails },
                 payments: {
                     create: payments.map((p: any) => ({
                         method: p.method,
-                        amount: p.amount
-                    }))
-                }
+                        amount: p.amount,
+                    })),
+                },
             },
             include: {
-                details: {
-                    include: {
-                        product: true
-                    }
-                },
-                payments: true
-            }
+                details: { include: { product: true } },
+                payments: true,
+            },
         });
+
+        if (subAccountLabel) {
+            await tx.subAccount.create({
+                data: {
+                    shiftId: activeShiftId,
+                    label: subAccountLabel,
+                    items: items as any,
+                    total: finalTotal,
+                    paid: true,
+                    saleId: newSale.id,
+                },
+            });
+        }
 
         return newSale;
     });
