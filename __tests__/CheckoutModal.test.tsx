@@ -113,7 +113,9 @@ describe('CheckoutModal — payment stage', () => {
             expect(mockProcessSale).toHaveBeenCalledWith(
                 'shift_1',
                 DEFAULT_PROPS.items,
-                expect.arrayContaining([expect.objectContaining({ method: 'CASH', amount: 15000 })])
+                expect.arrayContaining([expect.objectContaining({ method: 'CASH', amount: 15000 })]),
+                undefined,
+                undefined
             )
         );
     });
