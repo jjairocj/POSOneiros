@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { openShift } from "../../../actions/shift";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,8 +30,8 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-card w-full max-w-sm rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border relative">
         {onClose && (
           <button 
@@ -80,6 +81,7 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

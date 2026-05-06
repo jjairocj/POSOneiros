@@ -88,6 +88,7 @@ export default function ProductGrid() {
 
     return (
         <div className="flex flex-col h-full rounded-tr-3xl">
+            <div className="pb-1">
             <OrderSwitcher />
 
             {/* Search bar */}
@@ -115,8 +116,10 @@ export default function ProductGrid() {
                 activeCategoryId={activeCategoryId}
                 onSelect={handleCategorySelect}
             />
+            </div>{/* end sticky header */}
 
-            <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto pb-24 pr-4 custom-scrollbar transition-opacity duration-300 ${isPending ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-28 lg:pb-4 transition-opacity duration-300 ${isPending ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                 {products.length > 0 ? (
                     products.map((product) => (
                         <ProductCard key={product.id} product={product} />
@@ -130,6 +133,7 @@ export default function ProductGrid() {
                     </div>
                 )}
             </div>
+            </div>{/* end scroll wrapper */}
         </div>
     );
 }

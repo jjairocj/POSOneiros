@@ -31,6 +31,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { closeShift } from "@/app/actions/shift";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -89,9 +90,9 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
             ? `¡Buen turno, ${summary.userName.split(" ")[0]}!`
             : "¡Buen turno!";
 
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border overflow-y-auto max-h-[90vh]">
+        return createPortal(
+            <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto p-4">
+                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border my-auto">
                     {/* Header */}
                     <div className="flex flex-col items-center text-center space-y-2 mb-6">
                         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-2">
@@ -166,13 +167,14 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                         Confirmar y Salir
                     </Button>
                 </div>
-            </div>
+            </div>,
+            document.body
         );
     }
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-card w-full max-w-sm rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border">
+    return createPortal(
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto p-4">
+            <div className="bg-card w-full max-w-sm rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border my-auto">
                 <div className="flex flex-col items-center text-center space-y-2 mb-8">
                     <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-2">
                         <LogOut className="w-8 h-8 text-destructive" />
@@ -230,6 +232,7 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

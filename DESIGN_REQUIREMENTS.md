@@ -335,11 +335,225 @@ Sprint 3 — Experiencia emocional
 └── Sonido configurable en confirmación de venta
 
 Sprint 4 — Pulido y pruebas
-├── Pruebas de accesibilidad táctil
+├── Pruebas de accesibilidad táctil (targets mínimo 44px)
 ├── Skeleton loaders en todas las vistas con carga async
-├── Estados de error con mensajes amigables
+├── Estados de error con mensajes amigables (error boundaries)
 └── Exportación de reportes (PDF/Excel)
+
+Sprint 5 — Estabilización y QA visual
+├── Corrección de z-index y stacking contexts (modales detrás de headers sticky)
+├── Scroll del catálogo POS: buscador y categorías fijos al hacer scroll
+├── Filtro "Sin Categoría" en selector de categorías del POS
+├── Arqueo de cierre de turno: desglose por método de pago en resumen Z
+├── Hydration warnings suprimidos (extensiones de browser en body)
+└── Auditoría de modales: todos usan createPortal para escapar stacking contexts
 ```
+
+---
+
+## ACTO 4 — FUNCIONALIDADES AVANZADAS
+
+### Sprint 6 — Cuentas separadas (Split Bill)
+
+**Contexto narrativo**: En cafeterías, restaurantes y tiendas grupales, es común que un grupo de personas quiera dividir la cuenta. Hoy el POS solo soporta una orden por turno activa o múltiples órdenes manuales sin relación entre sí. El cajero debe dividir manualmente en papel, lo que genera errores y fricción.
+
+**Objetivo**: Permitir que una orden se divida en subcuentas por persona o grupo, cada una cobrable de forma independiente, con su propio método de pago.
+
+#### 6.1 Modelo de datos
+
+```
+Orden principal
+  └── Subcuenta 1 (Persona A) → items seleccionados → pago independiente
+  └── Subcuenta 2 (Persona B) → items seleccionados → pago independiente
+  └── Subcuenta 3 (Compartido) → items divididos equitativamente → pago por splits
+```
+
+- Agregar tabla `SubAccount` en Prisma:
+  ```prisma
+  model SubAccount {
+    id        String   @id @default(cuid())
+    orderId   String
+    label     String   // "Persona 1", "María", etc.
+    items     Json     // snapshot de CartItem[]
+    total     Decimal
+    paid      Boolean  @default(false)
+    saleId    String?  // referencia a Sale si ya se cobró
+    createdAt DateTime @default(now())
+  }
+  ```
+- `Sale` existente se reutiliza: cada subcuenta genera su propio `Sale` con su método de pago
+
+#### 6.2 Flujo de usuario (cajero)
+
+**Paso 1 — Activar modo split desde el carrito**
+- Botón "Dividir cuenta" en el footer del `CartDrawer`, visible solo cuando hay ≥ 2 items
+- Al activar, aparece el `SplitBillModal`
+
+**Paso 2 — Crear subcuentas**
+- El modal muestra todos los items del carrito a la izquierda
+- A la derecha, lista de subcuentas (inicia con 2, máximo 8)
+- Botones: "+ Agregar persona", "Dividir equitativamente", "Dividir por item"
+- Cada subcuenta tiene un label editable (default: "Persona 1", "Persona 2"...)
+
+**Paso 3 — Asignar items**
+- Modo drag-and-drop: arrastrar items de la lista central a cada subcuenta
+- O modo selector: tap en item → tap en subcuenta destino
+- Items con cantidad > 1 pueden dividirse (ej: 2 cafés → 1 a cada subcuenta)
+- "Dividir equitativamente": distribuye el total en partes iguales sin asignar items específicos (útil para mesas donde todos piden similar)
+
+**Paso 4 — Cobrar subcuentas**
+- Cada subcuenta muestra su total calculado
+- Botón "Cobrar" por subcuenta → abre `CheckoutModal` para esa subcuenta
+- Las subcuentas cobradas se marcan con ✓ verde y quedan bloqueadas
+- La orden se cierra completamente cuando todas las subcuentas están pagadas
+- Subcuentas pendientes persisten: si el cajero cobra 2 de 3, la 3ra queda en estado "pendiente de pago"
+
+**Paso 5 — Recibo por subcuenta**
+- Cada subcuenta genera su propio recibo con solo sus items y su total
+- El recibo indica "Subcuenta: [label] — Mesa/Orden: [id]"
+
+#### 6.3 Casos especiales
+
+- **Items compartidos**: un item puede marcarse como "compartido" → su precio se divide entre todas las subcuentas activas (ej: una botella de vino para la mesa)
+- **Propina por subcuenta**: si se implementa propina en el futuro, aplica por subcuenta
+- **Cancelar split**: si el cajero cancela, vuelve a la orden unificada sin perder items
+- **Split parcial**: se puede cobrar la cuenta completa a una persona y solo dividir algunos items
+
+#### 6.4 Componentes a crear
+
+| Componente | Ruta | Descripción |
+|---|---|---|
+| `SplitBillButton` | `CartDrawer.tsx` | Botón trigger visible con ≥2 items |
+| `SplitBillModal` | `Checkout/SplitBillModal.tsx` | Modal principal de división |
+| `SubAccountCard` | `Checkout/SubAccountCard.tsx` | Tarjeta por persona con sus items y total |
+| `ItemAssigner` | `Checkout/ItemAssigner.tsx` | Lista de items arrastrables/seleccionables |
+| `useSubAccounts` | `store/useSubAccounts.ts` | Zustand store para estado de subcuentas |
+
+#### 6.5 Server Actions a crear
+
+- `createSubAccounts(orderId, subAccounts[])` — persiste las subcuentas
+- `paySubAccount(subAccountId, paymentMethod, amount)` — cobra una subcuenta, crea Sale
+- `getOrderSubAccounts(orderId)` — obtiene subcuentas con estado de pago
+- `cancelSubAccounts(orderId)` — cancela split, restaura orden original
+
+#### 6.6 Criterios de aceptación
+
+- [ ] Una orden de 4 items puede dividirse en 2–4 subcuentas en menos de 30 segundos
+- [ ] Cada subcuenta genera su propio registro `Sale` con método de pago independiente
+- [ ] El cajero puede cobrar subcuentas en cualquier orden (no necesariamente secuencial)
+- [ ] Si una subcuenta queda sin pagar, la orden NO se cierra y permanece visible
+- [ ] El resumen del turno cuenta correctamente el total de subcuentas cobradas como transacciones separadas
+- [ ] "Dividir equitativamente" funciona con montos no divisibles (redondea la diferencia a la primera subcuenta)
+- [ ] En mobile (< 640px) el modal es usable con una sola mano
+
+---
+
+### Sprint 7 — Cobertura de tests unitarios
+
+**Objetivo**: Garantizar que cada componente crítico del sistema tiene al menos un test unitario que verifique su comportamiento principal. El stack es **Vitest + Testing Library**.
+
+#### 7.1 Inventario de componentes sin tests (prioridad alta)
+
+**Store / Estado global**
+
+| Archivo | Tests requeridos |
+|---|---|
+| `app/store/useCartStore.ts` | `addItem`, `removeItem`, `updateQuantity`, `clearActiveOrder`, cálculo de `subtotal/taxIva/total`, multi-orden |
+
+**Server Actions**
+
+| Archivo | Tests requeridos |
+|---|---|
+| `app/actions/product.ts` | `getProducts` con filtros (favorites, uncategorized, categoryId, search), `createProduct`, `updateProduct`, `deleteProduct` |
+| `app/actions/shift.ts` | `getActiveShift`, `openShift`, `closeShift` (cálculo de summary, topProduct, peakHour, diferencia de caja) |
+| `app/actions/sale.ts` | `createSale` con descuento de stock, validación de turno activo |
+| `app/actions/customers.ts` | `searchCustomers` (mínimo 2 chars, max 8 resultados), `createCustomer` |
+| `app/actions/dashboard.ts` | `getDashboardData` (KPIs correctos, lowStockProducts) |
+
+**Componentes UI — POS**
+
+| Componente | Tests requeridos |
+|---|---|
+| `ProductCard.tsx` | Renderiza nombre/precio, click agrega al carrito, out-of-stock deshabilita click, toggle favorito llama action |
+| `CategorySelector.tsx` | Renderiza categorías, badge activo cambia con `activeCategoryId`, click llama `onSelect` |
+| `CartDrawer.tsx` | Muestra items, botones +/- actualizan cantidad, "Limpiar" vacía orden, "Proceder al pago" abre checkout |
+| `ProductGrid.tsx` | Carga inicial con categoría `favorites`, cambio de categoría llama `getProducts`, búsqueda con debounce |
+| `OrderSwitcher.tsx` | Cambio de orden activa store, "+ Nueva" crea orden |
+| `MobileCartBar.tsx` | Muestra total y count, bounce animation al agregar item |
+
+**Componentes UI — Admin**
+
+| Componente | Tests requeridos |
+|---|---|
+| `ExportButton.tsx` | Click genera archivo XLSX, columnas correctas |
+| `LowStockPanel.tsx` | Renderiza productos con stock ≤ threshold, badge rojo si stock=0 |
+| `product-form.tsx` | Validación de campos requeridos, submit llama action correcta (create vs update) |
+
+**Componentes UI — Shift**
+
+| Componente | Tests requeridos |
+|---|---|
+| `ShiftClosingModal.tsx` | Stage 1: submit con monto válido/inválido; Stage 2: renderiza summary con diferencia coloreada correctamente |
+| `ShiftOpeningModal.tsx` | Submit llama `openShift`, cierra modal en éxito |
+| `CheckoutModal.tsx` | Selección de método de pago, búsqueda de cliente, submit llama `createSale`, sonido se reproduce |
+
+**Utilidades**
+
+| Archivo | Tests requeridos |
+|---|---|
+| `app/lib/money.ts` | `formatMoney` con valores enteros, decimales, cero, negativos |
+| `app/lib/sound.ts` | `playSaleSound` no lanza error en entorno sin AudioContext |
+| `app/actions/product.ts` — import | `parseXLSX`, detección de duplicados por código, mapeo de columnas Siigo |
+
+#### 7.2 Configuración de entorno de tests
+
+- Configurar `vitest.config.ts` con `jsdom` environment
+- Mock de `next/navigation` (`useRouter`, `useSearchParams`)
+- Mock de `next-auth/react` (`useSession`)
+- Mock de server actions con `vi.mock('@/app/actions/...')`
+- Mock de `prisma` para tests de actions (usar `prisma-mock` o `jest-mock-extended`)
+- Setup de `@testing-library/jest-dom` para matchers extendidos
+- Script en `package.json`: `"test": "vitest"`, `"test:coverage": "vitest --coverage"`
+
+#### 7.3 Estructura de archivos de test
+
+```
+__tests__/
+  store/
+    useCartStore.test.ts
+  actions/
+    product.test.ts
+    shift.test.ts
+    sale.test.ts
+    customers.test.ts
+    dashboard.test.ts
+  components/
+    pos/
+      ProductCard.test.tsx
+      CategorySelector.test.tsx
+      CartDrawer.test.tsx
+      ProductGrid.test.tsx
+      MobileCartBar.test.tsx
+    admin/
+      ExportButton.test.tsx
+      LowStockPanel.test.tsx
+      ProductForm.test.tsx
+    shift/
+      ShiftClosingModal.test.tsx
+      ShiftOpeningModal.test.tsx
+      CheckoutModal.test.tsx
+  lib/
+    money.test.ts
+    sound.test.ts
+```
+
+#### 7.4 Criterios de aceptación
+
+- [ ] `vitest --run` pasa sin errores desde cero (sin servidor ni DB real)
+- [ ] Cobertura mínima: 80% de statements en `app/store/`, 70% en `app/actions/`, 60% en `app/pos/components/`
+- [ ] Tests de actions usan mocks de Prisma — no tocan la DB real
+- [ ] CI-ready: los tests corren en GitHub Actions sin configuración adicional
+- [ ] Cada test describe claramente QUÉ prueba (nombres descriptivos en español o inglés)
 
 ---
 

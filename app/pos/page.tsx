@@ -30,7 +30,7 @@ export default async function POSPage() {
       <main className="flex-1 overflow-hidden">
         {/* Extra bottom padding on mobile so content isn't hidden behind the cart bar */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] h-full overflow-hidden">
-          <section className="h-full overflow-y-auto pb-28 lg:pb-0 pt-4 px-4 sm:px-6">
+          <section className="h-full overflow-hidden pt-4 px-4 sm:px-6">
             <ProductGrid />
           </section>
 

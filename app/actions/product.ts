@@ -7,8 +7,9 @@ export async function getProducts(categoryId?: string, search?: string) {
         const products = await prisma.product.findMany({
             where: {
                 AND: [
-                    categoryId && categoryId !== 'favorites' ? { categoryId } : {},
-                    categoryId === 'favorites' ? { isFavorite: true } : {},
+                    categoryId === 'favorites' ? { isFavorite: true } :
+                    categoryId === 'uncategorized' ? { categoryId: null } :
+                    categoryId ? { categoryId } : {},
                     search ? {
                         OR: [
                             { name: { contains: search, mode: 'insensitive' } },

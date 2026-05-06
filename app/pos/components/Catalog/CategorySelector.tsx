@@ -33,6 +33,14 @@ export default function CategorySelector({
                     {cat.name}
                 </Badge>
             ))}
+            <Badge
+                variant={activeCategoryId === 'uncategorized' ? "default" : "secondary"}
+                className={`cursor-pointer px-4 py-1.5 text-sm whitespace-nowrap transition-colors
+                           ${activeCategoryId !== 'uncategorized' && 'hover:bg-primary/20 hover:text-primary'}`}
+                onClick={() => onSelect('uncategorized')}
+            >
+                Sin Categoría
+            </Badge>
         </div>
     );
 }
