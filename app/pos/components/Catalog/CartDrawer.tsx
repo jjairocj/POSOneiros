@@ -192,6 +192,11 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                     activeShiftId={activeShiftId}
                     items={items}
                     onClose={() => setIsSplitOpen(false)}
+                    onSuccess={() => {
+                        setIsSplitOpen(false);
+                        clearActiveOrder();
+                        onCheckoutSuccess?.();
+                    }}
                 />
             )}
             {isCheckoutOpen && activeShiftId && (

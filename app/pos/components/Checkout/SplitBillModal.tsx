@@ -13,6 +13,7 @@ interface SplitBillModalProps {
     activeShiftId: string;
     items: CartItem[];
     onClose: () => void;
+    onSuccess?: () => void;
 }
 
 // ─── Quantity Picker ──────────────────────────────────────────────────────────
@@ -294,7 +295,7 @@ function SubAccountCard({
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
-export default function SplitBillModal({ activeShiftId, items, onClose }: SplitBillModalProps) {
+export default function SplitBillModal({ activeShiftId, items, onClose, onSuccess }: SplitBillModalProps) {
     const {
         subAccounts, pendingItemId, pendingQty,
         cancelSplit, addSubAccount, removeSubAccount, renameSubAccount,
@@ -346,6 +347,7 @@ export default function SplitBillModal({ activeShiftId, items, onClose }: SplitB
     const handleAllDone = () => {
         cancelSplit();
         onClose();
+        onSuccess?.();
     };
 
     const everythingPaid = allPaid() && subAccounts.length > 0;
