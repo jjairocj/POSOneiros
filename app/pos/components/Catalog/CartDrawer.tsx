@@ -23,7 +23,7 @@ function CartItemRow({ item, onChangeQty }: { item: CartItem; onChangeQty: (q: n
                 <button
                     type="button"
                     aria-label="Reducir cantidad"
-                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    className="w-11 h-11 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     onClick={() => onChangeQty(item.quantity - 1)}
                 >
                     <Minus className="w-3.5 h-3.5" />
@@ -32,7 +32,7 @@ function CartItemRow({ item, onChangeQty }: { item: CartItem; onChangeQty: (q: n
                 <button
                     type="button"
                     aria-label="Aumentar cantidad"
-                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    className="w-11 h-11 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                     onClick={() => onChangeQty(item.quantity + 1)}
                 >
                     <Plus className="w-3.5 h-3.5" />

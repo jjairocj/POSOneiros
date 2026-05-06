@@ -5,6 +5,7 @@ import { Receipt, AreaChart as ChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from './components/DashboardTab';
 import { HistoryTab } from './components/HistoryTab';
+import { ExportButton } from './components/ExportButton';
 
 export const metadata: Metadata = {
     title: "Oneiros Admin | Ventas y Reportes",
@@ -34,7 +35,7 @@ export default async function SalesPage() {
                         <p className="text-muted-foreground mt-1 text-sm md:text-lg">Analíticas y registro histórico de transacciones.</p>
                     </div>
                 </div>
-                {/* Future Server-Side Filters UI can go here */}
+                <ExportButton data={history} />
             </header>
 
             {/* Content Tabs */}
