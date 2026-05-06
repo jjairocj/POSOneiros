@@ -1,12 +1,14 @@
 "use client";
 import { useState } from "react";
-import { Minus, Plus, ShoppingCart, ArrowLeft, Trash2 } from "lucide-react";
+import { Minus, Plus, ShoppingCart, ArrowLeft, Trash2, Users } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCartStore, type CartItem } from "@/app/store/useCartStore";
 import { formatMoney } from "@/app/lib/money";
 import ShiftOpeningModal from "../Shift/ShiftOpeningModal";
 import CheckoutModal from "../Checkout/CheckoutModal";
+import SplitBillModal from "../Checkout/SplitBillModal";
+import { useSubAccountStore } from "@/app/store/useSubAccountStore";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -78,8 +80,10 @@ interface CartDrawerProps {
 
 export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDrawerProps) {
     const { orders, activeOrderId, updateQuantity, clearActiveOrder } = useCartStore();
+    const { initSplit } = useSubAccountStore();
     const [isOpeningShift, setIsOpeningShift] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [isSplitOpen, setIsSplitOpen] = useState(false);
 
     const activeOrder = orders[activeOrderId];
     if (!activeOrder) return null;
@@ -153,6 +157,20 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                     </span>
                 </div>
 
+                {hasItems && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                        if (!activeShiftId) { setIsOpeningShift(true); return; }
+                        initSplit(items);
+                        setIsSplitOpen(true);
+                    }}
+                        className="w-full py-2.5 text-sm font-semibold rounded-2xl border border-border text-muted-foreground hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2 mb-3"
+                    >
+                        <Users className="w-4 h-4" /> Dividir cuenta
+                    </button>
+                )}
+
                 <button
                     type="button"
                     disabled={!hasItems}
@@ -169,6 +187,13 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
             </div>
 
             {isOpeningShift && <ShiftOpeningModal onClose={() => setIsOpeningShift(false)} />}
+            {isSplitOpen && activeShiftId && (
+                <SplitBillModal
+                    activeShiftId={activeShiftId}
+                    items={items}
+                    onClose={() => setIsSplitOpen(false)}
+                />
+            )}
             {isCheckoutOpen && activeShiftId && (
                 <CheckoutModal
                     activeShiftId={activeShiftId}

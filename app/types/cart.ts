@@ -35,3 +35,16 @@ export interface Order extends OrderTotals {
     items: CartItem[];
     createdAt: number;
 }
+
+export interface SubAccount {
+    id: string;
+    label: string;
+    items: CartItem[];
+    subtotal: number;
+    taxIva: number;
+    taxIca: number;
+    taxImpoConsumo: number;
+    total: number;
+    customAmount?: number; // overrides total in checkout (editable, multiple of 50)
+    paid: boolean;
+}
