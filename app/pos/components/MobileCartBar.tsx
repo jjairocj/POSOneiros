@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ShoppingCart, X } from "lucide-react";
 import { useCartStore } from "@/app/store/useCartStore";
 import CartDrawer from "./Catalog/CartDrawer";
@@ -11,10 +11,20 @@ interface MobileCartBarProps {
 
 export default function MobileCartBar({ activeShiftId }: MobileCartBarProps) {
   const [open, setOpen] = useState(false);
+  const [bounce, setBounce] = useState(false);
   const { orders, activeOrderId } = useCartStore();
   const activeOrder = orders[activeOrderId];
   const itemCount = activeOrder?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
   const total = activeOrder?.total ?? 0;
+  const prevCount = useRef(itemCount);
+
+  useEffect(() => {
+    if (itemCount > prevCount.current) {
+      setBounce(true);
+      setTimeout(() => setBounce(false), 500);
+    }
+    prevCount.current = itemCount;
+  }, [itemCount]);
 
   return (
     <>
@@ -25,7 +35,7 @@ export default function MobileCartBar({ activeShiftId }: MobileCartBarProps) {
           className="w-full flex items-center justify-between bg-primary text-primary-foreground px-5 py-4 rounded-2xl shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
         >
           <div className="flex items-center gap-3">
-            <div className="relative">
+            <div className={`relative transition-transform duration-150 ${bounce ? "scale-125" : "scale-100"}`}>
               <ShoppingCart className="w-5 h-5" />
               {itemCount > 0 && (
                 <span className="absolute -top-2 -right-2 w-4 h-4 bg-destructive text-white rounded-full text-[10px] font-black flex items-center justify-center">

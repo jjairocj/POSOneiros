@@ -1,6 +1,7 @@
 import { getDashboardData } from "@/app/actions/dashboard";
 import { formatMoney } from "@/app/lib/money";
 import { SalesHourChart } from "./components/SalesHourChart";
+import { LowStockPanel } from "./inventory/components/LowStockPanel";
 import {
     TrendingUp,
     ShoppingCart,
@@ -22,7 +23,7 @@ const METHOD_LABELS: Record<string, string> = {
 
 export default async function AdminDashboardPage() {
     const data = await getDashboardData();
-    const { kpis, hourlySales, topProducts, recentSales } = data;
+    const { kpis, hourlySales, topProducts, recentSales, lowStockProducts } = data;
 
     const maxQty = topProducts[0]?.totalQty ?? 1;
 
@@ -158,6 +159,17 @@ export default async function AdminDashboardPage() {
                 </div>
                 <SalesHourChart data={hourlySales} />
             </div>
+
+            {/* Low stock alert panel */}
+            {kpis.lowStockCount > 0 && (
+                <div>
+                    <h2 className="text-lg font-bold tracking-tight mb-3 flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-500" />
+                        Alertas de Stock
+                    </h2>
+                    <LowStockPanel products={lowStockProducts} />
+                </div>
+            )}
 
             {/* Bottom row: Top Products + Recent Sales */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

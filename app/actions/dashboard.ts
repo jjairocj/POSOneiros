@@ -22,6 +22,14 @@ export interface RecentSale {
     mainPaymentMethod: string | null;
 }
 
+export interface LowStockItem {
+    id: string;
+    code: string;
+    name: string;
+    stock: number;
+    price: number;
+}
+
 export interface DashboardData {
     kpis: {
         todaySales: number;
@@ -32,6 +40,7 @@ export interface DashboardData {
     hourlySales: HourlySale[];
     topProducts: TopProduct[];
     recentSales: RecentSale[];
+    lowStockProducts: LowStockItem[];
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
@@ -41,7 +50,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     const start24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Run all queries in parallel
-    const [todaySales, activeShift, lowStockCount, salesLast24h, topProductsRaw, recentSalesRaw] =
+    const [todaySales, activeShift, lowStockCount, lowStockProducts, salesLast24h, topProductsRaw, recentSalesRaw] =
         await Promise.all([
             // 1. Aggregate today's sales
             prisma.sale.aggregate({
@@ -65,7 +74,15 @@ export async function getDashboardData(): Promise<DashboardData> {
                 where: { stock: { lt: 5 } },
             }),
 
-            // 4. Sales last 24h for hourly chart
+            // 4. Low stock product list (for actionable panel)
+            prisma.product.findMany({
+                where: { stock: { lte: 5 }, isActive: true },
+                select: { id: true, code: true, name: true, stock: true, price: true },
+                orderBy: { stock: "asc" },
+                take: 20,
+            }),
+
+            // 5. Sales last 24h for hourly chart
             prisma.sale.findMany({
                 where: {
                     createdAt: { gte: start24h },
@@ -161,5 +178,6 @@ export async function getDashboardData(): Promise<DashboardData> {
         hourlySales,
         topProducts,
         recentSales,
+        lowStockProducts,
     };
 }
