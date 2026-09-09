@@ -2,6 +2,7 @@
 
 import prisma from "../../lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { startOfBusinessDay, endOfBusinessDay, businessHour, BUSINESS_TZ } from "@/app/lib/time";
 
 export interface HourlySale {
     hour: number;
@@ -47,8 +48,8 @@ export interface DashboardData {
 export async function getDashboardData(): Promise<DashboardData> {
     await requireAdmin();
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfDay = startOfBusinessDay(now);
+    const endOfDay = endOfBusinessDay(now);
     const start24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Run all queries in parallel
@@ -130,7 +131,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     // Build hourly chart data (last 24h, one bucket per hour)
     const hourlyMap = new Map<number, { total: number; count: number }>();
     for (const sale of salesLast24h) {
-        const h = new Date(sale.createdAt).getHours();
+        const h = businessHour(new Date(sale.createdAt));
         const existing = hourlyMap.get(h) ?? { total: 0, count: 0 };
         hourlyMap.set(h, { total: existing.total + sale.total, count: existing.count + 1 });
     }
@@ -165,6 +166,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         time: new Date(s.createdAt).toLocaleTimeString("es-CO", {
             hour: "2-digit",
             minute: "2-digit",
+            timeZone: BUSINESS_TZ,
         }),
         total: s.total,
         mainPaymentMethod: s.payments[0]?.method ?? null,

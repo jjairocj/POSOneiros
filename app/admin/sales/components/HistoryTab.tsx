@@ -21,9 +21,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Printer, Maximize2, ReceiptText } from "lucide-react";
-import Receipt from "@/app/pos/components/Checkout/Receipt";
+import { ArrowUpDown, Printer, ReceiptText, Ban } from "lucide-react";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import Receipt, { type ReceiptSale } from "@/app/pos/components/Checkout/Receipt";
+import { printReceipt } from "@/app/pos/components/Checkout/SaleSuccess";
 import { getSaleForPrint } from "@/app/actions/report";
+import { cancelSale } from "@/app/actions/sale";
+import { CancelSaleDialog } from "./CancelSaleDialog";
 
 interface HistoryData {
     id: string;
@@ -34,12 +39,32 @@ interface HistoryData {
     sellerName: string;
     shiftId: string;
     payments: string;
+    cancelReason?: string | null;
 }
 
 export function HistoryTab({ data }: { data: HistoryData[] }) {
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [printingSale, setPrintingSale] = useState<any>(null);
+    const [printingSale, setPrintingSale] = useState<ReceiptSale | null>(null);
     const [isPrinting, setIsPrinting] = useState(false);
+    const [cancelTarget, setCancelTarget] = useState<HistoryData | null>(null);
+    const [cancelling, setCancelling] = useState(false);
+    const router = useRouter();
+
+    const handleCancel = async (reason: string) => {
+        if (!cancelTarget) return;
+        setCancelling(true);
+        try {
+            const res = await cancelSale(cancelTarget.id, reason);
+            if (!res.ok) { toast.error(res.error); return; }
+            toast.success(`Venta ${cancelTarget.shortId} anulada. El stock fue devuelto.`);
+            setCancelTarget(null);
+            router.refresh();
+        } catch {
+            toast.error("No se pudo conectar con el servidor.");
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount);
@@ -51,48 +76,14 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
         try {
             const res = await getSaleForPrint(saleId);
             if (res.success && res.sale) {
-                setPrintingSale(res.sale);
-                // Wait for state update to render hidden receipt
+                setPrintingSale(res.sale as unknown as ReceiptSale);
+                // Wait for state update to render the hidden receipt
                 setTimeout(() => {
-                    const receiptNode = document.getElementById("print-receipt");
-                    if (!receiptNode) {
-                        setIsPrinting(false);
-                        return;
-                    }
-                    
-                    const iframe = document.createElement("iframe");
-                    iframe.style.display = "none";
-                    document.body.appendChild(iframe);
-                    
-                    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-                        .map(node => node.outerHTML)
-                        .join('');
-                        
-                    const doc = iframe.contentWindow?.document;
-                    if (doc) {
-                        doc.open();
-                        doc.write(`
-                            <html>
-                                <head>${styles}</head>
-                                <body style="margin:0;">${receiptNode.outerHTML}</body>
-                            </html>
-                        `);
-                        doc.close();
-                        
-                        iframe.onload = () => {
-                            iframe.contentWindow?.focus();
-                            iframe.contentWindow?.print();
-                            // Cleanup
-                            setTimeout(() => {
-                                document.body.removeChild(iframe);
-                                setPrintingSale(null);
-                                setIsPrinting(false);
-                            }, 1000);
-                        };
-                    }
+                    printReceipt();
+                    setTimeout(() => { setPrintingSale(null); setIsPrinting(false); }, 1500);
                 }, 100);
             } else {
-                alert("Error: " + res.error);
+                toast.error(res.error || "No se pudo cargar el comprobante.");
                 setIsPrinting(false);
             }
         } catch (error) {
@@ -132,6 +123,22 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
             header: "Cajero / Usuario",
         },
         {
+            accessorKey: "status",
+            header: "Estado",
+            cell: ({ row }) => {
+                const status = row.getValue("status") as string;
+                const cancelled = status === "CANCELLED";
+                return (
+                    <span
+                        title={cancelled ? row.original.cancelReason ?? undefined : undefined}
+                        className={`px-2 py-0.5 text-xs font-bold rounded-md uppercase ${cancelled ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"}`}
+                    >
+                        {cancelled ? "Anulada" : "Completada"}
+                    </span>
+                );
+            },
+        },
+        {
             accessorKey: "payments",
             header: "Método",
             cell: ({ row }) => {
@@ -160,10 +167,15 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
             cell: ({ row }) => {
                 const sale = row.original;
                 return (
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleReprint(sale.id)}>
+                    <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" title="Reimprimir" onClick={() => handleReprint(sale.id)}>
                             <Printer className="h-4 w-4" />
                         </Button>
+                        {sale.status !== "CANCELLED" && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Anular venta" onClick={() => setCancelTarget(sale)}>
+                                <Ban className="h-4 w-4" />
+                            </Button>
+                        )}
                     </div>
                 );
             },
@@ -262,8 +274,11 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                                             {format(date, "d MMM, h:mm a", { locale: es })}
                                         </div>
                                     </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="font-black text-xl tracking-tight text-foreground">{formatCurrency(sale.total)}</span>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className={`font-black text-xl tracking-tight ${sale.status === "CANCELLED" ? "line-through text-muted-foreground" : "text-foreground"}`}>{formatCurrency(sale.total)}</span>
+                                        {sale.status === "CANCELLED" && (
+                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-md uppercase bg-destructive/10 text-destructive">Anulada</span>
+                                        )}
                                     </div>
                                 </div>
 
@@ -285,9 +300,14 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                                 </div>
 
                                 <div className="pt-2 border-t mt-1 flex justify-end gap-2">
-                                    <Button variant="secondary" className="w-full rounded-xl flex items-center gap-2" onClick={() => handleReprint(sale.id)}>
+                                    <Button variant="secondary" className="flex-1 rounded-xl flex items-center gap-2" onClick={() => handleReprint(sale.id)}>
                                         <Printer className="w-4 h-4" /> Reimprimir
                                     </Button>
+                                    {sale.status !== "CANCELLED" && (
+                                        <Button variant="outline" className="rounded-xl flex items-center gap-2 text-destructive border-destructive/30" onClick={() => setCancelTarget(sale)}>
+                                            <Ban className="w-4 h-4" /> Anular
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         )
@@ -324,6 +344,16 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                 </div>
             </div>
             
+            {cancelTarget && (
+                <CancelSaleDialog
+                    saleLabel={cancelTarget.shortId}
+                    total={cancelTarget.total}
+                    loading={cancelling}
+                    onConfirm={handleCancel}
+                    onClose={() => setCancelTarget(null)}
+                />
+            )}
+
             {/* Hidden Receipt for Printing */}
             <div className="hidden">
                 {printingSale && <Receipt sale={printingSale} />}

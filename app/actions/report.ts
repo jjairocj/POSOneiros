@@ -1,7 +1,8 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { startOfDay, endOfDay, differenceInDays } from "date-fns";
+import { differenceInDays } from "date-fns";
+import { startOfBusinessDay as startOfDay, endOfBusinessDay as endOfDay, businessDayKey, businessDayLabel } from "@/app/lib/time";
 import { requireAdmin } from "@/lib/auth";
 
 interface AnalyticsFilters {
@@ -113,17 +114,17 @@ export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
 
 
         // 3. Sales Trend over time (for AreaChart) - Group by Day
-        const trendingMap = new Map<string, number>();
+        const trendingMap = new Map<string, { label: string; total: number }>();
         for (const sale of sales) {
-            // Group by DD/MM/YYYY
-            const dateStr = sale.createdAt.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
-            trendingMap.set(dateStr, (trendingMap.get(dateStr) || 0) + sale.total);
+            const key = businessDayKey(sale.createdAt);
+            const entry = trendingMap.get(key) ?? { label: businessDayLabel(sale.createdAt), total: 0 };
+            entry.total += sale.total;
+            trendingMap.set(key, entry);
         }
 
-        const trendingSales = Array.from(trendingMap.entries()).map(([date, total]) => ({
-            date,
-            total
-        }));
+        const trendingSales = Array.from(trendingMap.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([, { label, total }]) => ({ date: label, total }));
 
         return {
             success: true,

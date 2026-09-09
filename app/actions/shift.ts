@@ -11,6 +11,7 @@ import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
 import { fail, ok, toUserMessage, type ActionResult } from "@/lib/result";
+import { businessHour } from "@/app/lib/time";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 
@@ -145,7 +146,7 @@ export async function closeShift(shiftId: string, closeAmount: number): Promise<
 
         const hourCount: Record<number, number> = {};
         for (const sale of completed) {
-            const h = new Date(sale.createdAt).getHours();
+            const h = businessHour(new Date(sale.createdAt));
             hourCount[h] = (hourCount[h] ?? 0) + 1;
         }
         const peakHourEntry = Object.entries(hourCount).sort((a, b) => b[1] - a[1])[0] ?? null;

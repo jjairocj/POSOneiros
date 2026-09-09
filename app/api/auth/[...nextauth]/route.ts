@@ -22,7 +22,7 @@ export const authOptions: NextAuthOptions = {
         CredentialsProvider({
             name: "Credentials",
             credentials: {
-                email: { label: "Email", type: "email", placeholder: "jhon_jairo@live.com" },
+                email: { label: "Email", type: "email", placeholder: "correo@negocio.com" },
                 password: { label: "Password", type: "password" }
             },
             async authorize(credentials) {
@@ -31,7 +31,7 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 const user = await prisma.user.findUnique({
-                    where: { email: credentials.email },
+                    where: { email: credentials.email.trim().toLowerCase() },
                     include: { role: true }
                 });
 
@@ -56,6 +56,7 @@ export const authOptions: NextAuthOptions = {
     ],
     session: {
         strategy: "jwt",
+        maxAge: 12 * 60 * 60, // 12h: a shift, not a week
     },
     callbacks: {
         async jwt({ token, user }) {

@@ -44,8 +44,7 @@ const unwrap = (res: any) => { if (!res.ok) throw new Error(res.error); return r
 const mockSession = (overrides: object = {}) => ({ user: { id: 'user_1', name: 'Ana López', ...overrides } });
 
 function makeSale(total: number, hour: number, products: { name: string; qty: number }[], method: 'CASH' | 'CARD' | 'TRANSFER' = 'CASH') {
-    const createdAt = new Date();
-    createdAt.setHours(hour, 0, 0, 0);
+    const createdAt = new Date(`2026-09-09T${String(hour).padStart(2, '0')}:00:00-05:00`); // Bogotá time
     return {
         total,
         status: 'COMPLETED',

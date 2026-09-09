@@ -13,6 +13,12 @@ async function main() {
         },
     });
 
+    await prisma.role.upsert({
+        where: { name: "CASHIER" },
+        update: {},
+        create: { name: "CASHIER", permissions: ["POS"] },
+    });
+
     const branch = await prisma.branch.upsert({
         where: { id: "branch-1" },
         update: {},
@@ -34,14 +40,22 @@ async function main() {
         }
     });
 
-    const passwordHash = await bcrypt.hash("HurremCochina#1", 10);
+    const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+    if (!adminEmail || !adminPassword) {
+        throw new Error("Define SEED_ADMIN_EMAIL y SEED_ADMIN_PASSWORD en .env antes de ejecutar el seed.");
+    }
+    if (process.env.NODE_ENV === "production" && process.env.ALLOW_SEED !== "true") {
+        throw new Error("El seed está bloqueado en producción. Usa ALLOW_SEED=true solo para la primera carga.");
+    }
+    const passwordHash = await bcrypt.hash(adminPassword, 12);
 
     const user = await prisma.user.upsert({
-        where: { email: "jhon_jairo@live.com" },
+        where: { email: adminEmail },
         update: {},
         create: {
-            name: "Jhon Jairo",
-            email: "jhon_jairo@live.com",
+            name: "Administrador",
+            email: adminEmail,
             password: passwordHash,
             roleId: adminRole.id,
             branchId: branch.id,
