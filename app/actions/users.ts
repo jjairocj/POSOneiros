@@ -90,7 +90,7 @@ export async function updateUser(
             const adminRole = await prisma.role.findUnique({ where: { name: "ADMIN" } });
             if (adminRole && data.roleId !== adminRole.id) return { success: false, error: "No puedes quitarte el rol de administrador a ti mismo." };
         }
-        const updateData: { name: string; email: string; roleId: string; branchId: string | null; password?: string } = {
+        const updateData: { name: string; email: string; roleId: string; branchId: string | null; password?: string; passwordChangedAt?: Date } = {
             name: data.name,
             email: data.email,
             roleId: data.roleId,
@@ -99,6 +99,7 @@ export async function updateUser(
 
         if (data.password && data.password.trim() !== "") {
             updateData.password = await bcrypt.hash(data.password, 12);
+            updateData.passwordChangedAt = new Date();
         }
 
         await prisma.user.update({
@@ -189,7 +190,10 @@ export async function changeOwnPassword(currentPassword: string, newPassword: st
         const valid = await bcrypt.compare(currentPassword ?? "", user.password);
         if (!valid) return { success: false, error: "La contraseña actual no es correcta." };
 
-        await prisma.user.update({ where: { id: me.id }, data: { password: await bcrypt.hash(newPassword, 12) } });
+        await prisma.user.update({
+            where: { id: me.id },
+            data: { password: await bcrypt.hash(newPassword, 12), passwordChangedAt: new Date() },
+        });
         return { success: true };
     } catch (error: unknown) {
         console.error("Error changing password:", error);

@@ -10,6 +10,7 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
+  passwordChangedAt DateTime? // sessions issued before this instant are rejected
   name      String
   roleId    String
   role      Role     @relation(fields: [roleId], references: [id])

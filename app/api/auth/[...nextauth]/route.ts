@@ -18,6 +18,16 @@ declare module "next-auth" {
     }
 }
 
+declare module "next-auth/jwt" {
+    interface JWT {
+        id?: string;
+        role?: string;
+        issuedAt?: number;
+        checkedAt?: number;
+        invalid?: boolean;
+    }
+}
+
 export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
@@ -80,10 +90,31 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 token.role = user.role;
                 token.id = user.id;
+                token.issuedAt = Date.now();
+                token.checkedAt = Date.now();
+                token.invalid = false;
+            }
+            // Every few minutes, confirm the password hasn't been changed since this
+            // token was issued (and that the user still exists). Cheap: one indexed read.
+            const RECHECK_MS = 5 * 60 * 1000;
+            const checkedAt = typeof token.checkedAt === "number" ? token.checkedAt : 0;
+            if (token.id && Date.now() - checkedAt > RECHECK_MS) {
+                const u = await prisma.user.findUnique({
+                    where: { id: token.id as string },
+                    select: { passwordChangedAt: true, role: { select: { name: true } } },
+                });
+                const issuedAt = typeof token.issuedAt === "number" ? token.issuedAt : 0;
+                token.invalid = !u || (u.passwordChangedAt !== null && u.passwordChangedAt.getTime() > issuedAt);
+                if (u) token.role = u.role.name;
+                token.checkedAt = Date.now();
             }
             return token;
         },
         async session({ session, token }) {
+            if (token.invalid) {
+                // Signals the client to sign out; requireSession() also rejects it.
+                return { ...session, user: undefined as unknown as typeof session.user, expires: new Date(0).toISOString() };
+            }
             if (session.user) {
                 session.user.role = token.role as string;
                 session.user.id = token.id as string;
