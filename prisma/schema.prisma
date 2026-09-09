@@ -160,7 +160,8 @@ model SaleDetail {
   taxIvaAmount         Float @default(0) // Calculated IVA amount per unit * quantity
   taxIcaAmount         Float @default(0) // Calculated ICA amount per unit * quantity
   taxImpoConsumoAmount Float @default(0) // Calculated ImpoConsumo amount per unit * quantity
-  subtotal  Float // (unitPrice * quantity) + total taxes
+  discount  Float @default(0) // COP discount applied to this line (own + prorated order discount)
+  subtotal  Float // (unitPrice * quantity - discount) + total taxes
   createdAt DateTime @default(now())
 }
 

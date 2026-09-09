@@ -4,10 +4,14 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
 import { fail, ok, toUserMessage, UserError, type ActionResult } from "@/lib/result";
+import { breakdownLines } from "@/app/lib/tax";
+import type { OrderDiscount } from "@/app/types/cart";
 
 export interface SaleLineInput {
     id: string;
     quantity: number;
+    /** Line discount in COP (whole line). */
+    discount?: number;
 }
 
 export interface PaymentInput {
@@ -25,6 +29,8 @@ export interface SubAccountInput {
 
 export interface ProcessSaleOptions {
     customerId?: string;
+    /** Order-level discount, prorated across lines on the server. */
+    discount?: OrderDiscount | null;
     /** Legacy single-label sub account (item-based split, one sale per person). */
     subAccountLabel?: string;
     /** Equal / custom split: one sale, several payers. */
@@ -69,6 +75,12 @@ export async function processSale(
             if (typeof line.quantity !== "number" || !Number.isFinite(line.quantity) || line.quantity <= 0) {
                 return fail("Las cantidades deben ser mayores a cero.");
             }
+            if (line.discount !== undefined && (!isMoney(line.discount))) return fail("Descuento de línea inválido.");
+        }
+        const orderDiscount = options.discount ?? null;
+        if (orderDiscount) {
+            if (!["percent", "amount"].includes(orderDiscount.type) || !isMoney(orderDiscount.value)) return fail("Descuento inválido.");
+            if (orderDiscount.type === "percent" && orderDiscount.value > 100) return fail("El descuento no puede superar el 100%.");
         }
         for (const p of payments) {
             if (!PAYMENT_METHODS.has(p?.method)) return fail("Método de pago inválido.");
@@ -77,7 +89,11 @@ export async function processSale(
 
         // Merge duplicated lines for the same product
         const qtyByProduct = new Map<string, number>();
-        for (const line of items) qtyByProduct.set(line.id, (qtyByProduct.get(line.id) ?? 0) + line.quantity);
+        const discByProduct = new Map<string, number>();
+        for (const line of items) {
+            qtyByProduct.set(line.id, (qtyByProduct.get(line.id) ?? 0) + line.quantity);
+            discByProduct.set(line.id, (discByProduct.get(line.id) ?? 0) + (line.discount ?? 0));
+        }
 
         // ── Shift ───────────────────────────────────────────────────────
         const shift = await prisma.shift.findUnique({ where: { id: activeShiftId }, include: { register: true } });
@@ -92,10 +108,23 @@ export async function processSale(
             if (dbProducts.length !== productIds.length) throw new UserError("Algunos productos ya no existen. Recarga el catálogo.");
 
             let finalTotal = 0;
+            let totalDiscount = 0;
             const saleDetails: Prisma.SaleDetailCreateWithoutSaleInput[] = [];
 
-            for (const product of dbProducts) {
+            // Same math as the cart (app/lib/tax.ts), but with DB prices and rates.
+            const lines = breakdownLines(
+                dbProducts.map((p) => ({
+                    price: p.price,
+                    quantity: qtyByProduct.get(p.id)!,
+                    discount: discByProduct.get(p.id) ?? 0,
+                    taxIva: p.taxIva / 100, taxIca: p.taxIca / 100, taxImpoConsumo: p.taxImpoConsumo / 100,
+                })),
+                orderDiscount
+            );
+
+            for (const [idx, product] of dbProducts.entries()) {
                 const quantity = qtyByProduct.get(product.id)!;
+                const line = lines[idx];
                 if (!product.isActive) throw new UserError(`"${product.name}" está desactivado y no se puede vender.`);
 
                 // Atomic, race-safe decrement: only succeeds if enough stock remains.
@@ -107,12 +136,8 @@ export async function processSale(
                     throw new UserError(`Stock insuficiente para "${product.name}". Quedan ${product.stock}.`);
                 }
 
-                const base = product.price * quantity;
-                const taxIvaAmount = round(base * (product.taxIva / 100));
-                const taxIcaAmount = round(base * (product.taxIca / 100));
-                const taxImpoConsumoAmount = round(base * (product.taxImpoConsumo / 100));
-                const lineTotal = round(base) + taxIvaAmount + taxIcaAmount + taxImpoConsumoAmount;
-                finalTotal += lineTotal;
+                finalTotal += line.total;
+                totalDiscount += line.discount;
 
                 saleDetails.push({
                     product: { connect: { id: product.id } },
@@ -120,10 +145,11 @@ export async function processSale(
                     productCode: product.code,
                     quantity,
                     unitPrice: product.price,
-                    taxIvaAmount,
-                    taxIcaAmount,
-                    taxImpoConsumoAmount,
-                    subtotal: lineTotal,
+                    discount: line.discount,
+                    taxIvaAmount: line.taxIva,
+                    taxIcaAmount: line.taxIca,
+                    taxImpoConsumoAmount: line.taxImpoConsumo,
+                    subtotal: line.total,
                 });
             }
 
@@ -149,6 +175,7 @@ export async function processSale(
                     customerId: options.customerId,
                     number,
                     total: finalTotal,
+                    discount: totalDiscount,
                     details: { create: saleDetails },
                     payments: { create: payments.map((p) => ({ method: p.method, amount: round(p.amount) })) },
                 },

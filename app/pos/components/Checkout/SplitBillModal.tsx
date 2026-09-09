@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import {
     X, Plus, Pencil, CheckCircle2, Users, SplitSquareHorizontal, Minus,
 } from "lucide-react";
-import { CartItem } from "@/app/types/cart";
+import { CartItem, OrderDiscount } from "@/app/types/cart";
 import { useSubAccountStore } from "@/app/store/useSubAccountStore";
 import { formatMoney } from "@/app/lib/money";
 import { calculateOrderTotals } from "@/app/lib/tax";
@@ -16,6 +16,7 @@ import { processSale, type PaymentInput } from "@/app/actions/sale";
 interface SplitBillModalProps {
     activeShiftId: string;
     items: CartItem[];
+    orderDiscount?: OrderDiscount | null;
     onClose: () => void;
     onSuccess?: () => void;
 }
@@ -299,14 +300,14 @@ function SubAccountCard({
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
-export default function SplitBillModal({ activeShiftId, items, onClose, onSuccess }: SplitBillModalProps) {
+export default function SplitBillModal({ activeShiftId, items, orderDiscount = null, onClose, onSuccess }: SplitBillModalProps) {
     const {
         subAccounts, pendingItemId, pendingQty,
         cancelSplit, addSubAccount, removeSubAccount, renameSubAccount,
         setPendingItem, assignItem, unassignItem, splitEqually, setCustomAmount, markPaid, allPaid,
     } = useSubAccountStore();
 
-    const cartTotal = calculateOrderTotals(items).total;
+    const cartTotal = calculateOrderTotals(items, orderDiscount).total;
     const assignedTotal = subAccounts.reduce((sum, sa) => sum + (sa.customAmount ?? sa.total), 0);
     const amountsMatch = Math.abs(assignedTotal - cartTotal) <= 1;
 
@@ -368,9 +369,10 @@ export default function SplitBillModal({ activeShiftId, items, onClose, onSucces
         try {
             const res = await processSale(
                 activeShiftId,
-                items.map((i) => ({ id: i.id, quantity: i.quantity })),
+                items.map((i) => ({ id: i.id, quantity: i.quantity, discount: i.discount ?? 0 })),
                 payments,
                 {
+                    discount: orderDiscount,
                     subAccounts: subAccounts.map((sa) => ({
                         label: sa.label,
                         items: sa.items.map((i) => ({ id: i.id, quantity: i.quantity })),

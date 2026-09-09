@@ -114,7 +114,7 @@ describe('CheckoutModal — payment stage', () => {
         await waitFor(() =>
             expect(mockProcessSale).toHaveBeenCalledWith(
                 'shift_1',
-                [{ id: 'p1', quantity: 1 }],
+                [{ id: 'p1', quantity: 1, discount: 0 }],
                 expect.arrayContaining([expect.objectContaining({ method: 'CASH', amount: 15000 })]),
                 expect.objectContaining({ customerId: undefined })
             )

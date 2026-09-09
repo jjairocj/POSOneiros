@@ -22,6 +22,14 @@ export default function CategorySelector({
             >
                 ⭐ Favoritos
             </Badge>
+            <Badge
+                variant={activeCategoryId === 'all' ? "default" : "secondary"}
+                className={`cursor-pointer px-4 py-1.5 text-sm whitespace-nowrap transition-colors
+                           ${activeCategoryId !== 'all' && 'hover:bg-primary/20 hover:text-primary'}`}
+                onClick={() => onSelect('all')}
+            >
+                Todos
+            </Badge>
             {categories.map((cat) => (
                 <Badge
                     key={cat.id}

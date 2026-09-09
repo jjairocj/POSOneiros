@@ -14,6 +14,8 @@ export interface CartItem {
     name: string;
     price: number;
     quantity: number;
+    /** Discount on this line, in COP (whole line, not per unit). */
+    discount?: number;
     taxIva: number;
     taxIca: number;
     taxImpoConsumo: number;
@@ -21,8 +23,17 @@ export interface CartItem {
     categoryId?: string | null;
 }
 
+/** Order-level discount: a percentage of the (line-discounted) base or a fixed COP amount. */
+export interface OrderDiscount {
+    type: "percent" | "amount";
+    value: number;
+}
+
 export interface OrderTotals {
+    /** Gross base before any discount. */
     subtotal: number;
+    /** Total discount (line + order), already subtracted from total. */
+    discount: number;
     taxIva: number;
     taxIca: number;
     taxImpoConsumo: number;
@@ -33,6 +44,7 @@ export interface Order extends OrderTotals {
     id: string;
     name: string;
     items: CartItem[];
+    orderDiscount?: OrderDiscount | null;
     createdAt: number;
 }
 

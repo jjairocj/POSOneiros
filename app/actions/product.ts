@@ -12,6 +12,7 @@ export async function getProducts(categoryId?: string, search?: string, opts: { 
                 AND: [
                     opts.includeInactive ? {} : { isActive: true },
                     categoryId === 'favorites' ? { isFavorite: true } :
+                    categoryId === 'all' ? {} :
                     categoryId === 'uncategorized' ? { categoryId: null } :
                     categoryId ? { categoryId } : {},
                     search ? {
@@ -124,7 +125,7 @@ export async function deleteProduct(id: string) {
 
 export async function toggleProductFavorite(id: string, isFavorite: boolean) {
     try {
-        await requireAdmin();
+        await requireSession();
         await prisma.product.update({
             where: { id },
             data: { isFavorite }

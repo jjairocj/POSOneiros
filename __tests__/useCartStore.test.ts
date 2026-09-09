@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCartStore } from '../app/store/useCartStore';
 
-const EMPTY_TOTALS = { subtotal: 0, taxIva: 0, taxIca: 0, taxImpoConsumo: 0, total: 0 };
+const EMPTY_TOTALS = { subtotal: 0, discount: 0, taxIva: 0, taxIca: 0, taxImpoConsumo: 0, total: 0 };
 
 describe('useCartStore Multi-Order Logic', () => {
     beforeEach(() => {

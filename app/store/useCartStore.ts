@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { CartItem, Order, ProductInput } from "@/app/types/cart";
+import type { CartItem, Order, OrderDiscount, ProductInput } from "@/app/types/cart";
 import { calculateOrderTotals, toDecimalRate, ZERO_TOTALS } from "@/app/lib/tax";
 
 export type { CartItem, Order } from "@/app/types/cart";
@@ -16,6 +16,8 @@ interface CartStore {
     addItem: (product: ProductInput) => void;
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
+    setLineDiscount: (productId: string, discount: number) => void;
+    setOrderDiscount: (discount: OrderDiscount | null) => void;
     clearActiveOrder: () => void;
 }
 
@@ -23,8 +25,16 @@ const makeOrder = (id: string, name: string): Order => ({
     id,
     name,
     items: [],
+    orderDiscount: null,
     ...ZERO_TOTALS,
     createdAt: Date.now(),
+});
+
+const withTotals = (order: Order, items: CartItem[], orderDiscount = order.orderDiscount): Order => ({
+    ...order,
+    items,
+    orderDiscount,
+    ...calculateOrderTotals(items, orderDiscount),
 });
 
 const DEFAULT_ORDER_ID = "default";
@@ -89,16 +99,7 @@ export const useCartStore = create<CartStore>()(
                               },
                           ];
 
-                    return {
-                        orders: {
-                            ...state.orders,
-                            [state.activeOrderId]: {
-                                ...order,
-                                items: newItems,
-                                ...calculateOrderTotals(newItems),
-                            },
-                        },
-                    };
+                    return { orders: { ...state.orders, [state.activeOrderId]: withTotals(order, newItems) } };
                 });
             },
 
@@ -107,12 +108,7 @@ export const useCartStore = create<CartStore>()(
                     const order = state.orders[state.activeOrderId];
                     if (!order) return state;
                     const newItems = order.items.filter((i) => i.id !== productId);
-                    return {
-                        orders: {
-                            ...state.orders,
-                            [state.activeOrderId]: { ...order, items: newItems, ...calculateOrderTotals(newItems) },
-                        },
-                    };
+                    return { orders: { ...state.orders, [state.activeOrderId]: withTotals(order, newItems) } };
                 });
             },
 
@@ -124,12 +120,28 @@ export const useCartStore = create<CartStore>()(
                     const newItems = order.items.map((i) =>
                         i.id === productId ? { ...i, quantity } : i
                     );
-                    return {
-                        orders: {
-                            ...state.orders,
-                            [state.activeOrderId]: { ...order, items: newItems, ...calculateOrderTotals(newItems) },
-                        },
-                    };
+                    return { orders: { ...state.orders, [state.activeOrderId]: withTotals(order, newItems) } };
+                });
+            },
+
+            setLineDiscount: (productId, discount) => {
+                set((state) => {
+                    const order = state.orders[state.activeOrderId];
+                    if (!order) return state;
+                    const safe = Number.isFinite(discount) && discount > 0 ? Math.round(discount) : 0;
+                    const newItems = order.items.map((i) =>
+                        i.id === productId ? { ...i, discount: Math.min(safe, Math.round(i.price * i.quantity)) } : i
+                    );
+                    return { orders: { ...state.orders, [state.activeOrderId]: withTotals(order, newItems) } };
+                });
+            },
+
+            setOrderDiscount: (discount) => {
+                set((state) => {
+                    const order = state.orders[state.activeOrderId];
+                    if (!order) return state;
+                    const clean = discount && Number.isFinite(discount.value) && discount.value > 0 ? discount : null;
+                    return { orders: { ...state.orders, [state.activeOrderId]: withTotals(order, order.items, clean) } };
                 });
             },
 
@@ -140,12 +152,12 @@ export const useCartStore = create<CartStore>()(
                     return {
                         orders: {
                             ...state.orders,
-                            [state.activeOrderId]: { ...order, items: [], ...ZERO_TOTALS },
+                            [state.activeOrderId]: { ...order, items: [], orderDiscount: null, ...ZERO_TOTALS },
                         },
                     };
                 });
             },
         }),
-        { name: "oneiros-multi-cart" }
+        { name: "oneiros-multi-cart", version: 2, migrate: (persisted) => persisted as CartStore }
     )
 );

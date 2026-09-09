@@ -23,8 +23,14 @@ export default function ProductGrid() {
                     getProducts('favorites').catch(() => []),
                     getCategories().catch(() => [])
                 ]);
-                setProducts(p || []);
                 setCategories(c || []);
+                if (p && p.length > 0) {
+                    setProducts(p);
+                } else {
+                    // No favorites yet: don't open on an empty screen.
+                    setActiveCategoryId('all');
+                    setProducts((await getProducts('all').catch(() => [])) || []);
+                }
             } catch (error) {
                 console.error("Error initializing catalog:", error);
             } finally {
@@ -128,7 +134,11 @@ export default function ProductGrid() {
                     <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground opacity-60">
                         <span className="text-4xl mb-4">🔍</span>
                         <p className="text-lg font-medium">
-                            {searchQuery ? `Sin resultados para "${searchQuery}"` : "No hay productos en esta categoría."}
+                            {searchQuery
+                                ? `Sin resultados para "${searchQuery}"`
+                                : activeCategoryId === 'favorites'
+                                    ? "Aún no hay favoritos. Toca la ⭐ de un producto para tenerlo aquí."
+                                    : "No hay productos en esta categoría."}
                         </p>
                     </div>
                 )}

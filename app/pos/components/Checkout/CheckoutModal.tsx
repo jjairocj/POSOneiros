@@ -11,7 +11,7 @@ import { processSale, type PaymentInput } from "../../../actions/sale";
 import { searchCustomers, createCustomer, type CustomerResult } from "../../../actions/customers";
 import SaleSuccess from "./SaleSuccess";
 import type { ReceiptSale } from "./Receipt";
-import type { CartItem } from "@/app/types/cart";
+import type { CartItem, OrderDiscount } from "@/app/types/cart";
 import { playSaleSound } from "@/app/lib/sound";
 import { formatMoney } from "@/app/lib/money";
 
@@ -179,6 +179,7 @@ export default function CheckoutModal({
     subAccountLabel,
     mode = "sale",
     onCollect,
+    orderDiscount = null,
 }: {
     activeShiftId: string;
     orderTotal: number;
@@ -193,6 +194,7 @@ export default function CheckoutModal({
      */
     mode?: "sale" | "collect";
     onCollect?: (payments: PaymentInput[], change: number) => void;
+    orderDiscount?: OrderDiscount | null;
 }) {
     const [loading, setLoading] = useState(false);
     const [cash, setCash] = useState("");
@@ -249,9 +251,9 @@ export default function CheckoutModal({
         try {
             const res = await processSale(
                 activeShiftId,
-                items.map((i) => ({ id: i.id, quantity: i.quantity })),
+                items.map((i) => ({ id: i.id, quantity: i.quantity, discount: i.discount ?? 0 })),
                 payments,
-                { customerId: customerId ?? undefined, subAccountLabel }
+                { customerId: customerId ?? undefined, subAccountLabel, discount: orderDiscount }
             );
             if (!res.ok) { setError(res.error); return; }
             playSaleSound();

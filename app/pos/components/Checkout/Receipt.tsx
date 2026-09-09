@@ -7,6 +7,7 @@ interface ReceiptDetail {
     product?: { name: string };
     quantity: number;
     unitPrice: number;
+    discount?: number;
     subtotal: number;
     taxIvaAmount: number;
     taxIcaAmount: number;
@@ -18,6 +19,7 @@ export interface ReceiptSale {
     number?: number | null;
     createdAt: string | Date;
     total: number;
+    discount?: number;
     status?: string;
     shiftId: string;
     shift?: { register?: { name: string; prefix?: string | null } | null; user?: { name: string } | null } | null;
@@ -84,6 +86,11 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
             </table>
 
             <div className="border-t border-black pt-2 mb-4 text-sm flex flex-col items-end">
+                {(sale.discount ?? 0) > 0 && (
+                    <div className="w-full text-xs flex justify-between mb-1">
+                        <span>Descuento:</span><span>-{money(sale.discount ?? 0)}</span>
+                    </div>
+                )}
                 <p className="font-bold text-lg border-b border-black border-dashed mb-2 pb-1 w-full text-right">
                     TOTAL: {money(sale.total)}
                 </p>
@@ -103,7 +110,7 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
             {showTaxes && (
                 <div className="border-t border-black pt-2 mb-4 text-xs">
                     <p className="font-bold mb-1">Discriminación de impuestos</p>
-                    <div className="flex justify-between"><span>Base:</span><span>{money(base)}</span></div>
+                    <div className="flex justify-between"><span>Base:</span><span>{money(base - sale.details.reduce((acc, d) => acc + (d.discount ?? 0), 0))}</span></div>
                     {iva > 0 && <div className="flex justify-between"><span>IVA:</span><span>{money(iva)}</span></div>}
                     {ica > 0 && <div className="flex justify-between"><span>ICA:</span><span>{money(ica)}</span></div>}
                     {impo > 0 && <div className="flex justify-between"><span>Impoconsumo:</span><span>{money(impo)}</span></div>}
