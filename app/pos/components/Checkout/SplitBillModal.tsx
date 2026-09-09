@@ -7,7 +7,11 @@ import {
 import { CartItem } from "@/app/types/cart";
 import { useSubAccountStore } from "@/app/store/useSubAccountStore";
 import { formatMoney } from "@/app/lib/money";
+import { calculateOrderTotals } from "@/app/lib/tax";
 import CheckoutModal from "./CheckoutModal";
+import SaleSuccess from "./SaleSuccess";
+import type { ReceiptSale } from "./Receipt";
+import { processSale, type PaymentInput } from "@/app/actions/sale";
 
 interface SplitBillModalProps {
     activeShiftId: string;
@@ -117,7 +121,7 @@ function SubAccountCard({
     onUnassign: (itemId: string) => void;
     onRename: (label: string) => void;
     onRemove: () => void;
-    onPaid: () => void;
+    onPaid: (payments: PaymentInput[]) => void;
     onSetAmount: (amount: number) => void;
 }) {
     const [editing, setEditing] = useState(false);
@@ -283,10 +287,9 @@ function SubAccountCard({
                     orderTotal={sa.customAmount ?? sa.total}
                     items={sa.items}
                     subAccountLabel={sa.label}
-                    onSuccess={() => {
-                        setCheckoutOpen(false);
-                        onPaid();
-                    }}
+                    mode="collect"
+                    onCollect={(payments) => onPaid(payments)}
+                    onSuccess={() => setCheckoutOpen(false)}
                     onCancel={() => setCheckoutOpen(false)}
                 />
             )}
@@ -303,9 +306,14 @@ export default function SplitBillModal({ activeShiftId, items, onClose, onSucces
         setPendingItem, assignItem, unassignItem, splitEqually, setCustomAmount, markPaid, allPaid,
     } = useSubAccountStore();
 
-    const cartTotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const cartTotal = calculateOrderTotals(items).total;
+    const assignedTotal = subAccounts.reduce((sum, sa) => sum + (sa.customAmount ?? sa.total), 0);
+    const amountsMatch = Math.abs(assignedTotal - cartTotal) <= 1;
 
     const [localQty, setLocalQty] = useState(1);
+    const [finalizing, setFinalizing] = useState(false);
+    const [finalError, setFinalError] = useState("");
+    const [completedSale, setCompletedSale] = useState<ReceiptSale | null>(null);
     const [pendingItemForPicker, setPendingItemForPicker] = useState<CartItem | null>(null);
 
     // Compute assigned quantities per item
@@ -345,6 +353,40 @@ export default function SplitBillModal({ activeShiftId, items, onClose, onSucces
         onClose();
     };
 
+    /** All persons paid: register ONE sale with every payment collected. */
+    const handleRegisterSale = async () => {
+        if (finalizing) return;
+        setFinalError("");
+        if (!amountsMatch) {
+            setFinalError(`Las cuentas suman ${formatMoney(assignedTotal)} y el pedido es ${formatMoney(cartTotal)}. Ajusta los montos.`);
+            return;
+        }
+        const payments: PaymentInput[] = subAccounts.flatMap((sa) =>
+            (sa.payments ?? []).map((p) => ({ ...p, subAccountLabel: sa.label }))
+        );
+        setFinalizing(true);
+        try {
+            const res = await processSale(
+                activeShiftId,
+                items.map((i) => ({ id: i.id, quantity: i.quantity })),
+                payments,
+                {
+                    subAccounts: subAccounts.map((sa) => ({
+                        label: sa.label,
+                        items: sa.items.map((i) => ({ id: i.id, quantity: i.quantity })),
+                        amount: sa.customAmount ?? sa.total,
+                    })),
+                }
+            );
+            if (!res.ok) { setFinalError(res.error); return; }
+            setCompletedSale(res.data as unknown as ReceiptSale);
+        } catch {
+            setFinalError("No se pudo conectar con el servidor. Los pagos siguen registrados aquí; intenta de nuevo.");
+        } finally {
+            setFinalizing(false);
+        }
+    };
+
     const handleAllDone = () => {
         cancelSplit();
         onClose();
@@ -378,22 +420,40 @@ export default function SplitBillModal({ activeShiftId, items, onClose, onSucces
                     </button>
                 </div>
 
-                {everythingPaid ? (
-                    /* ── All paid success ── */
-                    <div className="flex flex-col items-center justify-center p-12 gap-6 text-center">
+                {completedSale ? (
+                    <SaleSuccess sale={completedSale} change={0} subtitle="Cuenta dividida registrada como una sola venta." onClose={handleAllDone} />
+                ) : everythingPaid ? (
+                    /* ── All paid: register the sale ── */
+                    <div className="flex flex-col items-center justify-center p-10 gap-5 text-center">
                         <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
                             <CheckCircle2 className="w-12 h-12 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-2xl font-black text-foreground">¡Cuenta cerrada!</h3>
-                            <p className="text-muted-foreground mt-1 text-sm">Todas las partes han sido cobradas.</p>
+                            <h3 className="text-2xl font-black text-foreground">Todas las personas pagaron</h3>
+                            <p className="text-muted-foreground mt-1 text-sm">
+                                Total del pedido {formatMoney(cartTotal)} · cobrado {formatMoney(assignedTotal)}
+                            </p>
                         </div>
+                        <ul className="w-full max-w-sm text-sm divide-y divide-border/50 rounded-2xl border border-border/50 bg-muted/20">
+                            {subAccounts.map((sa) => (
+                                <li key={sa.id} className="flex justify-between px-4 py-2">
+                                    <span className="font-semibold">{sa.label}</span>
+                                    <span className="text-muted-foreground">{formatMoney(sa.customAmount ?? sa.total)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        {finalError && (
+                            <div className="text-sm text-destructive font-medium bg-destructive/10 p-3 rounded-xl border border-destructive/20 max-w-sm">
+                                {finalError}
+                            </div>
+                        )}
                         <button
                             type="button"
-                            onClick={handleAllDone}
-                            className="px-8 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90 transition-colors"
+                            disabled={finalizing}
+                            onClick={handleRegisterSale}
+                            className="px-8 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90 transition-colors disabled:opacity-60"
                         >
-                            Listo
+                            {finalizing ? "Registrando..." : "Registrar venta"}
                         </button>
                     </div>
                 ) : (
@@ -459,7 +519,7 @@ export default function SplitBillModal({ activeShiftId, items, onClose, onSucces
                                             onUnassign={(itemId) => unassignItem(sa.id, itemId)}
                                             onRename={(label) => renameSubAccount(sa.id, label)}
                                             onRemove={() => removeSubAccount(sa.id)}
-                                            onPaid={() => markPaid(sa.id)}
+                                            onPaid={(payments) => markPaid(sa.id, payments.map(p => ({ method: p.method, amount: p.amount })))}
                                             onSetAmount={(amount) => setCustomAmount(sa.id, amount)}
                                         />
                                     ))}
@@ -478,6 +538,11 @@ export default function SplitBillModal({ activeShiftId, items, onClose, onSucces
                         </div>
 
                         {/* Footer */}
+                        {subAccounts.some((sa) => sa.items.length > 0 || sa.customAmount !== undefined) && !amountsMatch && (
+                            <div className="px-5 py-2 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border-t border-amber-500/20 shrink-0">
+                                Asignado {formatMoney(assignedTotal)} de {formatMoney(cartTotal)}. Falta {formatMoney(cartTotal - assignedTotal)}.
+                            </div>
+                        )}
                         <div className="px-5 py-4 border-t border-border bg-muted/20 flex items-center gap-3 shrink-0">
                             <button
                                 type="button"

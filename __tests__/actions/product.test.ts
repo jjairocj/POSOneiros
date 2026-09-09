@@ -1,3 +1,4 @@
+vi.mock('../../lib/auth', () => ({ requireSession: vi.fn().mockResolvedValue({ id: 'u1', role: 'ADMIN' }), requireAdmin: vi.fn().mockResolvedValue({ id: 'u1', role: 'ADMIN' }) }));
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockFindMany = vi.fn();
@@ -13,6 +14,7 @@ vi.mock('../../lib/prisma', () => ({
             update: (...a: any[]) => mockUpdate(...a),
             delete: (...a: any[]) => mockDelete(...a),
         },
+        saleDetail: { count: vi.fn().mockResolvedValue(0) },
     },
 }));
 

@@ -5,12 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
     Receipt as ReceiptIcon, X, Banknote, CreditCard, ArrowRightLeft,
-    CheckCircle2, Printer, UserSearch, UserPlus, ChevronDown, ChevronUp, Search, User,
+    UserSearch, UserPlus, ChevronDown, ChevronUp, Search, User,
 } from "lucide-react";
-import { processSale } from "../../../actions/sale";
+import { processSale, type PaymentInput } from "../../../actions/sale";
 import { searchCustomers, createCustomer, type CustomerResult } from "../../../actions/customers";
-import Receipt from "./Receipt";
+import SaleSuccess from "./SaleSuccess";
+import type { ReceiptSale } from "./Receipt";
+import type { CartItem } from "@/app/types/cart";
 import { playSaleSound } from "@/app/lib/sound";
+import { formatMoney } from "@/app/lib/money";
+
+const QUICK_BILLS = [5000, 10000, 20000, 50000, 100000];
 
 // ─── Customer picker ──────────────────────────────────────────────────────────
 
@@ -24,6 +29,7 @@ function CustomerPicker({ onSelect }: { onSelect: (c: CustomerResult | null) => 
     const [newDoc, setNewDoc] = useState("");
     const [newPhone, setNewPhone] = useState("");
     const [searching, setSearching] = useState(false);
+    const [createError, setCreateError] = useState("");
     const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleQuery = useCallback((q: string) => {
@@ -54,11 +60,15 @@ function CustomerPicker({ onSelect }: { onSelect: (c: CustomerResult | null) => 
     const handleCreate = async () => {
         if (!newName.trim()) return;
         setSearching(true);
+        setCreateError("");
         try {
-            const c = await createCustomer({ fullName: newName, documentId: newDoc, phone: newPhone });
-            pick(c);
+            const res = await createCustomer({ fullName: newName, documentId: newDoc, phone: newPhone });
+            if (!res.ok) { setCreateError(res.error); return; }
+            pick(res.data);
             setCreating(false);
             setNewName(""); setNewDoc(""); setNewPhone("");
+        } catch {
+            setCreateError("No se pudo crear el cliente. Revisa la conexión.");
         } finally {
             setSearching(false);
         }
@@ -142,6 +152,7 @@ function CustomerPicker({ onSelect }: { onSelect: (c: CustomerResult | null) => 
                                 <Input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Teléfono" className="h-9 rounded-xl text-sm" />
                             </div>
                             <div className="flex gap-2">
+                                {createError && <p className="w-full text-xs text-destructive font-medium">{createError}</p>}
                                 <Button type="button" size="sm" className="flex-1 rounded-xl h-9 text-xs" onClick={handleCreate} disabled={!newName.trim() || searching}>
                                     {searching ? "Guardando..." : "Guardar"}
                                 </Button>
@@ -166,80 +177,89 @@ export default function CheckoutModal({
     onSuccess,
     onCancel,
     subAccountLabel,
+    mode = "sale",
+    onCollect,
 }: {
     activeShiftId: string;
     orderTotal: number;
-    items: any[];
+    items: CartItem[];
     onSuccess: () => void;
     onCancel: () => void;
     subAccountLabel?: string;
+    /**
+     * "sale": registers the sale on the server (default).
+     * "collect": only records how this person paid; the caller registers a
+     * single sale later with all the collected payments (split bill).
+     */
+    mode?: "sale" | "collect";
+    onCollect?: (payments: PaymentInput[], change: number) => void;
 }) {
     const [loading, setLoading] = useState(false);
     const [cash, setCash] = useState("");
     const [card, setCard] = useState("");
     const [transfer, setTransfer] = useState("");
     const [error, setError] = useState("");
-    const [completedSale, setCompletedSale] = useState<any>(null);
+    const [completedSale, setCompletedSale] = useState<ReceiptSale | null>(null);
+    const [collected, setCollected] = useState(false);
     const [customerId, setCustomerId] = useState<string | null>(null);
 
-    const cashAmount = parseFloat(cash) || 0;
-    const cardAmount = parseFloat(card) || 0;
-    const transferAmount = parseFloat(transfer) || 0;
+    const toAmount = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : 0; };
+    const cashAmount = toAmount(cash);
+    const cardAmount = toAmount(card);
+    const transferAmount = toAmount(transfer);
     const totalPaid = cashAmount + cardAmount + transferAmount;
     const remaining = Math.max(0, orderTotal - totalPaid);
     const change = Math.max(0, totalPaid - orderTotal);
-    const canSubmit = totalPaid >= orderTotal && items.length > 0;
+    const canSubmit = totalPaid >= orderTotal - 0.5 && (mode === "collect" || items.length > 0);
 
-    const handleCheckout = async () => {
-        if (!canSubmit) return;
-        setLoading(true);
-        setError("");
-        try {
-            let amountToCover = orderTotal;
-            const payments = [];
-            if (cardAmount > 0) {
-                const applied = Math.min(amountToCover, cardAmount);
-                payments.push({ method: "CARD", amount: applied });
-                amountToCover -= applied;
-            }
-            if (transferAmount > 0) {
-                const applied = Math.min(amountToCover, transferAmount);
-                payments.push({ method: "TRANSFER", amount: applied });
-                amountToCover -= applied;
-            }
-            if (cashAmount > 0 && amountToCover > 0) {
-                payments.push({ method: "CASH", amount: amountToCover });
-            }
-            const sale = await processSale(activeShiftId, items, payments, customerId ?? undefined, subAccountLabel);
-            playSaleSound();
-            setCompletedSale(sale);
-        } catch (err: any) {
-            setError(err.message || "Error procesando el pago");
-            setLoading(false);
+    const buildPayments = (): PaymentInput[] => {
+        // Card / transfer never give change; cash absorbs the remainder.
+        let amountToCover = orderTotal;
+        const payments: PaymentInput[] = [];
+        if (cardAmount > 0) {
+            const applied = Math.min(amountToCover, cardAmount);
+            payments.push({ method: "CARD", amount: applied, subAccountLabel });
+            amountToCover -= applied;
         }
+        if (transferAmount > 0) {
+            const applied = Math.min(amountToCover, transferAmount);
+            payments.push({ method: "TRANSFER", amount: applied, subAccountLabel });
+            amountToCover -= applied;
+        }
+        if (cashAmount > 0 && amountToCover > 0) {
+            payments.push({ method: "CASH", amount: amountToCover, subAccountLabel });
+        }
+        return payments.filter((p) => p.amount > 0);
     };
 
-    const handlePrintTicket = () => {
-        const receiptNode = document.getElementById("print-receipt");
-        if (!receiptNode) return;
-        const iframe = document.createElement("iframe");
-        iframe.style.display = "none";
-        document.body.appendChild(iframe);
-        const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-            .map(node => node.outerHTML).join("");
-        const content = receiptNode.cloneNode(true) as HTMLElement;
-        content.classList.remove("hidden");
-        content.classList.add("block");
-        const doc = iframe.contentWindow?.document;
-        if (doc) {
-            doc.open();
-            doc.write(`<html><head>${styles}<style>@page{margin:0}body{margin:0;padding:0;background:white}</style></head><body>${content.outerHTML}</body></html>`);
-            doc.close();
-            iframe.contentWindow?.focus();
-            setTimeout(() => {
-                iframe.contentWindow?.print();
-                setTimeout(() => document.body.removeChild(iframe), 1000);
-            }, 500);
+    const handleCheckout = async () => {
+        if (!canSubmit || loading) return;
+        setError("");
+        const payments = buildPayments();
+        if (payments.length === 0) { setError("Ingresa cómo se paga."); return; }
+
+        if (mode === "collect") {
+            playSaleSound();
+            setCollected(true);
+            onCollect?.(payments, change);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await processSale(
+                activeShiftId,
+                items.map((i) => ({ id: i.id, quantity: i.quantity })),
+                payments,
+                { customerId: customerId ?? undefined, subAccountLabel }
+            );
+            if (!res.ok) { setError(res.error); return; }
+            playSaleSound();
+            setCompletedSale(res.data as unknown as ReceiptSale);
+        } catch {
+            setError("No se pudo conectar con el servidor. Revisa la conexión e intenta de nuevo.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -247,38 +267,15 @@ export default function CheckoutModal({
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-card w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-border flex flex-col max-h-[90vh]">
 
-                {completedSale ? (
-                    // ── Success stage ──
-                    <div className="p-8 flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
-                        <div className="relative flex items-center justify-center">
-                            <span className="absolute w-28 h-28 rounded-full bg-emerald-500/20 animate-ping" style={{ animationDuration: "1s", animationIterationCount: 2 }} />
-                            <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-in zoom-in duration-300">
-                                <CheckCircle2 className="w-14 h-14 text-white" />
-                            </div>
-                        </div>
-                        <div>
-                            <h2 className="text-3xl font-black text-foreground mb-2">¡Venta Exitosa!</h2>
-                            {change > 0 ? (
-                                <p className="text-muted-foreground">
-                                    Cambio a entregar:{" "}
-                                    <strong className="text-2xl text-emerald-500 block mt-1">${change.toLocaleString()}</strong>
-                                </p>
-                            ) : (
-                                <p className="text-muted-foreground">Pago exacto recibido.</p>
-                            )}
-                        </div>
-                        <div className="flex w-full gap-4 mt-8 pt-6 border-t border-border">
-                            <Button variant="outline" className="flex-1 h-14 rounded-2xl text-base font-bold" onClick={onSuccess}>
-                                Cerrar
-                            </Button>
-                            <Button className="flex-1 h-14 rounded-2xl text-base font-bold shadow-lg" onClick={handlePrintTicket}>
-                                <Printer className="w-5 h-5 mr-2" /> Imprimir Ticket
-                            </Button>
-                        </div>
-                        <div className="hidden" id="print-receipt">
-                            <Receipt sale={completedSale} subAccountLabel={subAccountLabel} />
-                        </div>
-                    </div>
+                {completedSale || collected ? (
+                    <SaleSuccess
+                        sale={completedSale}
+                        change={change}
+                        title={collected ? "Pago registrado" : "¡Venta registrada!"}
+                        subtitle={collected ? "Continúa con la siguiente persona." : undefined}
+                        subAccountLabel={subAccountLabel}
+                        onClose={onSuccess}
+                    />
                 ) : (
                     <>
                         {/* Header */}
@@ -294,13 +291,27 @@ export default function CheckoutModal({
                             </h2>
                             <p className="text-muted-foreground text-sm font-medium mt-1">
                                 Total a cobrar:{" "}
-                                <span className="text-foreground text-xl font-bold ml-1">${orderTotal.toLocaleString()}</span>
+                                <span className="text-foreground text-xl font-bold ml-1">{formatMoney(orderTotal)}</span>
                             </p>
                         </div>
 
                         <div className="p-6 overflow-y-auto space-y-4">
                             {/* Customer picker */}
-                            <CustomerPicker onSelect={(c) => setCustomerId(c?.id ?? null)} />
+                            {mode === "sale" && <CustomerPicker onSelect={(c) => setCustomerId(c?.id ?? null)} />}
+
+                            {/* Quick cash buttons */}
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => setCash(String(Math.ceil(orderTotal)))}
+                                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">
+                                    Exacto {formatMoney(orderTotal)}
+                                </button>
+                                {QUICK_BILLS.filter((b) => b >= orderTotal).slice(0, 3).map((b) => (
+                                    <button key={b} type="button" onClick={() => setCash(String(b))}
+                                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-muted text-foreground border border-border hover:border-primary hover:text-primary transition-colors">
+                                        {formatMoney(b)}
+                                    </button>
+                                ))}
+                            </div>
 
                             {/* Payment methods */}
                             <div className="space-y-3">
@@ -317,6 +328,8 @@ export default function CheckoutModal({
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
                                             <Input
                                                 type="number"
+                                                min="0"
+                                                inputMode="numeric"
                                                 value={value}
                                                 onChange={(e) => set(e.target.value)}
                                                 placeholder="0"
@@ -340,12 +353,12 @@ export default function CheckoutModal({
                                 <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
                                     <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Restante</span>
                                     <span className={`text-xl font-black ${remaining > 0 ? "text-destructive" : "text-emerald-500"}`}>
-                                        ${remaining.toLocaleString()}
+                                        {formatMoney(remaining)}
                                     </span>
                                 </div>
                                 <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
                                     <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Vuelto / Cambio</span>
-                                    <span className="text-xl font-black text-primary">${change.toLocaleString()}</span>
+                                    <span className="text-xl font-black text-primary">{formatMoney(change)}</span>
                                 </div>
                             </div>
                             <Button
@@ -353,7 +366,7 @@ export default function CheckoutModal({
                                 disabled={loading || !canSubmit}
                                 className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all"
                             >
-                                {loading ? "PROCESANDO..." : "FINALIZAR VENTA"}
+                                {loading ? "PROCESANDO..." : mode === "collect" ? "REGISTRAR PAGO" : "FINALIZAR VENTA"}
                             </Button>
                         </div>
                     </>

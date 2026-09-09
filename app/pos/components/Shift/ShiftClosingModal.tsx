@@ -32,11 +32,11 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { closeShift } from "@/app/actions/shift";
+import { closeShift, type ShiftSummary } from "@/app/actions/shift";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, CheckCircle2, AlertCircle, Trophy, Clock, ShoppingBag, TrendingUp } from "lucide-react";
+import { LogOut, CheckCircle2, Trophy, Clock, ShoppingBag, TrendingUp, Banknote, CreditCard, ArrowRightLeft, AlertCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 /** Converts a 0–23 hour integer to a human-readable 12h string. */
@@ -50,7 +50,7 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [summary, setSummary] = useState<any>(null);
+    const [summary, setSummary] = useState<ShiftSummary | null>(null);
     const router = useRouter();
 
     const handleCloseShift = async (e: React.FormEvent) => {
@@ -66,9 +66,11 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
         setLoading(true);
         try {
             const res = await closeShift(activeShiftId, closeAmount);
-            setSummary(res.summary);
-        } catch (err: any) {
-            setError(err.message || "Error al cerrar turno");
+            if (!res.ok) { setError(res.error); return; }
+            setSummary(res.data.summary);
+        } catch {
+            setError("No se pudo conectar con el servidor. Intenta de nuevo.");
+        } finally {
             setLoading(false);
         }
     };
@@ -138,12 +140,32 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                         )}
                     </div>
 
+                    {/* Payment breakdown */}
+                    <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+                        <div className="bg-muted/40 rounded-2xl p-3 border border-border/50">
+                            <div className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"><Banknote className="w-3 h-3" />Efectivo</div>
+                            <div className="text-sm font-black mt-1">${summary.cashSales.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-muted/40 rounded-2xl p-3 border border-border/50">
+                            <div className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"><CreditCard className="w-3 h-3" />Tarjeta</div>
+                            <div className="text-sm font-black mt-1">${summary.cardSales.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-muted/40 rounded-2xl p-3 border border-border/50">
+                            <div className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"><ArrowRightLeft className="w-3 h-3" />Transf.</div>
+                            <div className="text-sm font-black mt-1">${summary.transferSales.toLocaleString()}</div>
+                        </div>
+                    </div>
+                    {summary.cancelledCount > 0 && (
+                        <p className="text-xs text-muted-foreground text-center mb-4">{summary.cancelledCount} venta{summary.cancelledCount === 1 ? "" : "s"} anulada{summary.cancelledCount === 1 ? "" : "s"} (no cuentan en los totales).</p>
+                    )}
+
                     {/* Cash reconciliation */}
                     <div className="space-y-3 mb-6 bg-muted/50 p-5 rounded-2xl border border-border/50">
                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground font-medium">Esperado en Caja</span>
+                            <span className="text-muted-foreground font-medium">Esperado en efectivo</span>
                             <strong>${summary.expected.toLocaleString()}</strong>
                         </div>
+                        <p className="text-[11px] text-muted-foreground -mt-2">Base + ventas en efectivo. Tarjeta y transferencia no van en el cajón.</p>
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-muted-foreground font-medium">Monto Declarado</span>
                             <strong>${summary.declared.toLocaleString()}</strong>
@@ -181,13 +203,13 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                     </div>
                     <h2 className="text-2xl font-bold tracking-tight">Cerrar Turno</h2>
                     <p className="text-muted-foreground text-sm">
-                        Ingresa el dinero total en caja para realizar el arqueo.
+                        Cuenta solo el efectivo del cajón (incluida la base) para hacer el arqueo.
                     </p>
                 </div>
 
                 <form onSubmit={handleCloseShift} className="space-y-6">
                     <div className="space-y-2">
-                        <label htmlFor="closeAmount" className="text-sm font-semibold text-foreground ml-1">Monto Total en Caja ($)</label>
+                        <label htmlFor="closeAmount" className="text-sm font-semibold text-foreground ml-1">Efectivo contado en caja ($)</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
                             <Input

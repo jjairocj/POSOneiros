@@ -1,6 +1,8 @@
 "use server";
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireSession, requireAdmin } from "@/lib/auth";
+import { toUserMessage } from "@/lib/result";
 
 export type SettingsData = {
   // Sección 1 — Información del negocio
@@ -62,9 +64,16 @@ export async function getSettings(): Promise<SettingsData> {
   }
 }
 
+const ALLOWED_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
+
 export async function saveSettings(data: SettingsData): Promise<{ success: boolean; error?: string }> {
   try {
-    const entries = Object.entries(data) as [string, string][];
+    await requireAdmin();
+    const entries = (Object.entries(data) as [string, string][])
+      .filter(([key]) => ALLOWED_KEYS.has(key))
+      .map(([key, value]) => [key, String(value ?? "")] as [string, string]);
+    const iva = Number(data.defaultTaxIva);
+    if (!Number.isFinite(iva) || iva < 0 || iva > 100) return { success: false, error: "El IVA por defecto debe estar entre 0 y 100." };
     await Promise.all(
       entries.map(([key, value]) =>
         prisma.systemConfig.upsert({
@@ -75,9 +84,11 @@ export async function saveSettings(data: SettingsData): Promise<{ success: boole
       )
     );
     revalidatePath("/admin/settings");
+    revalidatePath("/pos");
+    revalidatePath("/", "layout");
     return { success: true };
   } catch (error: any) {
     console.error("Error saving settings:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toUserMessage(error) };
   }
 }

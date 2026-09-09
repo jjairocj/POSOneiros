@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "../../lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 export interface HourlySale {
     hour: number;
@@ -44,6 +45,7 @@ export interface DashboardData {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
+    await requireAdmin();
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);

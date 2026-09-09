@@ -2,98 +2,221 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { requireSession } from "@/lib/auth";
+import { fail, ok, toUserMessage, UserError, type ActionResult } from "@/lib/result";
 
+export interface SaleLineInput {
+    id: string;
+    quantity: number;
+}
+
+export interface PaymentInput {
+    method: "CASH" | "CARD" | "TRANSFER";
+    amount: number;
+    /** Label of the person paying when the bill is split. */
+    subAccountLabel?: string;
+}
+
+export interface SubAccountInput {
+    label: string;
+    items: SaleLineInput[];
+    amount: number;
+}
+
+export interface ProcessSaleOptions {
+    customerId?: string;
+    /** Legacy single-label sub account (item-based split, one sale per person). */
+    subAccountLabel?: string;
+    /** Equal / custom split: one sale, several payers. */
+    subAccounts?: SubAccountInput[];
+}
+
+export type SaleWithDetails = Prisma.SaleGetPayload<{
+    include: { details: { include: { product: true } }; payments: true; shift: { include: { register: true } } };
+}>;
+
+const PAYMENT_METHODS = new Set(["CASH", "CARD", "TRANSFER"]);
+const isMoney = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0;
+const round = (n: number) => Math.round(n);
+
+/**
+ * Registers a sale. Server is the source of truth for prices and taxes;
+ * the client only sends product ids, quantities and how it was paid.
+ *
+ * Guarantees:
+ * - quantities are positive finite numbers
+ * - products exist and are active
+ * - stock is decremented atomically (no oversell under concurrency) unless
+ *   the "allowNegativeStock" setting is on
+ * - payments add up to the computed total (within $1 rounding)
+ * - a consecutive number per register is assigned inside the transaction
+ */
 export async function processSale(
     activeShiftId: string,
-    items: any[],
-    payments: { method: string, amount: number }[],
-    customerId?: string,
-    subAccountLabel?: string
-) {
-    // Validate shift
-    const shift = await prisma.shift.findUnique({ where: { id: activeShiftId } });
-    if (!shift || shift.status !== "OPEN") throw new Error("Turno inválido o cerrado");
+    items: SaleLineInput[],
+    payments: PaymentInput[],
+    options: ProcessSaleOptions = {}
+): Promise<ActionResult<SaleWithDetails>> {
+    try {
+        const user = await requireSession();
 
-    const productIds = items.map((i: any) => i.id);
-    const dbProducts = await prisma.product.findMany({ where: { id: { in: productIds } } });
+        // ── Input validation ────────────────────────────────────────────
+        if (!Array.isArray(items) || items.length === 0) return fail("El carrito está vacío.");
+        if (!Array.isArray(payments) || payments.length === 0) return fail("No se registró ningún pago.");
 
-    if (dbProducts.length !== items.length) throw new Error("Algunos productos ya no existen");
+        for (const line of items) {
+            if (!line?.id || typeof line.id !== "string") return fail("Producto inválido en el carrito.");
+            if (typeof line.quantity !== "number" || !Number.isFinite(line.quantity) || line.quantity <= 0) {
+                return fail("Las cantidades deben ser mayores a cero.");
+            }
+        }
+        for (const p of payments) {
+            if (!PAYMENT_METHODS.has(p?.method)) return fail("Método de pago inválido.");
+            if (!isMoney(p.amount) || p.amount <= 0) return fail("Los importes de pago deben ser mayores a cero.");
+        }
 
-    // Transactional sale creation
-    const sale = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        let finalTotal = 0;
-        const saleDetails = [];
+        // Merge duplicated lines for the same product
+        const qtyByProduct = new Map<string, number>();
+        for (const line of items) qtyByProduct.set(line.id, (qtyByProduct.get(line.id) ?? 0) + line.quantity);
 
-        for (const item of items) {
-            const dbProduct = dbProducts.find((p: any) => p.id === item.id);
-            if (!dbProduct) throw new Error("Producto no encontrado");
+        // ── Shift ───────────────────────────────────────────────────────
+        const shift = await prisma.shift.findUnique({ where: { id: activeShiftId }, include: { register: true } });
+        if (!shift || shift.status !== "OPEN") return fail("El turno no está abierto. Abre un turno para vender.");
+        if (shift.userId !== user.id && user.role !== "ADMIN") return fail("Este turno pertenece a otro usuario.");
 
-            if (dbProduct.stock < item.quantity) {
-                throw new Error(`Stock insuficiente para ${dbProduct.name}. Quedan ${dbProduct.stock}.`);
+        const allowNegative = (await prisma.systemConfig.findUnique({ where: { key: "allowNegativeStock" } }))?.value === "true";
+
+        const sale = await prisma.$transaction(async (tx) => {
+            const productIds = Array.from(qtyByProduct.keys());
+            const dbProducts = await tx.product.findMany({ where: { id: { in: productIds } } });
+            if (dbProducts.length !== productIds.length) throw new UserError("Algunos productos ya no existen. Recarga el catálogo.");
+
+            let finalTotal = 0;
+            const saleDetails: Prisma.SaleDetailCreateWithoutSaleInput[] = [];
+
+            for (const product of dbProducts) {
+                const quantity = qtyByProduct.get(product.id)!;
+                if (!product.isActive) throw new UserError(`"${product.name}" está desactivado y no se puede vender.`);
+
+                // Atomic, race-safe decrement: only succeeds if enough stock remains.
+                const updated = await tx.product.updateMany({
+                    where: allowNegative ? { id: product.id } : { id: product.id, stock: { gte: quantity } },
+                    data: { stock: { decrement: quantity } },
+                });
+                if (updated.count === 0) {
+                    throw new UserError(`Stock insuficiente para "${product.name}". Quedan ${product.stock}.`);
+                }
+
+                const base = product.price * quantity;
+                const taxIvaAmount = round(base * (product.taxIva / 100));
+                const taxIcaAmount = round(base * (product.taxIca / 100));
+                const taxImpoConsumoAmount = round(base * (product.taxImpoConsumo / 100));
+                const lineTotal = round(base) + taxIvaAmount + taxIcaAmount + taxImpoConsumoAmount;
+                finalTotal += lineTotal;
+
+                saleDetails.push({
+                    product: { connect: { id: product.id } },
+                    productName: product.name,
+                    productCode: product.code,
+                    quantity,
+                    unitPrice: product.price,
+                    taxIvaAmount,
+                    taxIcaAmount,
+                    taxImpoConsumoAmount,
+                    subtotal: lineTotal,
+                });
             }
 
-            await tx.product.update({
-                where: { id: dbProduct.id },
-                data: { stock: { decrement: item.quantity } }
+            const paid = round(payments.reduce((acc, p) => acc + p.amount, 0));
+            if (Math.abs(paid - finalTotal) > 1) {
+                throw new UserError(
+                    `Los pagos ($${paid.toLocaleString("es-CO")}) no coinciden con el total ($${finalTotal.toLocaleString("es-CO")}). ` +
+                    `Puede que un precio haya cambiado; vuelve a intentar.`
+                );
+            }
+
+            // Consecutive number per register, assigned atomically.
+            const register = await tx.register.update({
+                where: { id: shift.registerId },
+                data: { nextNumber: { increment: 1 } },
+                select: { nextNumber: true },
             });
+            const number = register.nextNumber - 1;
 
-            // Taxes calculations
-            const taxIvaAmount = dbProduct.taxIva ? dbProduct.price * (dbProduct.taxIva / 100) : 0;
-            const taxIcaAmount = dbProduct.taxIca ? dbProduct.price * (dbProduct.taxIca / 100) : 0;
-            const taxImpoConsumoAmount = dbProduct.taxImpoConsumo ? dbProduct.price * (dbProduct.taxImpoConsumo / 100) : 0;
-
-            const totalTaxes = taxIvaAmount + taxIcaAmount + taxImpoConsumoAmount;
-
-            // Subtotal per line
-            const lineTotal = (dbProduct.price * item.quantity) + (totalTaxes * item.quantity);
-            finalTotal += lineTotal;
-
-            saleDetails.push({
-                productId: dbProduct.id,
-                quantity: item.quantity,
-                unitPrice: dbProduct.price, // Base unit price
-                taxIvaAmount: taxIvaAmount * item.quantity,
-                taxIcaAmount: taxIcaAmount * item.quantity,
-                taxImpoConsumoAmount: taxImpoConsumoAmount * item.quantity,
-                subtotal: lineTotal
-            });
-        }
-
-        const newSale = await tx.sale.create({
-            data: {
-                shiftId: activeShiftId,
-                customerId,
-                total: finalTotal,
-                details: { create: saleDetails },
-                payments: {
-                    create: payments.map((p: any) => ({
-                        method: p.method,
-                        amount: p.amount,
-                    })),
-                },
-            },
-            include: {
-                details: { include: { product: true } },
-                payments: true,
-            },
-        });
-
-        if (subAccountLabel) {
-            await tx.subAccount.create({
+            const newSale = await tx.sale.create({
                 data: {
                     shiftId: activeShiftId,
-                    label: subAccountLabel,
-                    items: items as any,
+                    customerId: options.customerId,
+                    number,
                     total: finalTotal,
-                    paid: true,
-                    saleId: newSale.id,
+                    details: { create: saleDetails },
+                    payments: { create: payments.map((p) => ({ method: p.method, amount: round(p.amount) })) },
+                },
+                include: {
+                    details: { include: { product: true } },
+                    payments: true,
+                    shift: { include: { register: true } },
                 },
             });
-        }
 
-        return newSale;
-    });
+            const subAccounts: SubAccountInput[] = options.subAccounts
+                ?? (options.subAccountLabel ? [{ label: options.subAccountLabel, items, amount: finalTotal }] : []);
+            if (subAccounts.length > 0) {
+                await tx.subAccount.createMany({
+                    data: subAccounts.map((sa) => ({
+                        shiftId: activeShiftId,
+                        label: sa.label,
+                        items: sa.items as unknown as Prisma.InputJsonValue,
+                        total: round(sa.amount),
+                        paid: true,
+                        saleId: newSale.id,
+                    })),
+                });
+            }
 
-    revalidatePath("/pos");
-    return sale;
+            return newSale;
+        });
+
+        revalidatePath("/pos");
+        revalidatePath("/admin");
+        return ok(sale);
+    } catch (err) {
+        console.error("[processSale]", err);
+        return fail(toUserMessage(err, "No se pudo registrar la venta."));
+    }
+}
+
+/**
+ * Cancels (anula) a completed sale: restores stock and marks it CANCELLED.
+ * Only admins can cancel. The sale stays in the history for traceability.
+ */
+export async function cancelSale(saleId: string, reason: string): Promise<ActionResult> {
+    try {
+        const user = await requireSession("ADMIN");
+        const trimmed = (reason ?? "").trim();
+        if (trimmed.length < 3) return fail("Escribe el motivo de la anulación.");
+
+        await prisma.$transaction(async (tx) => {
+            const sale = await tx.sale.findUnique({ where: { id: saleId }, include: { details: true } });
+            if (!sale) throw new UserError("La venta no existe.");
+            if (sale.status === "CANCELLED") throw new UserError("Esta venta ya fue anulada.");
+
+            for (const d of sale.details) {
+                await tx.product.update({ where: { id: d.productId }, data: { stock: { increment: d.quantity } } });
+            }
+            await tx.payment.updateMany({ where: { saleId }, data: { status: "REFUNDED" } });
+            await tx.sale.update({
+                where: { id: saleId },
+                data: { status: "CANCELLED", cancelledAt: new Date(), cancelledById: user.id, cancelReason: trimmed },
+            });
+        });
+
+        revalidatePath("/admin/sales");
+        revalidatePath("/admin");
+        revalidatePath("/pos");
+        return ok();
+    } catch (err) {
+        console.error("[cancelSale]", err);
+        return fail(toUserMessage(err, "No se pudo anular la venta."));
+    }
 }

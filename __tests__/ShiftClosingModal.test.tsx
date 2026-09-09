@@ -41,6 +41,10 @@ function makeSummary(overrides: object = {}) {
         expected: 220000,
         declared: 210000,
         difference: -10000,
+        cashSales: 120000,
+        cardSales: 0,
+        transferSales: 0,
+        cancelledCount: 0,
         transactionCount: 5,
         topProduct: 'Empanada',
         peakHour: 13,
@@ -60,7 +64,7 @@ describe('ShiftClosingModal — form stage', () => {
     });
 
     it('renders the amount input', () => {
-        expect(screen.getByLabelText(/monto total en caja/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/efectivo contado en caja/i)).toBeInTheDocument();
     });
 
     it('"Cerrar Turno" button is disabled when the amount is empty', () => {
@@ -68,7 +72,7 @@ describe('ShiftClosingModal — form stage', () => {
     });
 
     it('"Cerrar Turno" button becomes enabled after entering an amount', () => {
-        fireEvent.change(screen.getByLabelText(/monto total en caja/i), { target: { value: '150000' } });
+        fireEvent.change(screen.getByLabelText(/efectivo contado en caja/i), { target: { value: '150000' } });
         expect(screen.getByRole('button', { name: /cerrar turno/i })).not.toBeDisabled();
     });
 
@@ -78,15 +82,15 @@ describe('ShiftClosingModal — form stage', () => {
     });
 
     it('calls closeShift with the correct shiftId and amount on submit', async () => {
-        mockCloseShift.mockResolvedValue({ summary: makeSummary() });
-        fireEvent.change(screen.getByLabelText(/monto total en caja/i), { target: { value: '210000' } });
+        mockCloseShift.mockResolvedValue({ ok: true, data: { summary: makeSummary() } });
+        fireEvent.change(screen.getByLabelText(/efectivo contado en caja/i), { target: { value: '210000' } });
         fireEvent.click(screen.getByRole('button', { name: /cerrar turno/i }));
         await waitFor(() => expect(mockCloseShift).toHaveBeenCalledWith('shift_1', 210000));
     });
 
-    it('shows an error message when closeShift rejects', async () => {
-        mockCloseShift.mockRejectedValue(new Error('Turno inválido'));
-        fireEvent.change(screen.getByLabelText(/monto total en caja/i), { target: { value: '100' } });
+    it('shows the server error message when closeShift returns ok:false', async () => {
+        mockCloseShift.mockResolvedValue({ ok: false, error: 'Turno inválido' });
+        fireEvent.change(screen.getByLabelText(/efectivo contado en caja/i), { target: { value: '100' } });
         fireEvent.click(screen.getByRole('button', { name: /cerrar turno/i }));
         await waitFor(() => expect(screen.getByText('Turno inválido')).toBeInTheDocument());
     });
@@ -96,11 +100,11 @@ describe('ShiftClosingModal — form stage', () => {
 
 describe('ShiftClosingModal — summary stage', () => {
     async function renderSummary(summaryOverrides: object = {}) {
-        mockCloseShift.mockResolvedValue({ summary: makeSummary(summaryOverrides) });
+        mockCloseShift.mockResolvedValue({ ok: true, data: { summary: makeSummary(summaryOverrides) } });
         render(<ShiftClosingModal activeShiftId="shift_1" onCancel={vi.fn()} />);
-        fireEvent.change(screen.getByLabelText(/monto total en caja/i), { target: { value: '210000' } });
+        fireEvent.change(screen.getByLabelText(/efectivo contado en caja/i), { target: { value: '210000' } });
         fireEvent.click(screen.getByRole('button', { name: /cerrar turno/i }));
-        await waitFor(() => expect(screen.queryByLabelText(/monto total en caja/i)).not.toBeInTheDocument());
+        await waitFor(() => expect(screen.queryByLabelText(/efectivo contado en caja/i)).not.toBeInTheDocument());
     }
 
     beforeEach(() => vi.clearAllMocks());
@@ -122,7 +126,7 @@ describe('ShiftClosingModal — summary stage', () => {
 
     it('displays total sales formatted', async () => {
         await renderSummary({ totalSales: 120000 });
-        expect(screen.getByText('$120,000')).toBeInTheDocument();
+        expect(screen.getAllByText('$120,000').length).toBeGreaterThanOrEqual(1);
     });
 
     it('displays the top product', async () => {

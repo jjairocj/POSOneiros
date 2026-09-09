@@ -47,4 +47,11 @@ export interface SubAccount {
     total: number;
     customAmount?: number; // overrides total in checkout (editable, multiple of 50)
     paid: boolean;
+    /** Payments collected for this person (recorded when paid). */
+    payments?: SubAccountPayment[];
+}
+
+export interface SubAccountPayment {
+    method: "CASH" | "CARD" | "TRANSFER";
+    amount: number;
 }

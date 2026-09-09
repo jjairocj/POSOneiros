@@ -1,6 +1,8 @@
 "use server";
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireSession, requireAdmin } from "@/lib/auth";
+import { toUserMessage } from "@/lib/result";
 
 export async function getCategories() {
     try {
@@ -24,7 +26,9 @@ export async function getCategories() {
 
 export async function createCategory(formData: FormData) {
     try {
-        const name = formData.get("name") as string;
+        await requireAdmin();
+        const name = String(formData.get("name") ?? "").trim();
+        if (!name) return { success: false, error: "El nombre es obligatorio." };
         const sortOrder = Number(formData.get("sortOrder") || 0);
 
         await prisma.category.create({
@@ -36,13 +40,15 @@ export async function createCategory(formData: FormData) {
         return { success: true };
     } catch (error: any) {
         console.error("Error creating category:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: toUserMessage(error) };
     }
 }
 
 export async function updateCategory(id: string, formData: FormData) {
     try {
-        const name = formData.get("name") as string;
+        await requireAdmin();
+        const name = String(formData.get("name") ?? "").trim();
+        if (!name) return { success: false, error: "El nombre es obligatorio." };
         const sortOrder = Number(formData.get("sortOrder") || 0);
 
         await prisma.category.update({
@@ -55,12 +61,13 @@ export async function updateCategory(id: string, formData: FormData) {
         return { success: true };
     } catch (error: any) {
         console.error("Error updating category:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: toUserMessage(error) };
     }
 }
 
 export async function deleteCategory(id: string) {
     try {
+        await requireAdmin();
         await prisma.category.delete({
             where: { id }
         });
@@ -71,12 +78,13 @@ export async function deleteCategory(id: string) {
     } catch (error: any) {
         // If there are linked products, it will fail
         console.error("Error deleting category:", error);
-        return { success: false, error: "No se puede eliminar una categoría que contiene productos." };
+        return { success: false, error: toUserMessage(error, "No se puede eliminar una categoría que contiene productos.") };
     }
 }
 
 export async function updateCategoryOrders(updates: { id: string, sortOrder: number }[]) {
     try {
+        await requireAdmin();
         // Use a transaction to update all sorting orders atomically
         await prisma.$transaction(
             updates.map((update) =>
@@ -92,6 +100,6 @@ export async function updateCategoryOrders(updates: { id: string, sortOrder: num
         return { success: true };
     } catch (error: any) {
         console.error("Error updating category orders:", error);
-        return { success: false, error: "Error al reordenar las categorías." };
+        return { success: false, error: toUserMessage(error, "Error al reordenar las categorías.") };
     }
 }

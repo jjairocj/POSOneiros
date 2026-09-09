@@ -2,6 +2,7 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { SiigoRow } from "@/app/lib/siigo-parser";
+import { requireAdmin } from "@/lib/auth";
 
 export type RowStatus = "new" | "update" | "unchanged";
 
@@ -19,6 +20,7 @@ export interface ImportResult {
 
 /** Returns which rows are new, which would update an existing product, and which are identical. */
 export async function previewImport(rows: SiigoRow[]): Promise<PreviewRow[]> {
+    await requireAdmin();
     const codes = rows.map((r) => r.code);
     const existing = await prisma.product.findMany({
         where: { code: { in: codes } },
@@ -48,6 +50,7 @@ export async function previewImport(rows: SiigoRow[]): Promise<PreviewRow[]> {
 
 /** Upserts all rows by code. New → create, changed → update, unchanged → skip. */
 export async function importProducts(rows: SiigoRow[]): Promise<ImportResult> {
+    await requireAdmin();
     const preview = await previewImport(rows);
     const result: ImportResult = { created: 0, updated: 0, unchanged: 0, errors: [] };
 
@@ -64,14 +67,12 @@ export async function importProducts(rows: SiigoRow[]): Promise<ImportResult> {
                 taxIva: row.taxIva,
                 stock: row.stock,
                 isActive: row.isActive,
-                // Reset other taxes to 0 — Siigo export doesn't include ICA / ImpoConsumo
-                taxIca: 0,
-                taxImpoConsumo: 0,
             };
 
+            // Siigo export doesn't include ICA / ImpoConsumo: keep existing values on update.
             await prisma.product.upsert({
                 where: { code: row.code },
-                create: { ...data, code: row.code, cost: 0 },
+                create: { ...data, code: row.code, cost: 0, taxIca: 0, taxImpoConsumo: 0 },
                 update: data,
             });
 

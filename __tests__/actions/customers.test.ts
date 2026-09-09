@@ -12,6 +12,9 @@ vi.mock('../../lib/prisma', () => ({
     },
 }));
 
+vi.mock('../../lib/auth', () => ({ requireSession: vi.fn().mockResolvedValue({ id: 'u1', role: 'CASHIER' }) }));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+
 import { searchCustomers, createCustomer } from '../../app/actions/customers';
 
 beforeEach(() => vi.clearAllMocks());
@@ -47,7 +50,7 @@ describe('createCustomer', () => {
         const fake = { id: 'c1', fullName: 'María López', documentId: null, phone: null, email: null };
         mockCreate.mockResolvedValue(fake);
         const result = await createCustomer({ fullName: 'María López' });
-        expect(result.fullName).toBe('María López');
+        expect(result).toEqual({ ok: true, data: fake });
         expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
             data: expect.objectContaining({ fullName: 'María López' }),
         }));

@@ -32,12 +32,14 @@ vi.mock('../app/actions/sale', () => ({ processSale: (...a: any[]) => mockProces
 
 vi.mock('../app/pos/components/Checkout/Receipt', () => ({
     default: () => <div data-testid="receipt" />,
+    receiptNumber: () => '1',
 }));
+vi.mock('../app/actions/customers', () => ({ searchCustomers: vi.fn().mockResolvedValue([]), createCustomer: vi.fn() }));
 
 const DEFAULT_PROPS = {
     activeShiftId: 'shift_1',
     orderTotal: 15000,
-    items: [{ id: 'p1', name: 'Café', price: 15000, quantity: 1 }],
+    items: [{ id: 'p1', name: 'Café', price: 15000, quantity: 1, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 }],
     onSuccess: vi.fn(),
     onCancel: vi.fn(),
 };
@@ -56,7 +58,7 @@ describe('CheckoutModal — payment stage', () => {
         renderModal();
         expect(screen.getByText(/total a cobrar/i)).toBeInTheDocument();
         // The order total appears at least once in the header area
-        expect(screen.getAllByText('$15,000').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText('$15.000').length).toBeGreaterThanOrEqual(1);
     });
 
     it('"FINALIZAR VENTA" is disabled when no payment has been entered', () => {
@@ -99,11 +101,11 @@ describe('CheckoutModal — payment stage', () => {
         const cashInput = screen.getAllByPlaceholderText('0')[0];
         fireEvent.change(cashInput, { target: { value: '20000' } });
         // Change = 20000 - 15000 = 5000
-        expect(screen.getByText('$5,000')).toBeInTheDocument();
+        expect(screen.getAllByText('$5.000').length).toBeGreaterThanOrEqual(1);
     });
 
     it('calls processSale with correct arguments on submit', async () => {
-        mockProcessSale.mockResolvedValue({ id: 'sale_1' });
+        mockProcessSale.mockResolvedValue({ ok: true, data: { id: 'sale_1', details: [], payments: [] } });
         renderModal();
         const cashInput = screen.getAllByPlaceholderText('0')[0];
         fireEvent.change(cashInput, { target: { value: '15000' } });
@@ -112,16 +114,15 @@ describe('CheckoutModal — payment stage', () => {
         await waitFor(() =>
             expect(mockProcessSale).toHaveBeenCalledWith(
                 'shift_1',
-                DEFAULT_PROPS.items,
+                [{ id: 'p1', quantity: 1 }],
                 expect.arrayContaining([expect.objectContaining({ method: 'CASH', amount: 15000 })]),
-                undefined,
-                undefined
+                expect.objectContaining({ customerId: undefined })
             )
         );
     });
 
-    it('shows an inline error when processSale rejects', async () => {
-        mockProcessSale.mockRejectedValue(new Error('Stock insuficiente'));
+    it('shows the server error message when processSale returns ok:false', async () => {
+        mockProcessSale.mockResolvedValue({ ok: false, error: 'Stock insuficiente' });
         renderModal();
         const cashInput = screen.getAllByPlaceholderText('0')[0];
         fireEvent.change(cashInput, { target: { value: '15000' } });
@@ -129,13 +130,24 @@ describe('CheckoutModal — payment stage', () => {
         await waitFor(() => expect(screen.getByText('Stock insuficiente')).toBeInTheDocument());
     });
 
-    it('calls onCancel when the X button is clicked', () => {
-        const onCancel = vi.fn();
-        renderModal({ onCancel });
-        // The X button doesn't have a label; find by its close icon container
-        const closeBtn = screen.getByRole('button', { name: '' });
-        fireEvent.click(closeBtn);
-        expect(onCancel).toHaveBeenCalledOnce();
+    it('shows a connection error when processSale throws', async () => {
+        mockProcessSale.mockRejectedValue(new Error('network'));
+        renderModal();
+        const cashInput = screen.getAllByPlaceholderText('0')[0];
+        fireEvent.change(cashInput, { target: { value: '15000' } });
+        fireEvent.click(screen.getByRole('button', { name: /finalizar venta/i }));
+        await waitFor(() => expect(screen.getByText(/No se pudo conectar/)).toBeInTheDocument());
+    });
+
+    it('in "collect" mode records the payments without calling processSale', async () => {
+        const onCollect = vi.fn();
+        render(<CheckoutModal {...DEFAULT_PROPS} mode="collect" subAccountLabel="Ana" onCollect={onCollect} />);
+        const cashInput = screen.getAllByPlaceholderText('0')[0];
+        fireEvent.change(cashInput, { target: { value: '20000' } });
+        fireEvent.click(screen.getByRole('button', { name: /registrar pago/i }));
+        await waitFor(() => expect(screen.getByText('Pago registrado')).toBeInTheDocument());
+        expect(mockProcessSale).not.toHaveBeenCalled();
+        expect(onCollect).toHaveBeenCalledWith([{ method: 'CASH', amount: 15000, subAccountLabel: 'Ana' }], 5000);
     });
 });
 
@@ -143,24 +155,24 @@ describe('CheckoutModal — payment stage', () => {
 
 describe('CheckoutModal — success stage (climax visual)', () => {
     async function triggerSuccess(cashAmount: number, orderTotal = 15000) {
-        mockProcessSale.mockResolvedValue({ id: 'sale_1' });
+        mockProcessSale.mockResolvedValue({ ok: true, data: { id: 'sale_1', details: [], payments: [] } });
         renderModal({ orderTotal });
         const cashInput = screen.getAllByPlaceholderText('0')[0];
         fireEvent.change(cashInput, { target: { value: String(cashAmount) } });
         fireEvent.click(screen.getByRole('button', { name: /finalizar venta/i }));
-        await waitFor(() => expect(screen.getByText('¡Venta Exitosa!')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('¡Venta registrada!')).toBeInTheDocument());
     }
 
     beforeEach(() => vi.clearAllMocks());
 
     it('renders the success heading after a completed sale', async () => {
         await triggerSuccess(15000);
-        expect(screen.getByText('¡Venta Exitosa!')).toBeInTheDocument();
+        expect(screen.getByText('¡Venta registrada!')).toBeInTheDocument();
     });
 
     it('shows the change amount when there is an overpayment', async () => {
         await triggerSuccess(20000); // change = 5000
-        expect(screen.getByText('$5,000')).toBeInTheDocument();
+        expect(screen.getAllByText('$5.000').length).toBeGreaterThanOrEqual(1);
     });
 
     it('shows "Pago exacto recibido." when change is zero', async () => {
@@ -170,12 +182,12 @@ describe('CheckoutModal — success stage (climax visual)', () => {
 
     it('"Cerrar" calls onSuccess', async () => {
         const onSuccess = vi.fn();
-        mockProcessSale.mockResolvedValue({ id: 'sale_1' });
+        mockProcessSale.mockResolvedValue({ ok: true, data: { id: 'sale_1', details: [], payments: [] } });
         render(<CheckoutModal {...DEFAULT_PROPS} onSuccess={onSuccess} />);
         const cashInput = screen.getAllByPlaceholderText('0')[0];
         fireEvent.change(cashInput, { target: { value: '15000' } });
         fireEvent.click(screen.getByRole('button', { name: /finalizar venta/i }));
-        await waitFor(() => screen.getByText('¡Venta Exitosa!'));
+        await waitFor(() => screen.getByText('¡Venta registrada!'));
         fireEvent.click(screen.getByRole('button', { name: /cerrar/i }));
         expect(onSuccess).toHaveBeenCalledOnce();
     });

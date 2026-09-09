@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import { SubAccount, CartItem } from "@/app/types/cart";
+import { SubAccount, CartItem, SubAccountPayment } from "@/app/types/cart";
 import { calculateOrderTotals } from "@/app/lib/tax";
 
 function makeId(): string {
@@ -45,7 +45,7 @@ interface SubAccountStore {
     unassignItem: (subAccountId: string, itemId: string) => void;
     splitEqually: (items: CartItem[], cartTotal: number) => void;
     setCustomAmount: (id: string, amount: number) => void;
-    markPaid: (id: string) => void;
+    markPaid: (id: string, payments?: SubAccountPayment[]) => void;
     allPaid: () => boolean;
 }
 
@@ -147,10 +147,10 @@ export const useSubAccountStore = create<SubAccountStore>((set, get) => ({
         }));
     },
 
-    markPaid: (id) => {
+    markPaid: (id, payments = []) => {
         set(state => ({
             subAccounts: state.subAccounts.map(sa =>
-                sa.id === id ? { ...sa, paid: true } : sa
+                sa.id === id ? { ...sa, paid: true, payments } : sa
             ),
         }));
     },

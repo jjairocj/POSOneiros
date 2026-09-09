@@ -1,6 +1,8 @@
 "use server";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireSession } from "@/lib/auth";
+import { fail, ok, toUserMessage, type ActionResult } from "@/lib/result";
 
 export interface CustomerResult {
     id: string;
@@ -12,6 +14,7 @@ export interface CustomerResult {
 
 export async function searchCustomers(query: string): Promise<CustomerResult[]> {
     if (!query || query.trim().length < 2) return [];
+    try { await requireSession(); } catch { return []; }
     const q = query.trim();
     return prisma.customer.findMany({
         where: {
@@ -32,7 +35,11 @@ export async function createCustomer(data: {
     documentId?: string;
     phone?: string;
     email?: string;
-}): Promise<CustomerResult> {
+}): Promise<ActionResult<CustomerResult>> {
+  try {
+    await requireSession();
+    if (!data.fullName?.trim()) return fail("El nombre del cliente es obligatorio.");
+    if (data.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email.trim())) return fail("Correo inválido.");
     const customer = await prisma.customer.create({
         data: {
             fullName: data.fullName.trim(),
@@ -43,5 +50,9 @@ export async function createCustomer(data: {
         select: { id: true, fullName: true, documentId: true, phone: true, email: true },
     });
     revalidatePath("/admin/customers");
-    return customer;
+    return ok(customer);
+  } catch (err) {
+    console.error("[createCustomer]", err);
+    return fail(toUserMessage(err, "No se pudo crear el cliente."));
+  }
 }

@@ -14,12 +14,13 @@ export const ZERO_TOTALS: OrderTotals = {
 
 export function calculateOrderTotals(items: CartItem[]): OrderTotals {
     let subtotal = 0, taxIva = 0, taxIca = 0, taxImpoConsumo = 0;
+    // Rounded per line to whole pesos, mirroring the server (processSale).
     for (const item of items) {
         const base = item.price * item.quantity;
-        subtotal       += base;
-        taxIva         += base * (item.taxIva ?? 0);
-        taxIca         += base * (item.taxIca ?? 0);
-        taxImpoConsumo += base * (item.taxImpoConsumo ?? 0);
+        subtotal       += Math.round(base);
+        taxIva         += Math.round(base * (item.taxIva ?? 0));
+        taxIca         += Math.round(base * (item.taxIca ?? 0));
+        taxImpoConsumo += Math.round(base * (item.taxImpoConsumo ?? 0));
     }
     return { subtotal, taxIva, taxIca, taxImpoConsumo, total: subtotal + taxIva + taxIca + taxImpoConsumo };
 }

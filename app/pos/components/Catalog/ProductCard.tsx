@@ -35,7 +35,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         setTimeout(() => setAdded(false), 600);
     };
 
-    const isOutOfStock = product.stock === 0;
+    const isOutOfStock = product.stock <= 0;
 
     return (
         <div

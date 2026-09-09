@@ -1,7 +1,8 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { startOfDay, endOfDay, subDays, differenceInDays } from "date-fns";
+import { startOfDay, endOfDay, differenceInDays } from "date-fns";
+import { requireAdmin } from "@/lib/auth";
 
 interface AnalyticsFilters {
     startDate?: Date;
@@ -10,6 +11,7 @@ interface AnalyticsFilters {
 }
 
 export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
+    await requireAdmin();
     const { startDate, endDate, shiftId } = filters;
 
     // Date range for query
@@ -154,6 +156,7 @@ export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
 
 // History List for the DataTable
 export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
+    await requireAdmin();
     const { startDate, endDate, shiftId } = filters;
 
     const where: any = {};
@@ -172,7 +175,7 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
             orderBy: { createdAt: 'desc' },
             include: {
                 shift: {
-                    include: { user: true }
+                    include: { user: true, register: true }
                 },
                 payments: true
             }
@@ -180,7 +183,11 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
 
         return sales.map(sale => ({
             id: sale.id,
-            shortId: sale.id.substring(0, 8).toUpperCase(), // Fake Invoice Number
+            shortId: sale.number != null
+                ? `${sale.shift?.register?.prefix ? sale.shift.register.prefix + "-" : ""}${sale.number}`
+                : sale.id.substring(0, 8).toUpperCase(),
+            number: sale.number,
+            cancelReason: sale.cancelReason,
             createdAt: sale.createdAt.toISOString(),
             total: sale.total,
             status: sale.status,
@@ -197,17 +204,19 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
 
 export async function getSaleForPrint(saleId: string) {
     try {
+        await requireAdmin();
         const sale = await prisma.sale.findUnique({
             where: { id: saleId },
             include: {
                 details: {
                     include: { product: true }
                 },
-                payments: true
+                payments: true,
+                shift: { include: { register: true } },
             }
         });
 
-        if (!sale) return { success: false, error: "Factura no encontrada" };
+        if (!sale) return { success: false, error: "Comprobante no encontrado" };
 
         return {
             success: true,

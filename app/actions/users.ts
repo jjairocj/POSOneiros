@@ -2,9 +2,12 @@
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { requireSession, requireAdmin } from "@/lib/auth";
+import { toUserMessage } from "@/lib/result";
 
 export async function getUsers() {
     try {
+        await requireAdmin();
         const users = await prisma.user.findMany({
             include: {
                 role: true,
@@ -43,6 +46,13 @@ export async function createUser(data: {
     branchId?: string;
 }) {
     try {
+        await requireAdmin();
+        const email = data.email?.trim().toLowerCase();
+        if (!data.name?.trim()) return { success: false, error: "El nombre es obligatorio." };
+        if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { success: false, error: "Correo inválido." };
+        if (!data.password || data.password.length < 6) return { success: false, error: "La contraseña debe tener al menos 6 caracteres." };
+        if (!data.roleId) return { success: false, error: "Selecciona un rol." };
+        data = { ...data, email, name: data.name.trim() };
         const hashedPassword = await bcrypt.hash(data.password, 12);
         await prisma.user.create({
             data: {
@@ -57,7 +67,7 @@ export async function createUser(data: {
         return { success: true };
     } catch (error: any) {
         console.error("Error creating user:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: toUserMessage(error) };
     }
 }
 
@@ -72,6 +82,14 @@ export async function updateUser(
     }
 ) {
     try {
+        const admin = await requireAdmin();
+        if (data.password && data.password.trim() !== "" && data.password.length < 6) {
+            return { success: false, error: "La contraseña debe tener al menos 6 caracteres." };
+        }
+        if (admin.id === id) {
+            const adminRole = await prisma.role.findUnique({ where: { name: "ADMIN" } });
+            if (adminRole && data.roleId !== adminRole.id) return { success: false, error: "No puedes quitarte el rol de administrador a ti mismo." };
+        }
         const updateData: any = {
             name: data.name,
             email: data.email,
@@ -91,12 +109,14 @@ export async function updateUser(
         return { success: true };
     } catch (error: any) {
         console.error("Error updating user:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: toUserMessage(error) };
     }
 }
 
 export async function deleteUser(id: string) {
     try {
+        const admin = await requireAdmin();
+        if (admin.id === id) return { success: false, error: "No puedes eliminar tu propio usuario." };
         // Check that it's not the last admin
         const user = await prisma.user.findUnique({
             where: { id },
@@ -113,17 +133,22 @@ export async function deleteUser(id: string) {
                 };
             }
         }
+        const shiftCount = await prisma.shift.count({ where: { userId: id } });
+        if (shiftCount > 0) {
+            return { success: false, error: "Este usuario tiene turnos registrados y no puede eliminarse. Cambia su contraseña para bloquear el acceso." };
+        }
         await prisma.user.delete({ where: { id } });
         revalidatePath("/admin/users");
         return { success: true };
     } catch (error: any) {
         console.error("Error deleting user:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: toUserMessage(error) };
     }
 }
 
 export async function getRoles() {
     try {
+        await requireAdmin();
         const roles = await prisma.role.findMany({ orderBy: { name: "asc" } });
         return roles.map((r) => ({
             ...r,
@@ -138,6 +163,7 @@ export async function getRoles() {
 
 export async function getBranches() {
     try {
+        await requireAdmin();
         const branches = await prisma.branch.findMany({ orderBy: { name: "asc" } });
         return branches.map((b) => ({
             ...b,

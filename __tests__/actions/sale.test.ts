@@ -1,80 +1,206 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockFindUnique = vi.fn();
-const mockFindMany = vi.fn();
+const mockShiftFindUnique = vi.fn();
+const mockConfigFindUnique = vi.fn();
 const mockTransaction = vi.fn();
+const mockRequireSession = vi.fn();
 
 vi.mock('../../lib/prisma', () => ({
     default: {
-        shift: { findUnique: (...a: any[]) => mockFindUnique(...a) },
-        product: { findMany: (...a: any[]) => mockFindMany(...a) },
+        shift: { findUnique: (...a: any[]) => mockShiftFindUnique(...a) },
+        systemConfig: { findUnique: (...a: any[]) => mockConfigFindUnique(...a) },
         $transaction: (...a: any[]) => mockTransaction(...a),
     },
 }));
+vi.mock('../../lib/auth', () => ({
+    requireSession: (...a: any[]) => mockRequireSession(...a),
+}));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-import { processSale } from '../../app/actions/sale';
+import { processSale, cancelSale } from '../../app/actions/sale';
 
-const ITEMS = [{ id: 'p1', name: 'Café', price: 3000, quantity: 2 }];
-const PAYMENTS = [{ method: 'CASH', amount: 6000 }];
-const DB_PRODUCT = { id: 'p1', name: 'Café', price: 3000, stock: 10, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 };
+const ITEMS = [{ id: 'p1', quantity: 2 }];
+const PAYMENTS = [{ method: 'CASH' as const, amount: 6000 }];
+const DB_PRODUCT = { id: 'p1', name: 'Café', code: 'C1', price: 3000, stock: 10, isActive: true, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 };
+const OPEN_SHIFT = { id: 's1', status: 'OPEN', userId: 'u1', registerId: 'r1', register: { id: 'r1', prefix: 'POS' } };
 
-beforeEach(() => vi.clearAllMocks());
+function makeTx(overrides: Partial<Record<string, any>> = {}) {
+    const tx = {
+        product: {
+            findMany: vi.fn().mockResolvedValue([DB_PRODUCT]),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+            update: vi.fn().mockResolvedValue({}),
+        },
+        register: { update: vi.fn().mockResolvedValue({ nextNumber: 8 }) },
+        sale: {
+            create: vi.fn().mockImplementation(async ({ data }: any) => ({ id: 'sale-1', ...data, details: [], payments: data.payments.create })),
+            findUnique: vi.fn(),
+            update: vi.fn().mockResolvedValue({}),
+        },
+        payment: { updateMany: vi.fn().mockResolvedValue({}) },
+        subAccount: { createMany: vi.fn().mockResolvedValue({}) },
+        ...overrides,
+    };
+    mockTransaction.mockImplementation(async (fn: any) => fn(tx));
+    return tx;
+}
 
-describe('processSale', () => {
-    it('throws when shift is not found', async () => {
-        mockFindUnique.mockResolvedValue(null);
-        await expect(processSale('bad-shift', ITEMS, PAYMENTS)).rejects.toThrow('Turno inválido');
+beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireSession.mockResolvedValue({ id: 'u1', role: 'CASHIER' });
+    mockConfigFindUnique.mockResolvedValue({ value: 'false' });
+    mockShiftFindUnique.mockResolvedValue(OPEN_SHIFT);
+});
+
+describe('processSale — validation', () => {
+    it('fails when not authenticated', async () => {
+        mockRequireSession.mockRejectedValue(Object.assign(new Error('No autenticado'), { name: 'AuthError' }));
+        const res = await processSale('s1', ITEMS, PAYMENTS);
+        expect(res).toEqual({ ok: false, error: 'No autenticado' });
     });
 
-    it('throws when shift is closed', async () => {
-        mockFindUnique.mockResolvedValue({ id: 's1', status: 'CLOSED' });
-        await expect(processSale('s1', ITEMS, PAYMENTS)).rejects.toThrow('Turno inválido');
+    it('fails when the cart is empty', async () => {
+        const res = await processSale('s1', [], PAYMENTS);
+        expect(res.ok).toBe(false);
     });
 
-    it('throws when a product is missing', async () => {
-        mockFindUnique.mockResolvedValue({ id: 's1', status: 'OPEN' });
-        mockFindMany.mockResolvedValue([]); // no products found
-        await expect(processSale('s1', ITEMS, PAYMENTS)).rejects.toThrow('Algunos productos ya no existen');
+    it('rejects quantities <= 0', async () => {
+        const res = await processSale('s1', [{ id: 'p1', quantity: -1 }], PAYMENTS);
+        expect(res).toMatchObject({ ok: false, error: expect.stringMatching(/mayores a cero/) });
     });
 
-    it('throws when stock is insufficient', async () => {
-        mockFindUnique.mockResolvedValue({ id: 's1', status: 'OPEN' });
-        mockFindMany.mockResolvedValue([{ ...DB_PRODUCT, stock: 1 }]); // only 1 in stock, need 2
-        const txFn = vi.fn().mockImplementation(async (fn: any) => fn({
-            product: { update: vi.fn() },
-            sale: { create: vi.fn() },
-            subAccount: { create: vi.fn() },
+    it('rejects unknown payment methods and non-positive amounts', async () => {
+        expect((await processSale('s1', ITEMS, [{ method: 'BITCOIN' as any, amount: 1 }])).ok).toBe(false);
+        expect((await processSale('s1', ITEMS, [{ method: 'CASH', amount: 0 }])).ok).toBe(false);
+    });
+
+    it('fails when shift is not found or closed', async () => {
+        mockShiftFindUnique.mockResolvedValue(null);
+        expect(await processSale('bad', ITEMS, PAYMENTS)).toMatchObject({ ok: false, error: expect.stringMatching(/turno/i) });
+        mockShiftFindUnique.mockResolvedValue({ ...OPEN_SHIFT, status: 'CLOSED' });
+        expect(await processSale('s1', ITEMS, PAYMENTS)).toMatchObject({ ok: false });
+    });
+
+    it('fails when the shift belongs to another cashier', async () => {
+        mockRequireSession.mockResolvedValue({ id: 'u2', role: 'CASHIER' });
+        makeTx();
+        expect(await processSale('s1', ITEMS, PAYMENTS)).toMatchObject({ ok: false, error: expect.stringMatching(/otro usuario/) });
+    });
+
+    it('fails when a product is missing', async () => {
+        makeTx({ product: { findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn() } });
+        expect(await processSale('s1', ITEMS, PAYMENTS)).toMatchObject({ ok: false, error: expect.stringMatching(/ya no existen/) });
+    });
+
+    it('fails when a product is inactive', async () => {
+        makeTx({ product: { findMany: vi.fn().mockResolvedValue([{ ...DB_PRODUCT, isActive: false }]), updateMany: vi.fn() } });
+        expect(await processSale('s1', ITEMS, PAYMENTS)).toMatchObject({ ok: false, error: expect.stringMatching(/desactivado/) });
+    });
+});
+
+describe('processSale — stock', () => {
+    it('decrements stock atomically with a stock >= quantity guard', async () => {
+        const tx = makeTx();
+        await processSale('s1', ITEMS, PAYMENTS);
+        expect(tx.product.updateMany).toHaveBeenCalledWith({
+            where: { id: 'p1', stock: { gte: 2 } },
+            data: { stock: { decrement: 2 } },
+        });
+    });
+
+    it('fails with "Stock insuficiente" when the guarded update matches nothing (race-safe)', async () => {
+        makeTx({ product: { findMany: vi.fn().mockResolvedValue([{ ...DB_PRODUCT, stock: 1 }]), updateMany: vi.fn().mockResolvedValue({ count: 0 }) } });
+        expect(await processSale('s1', ITEMS, PAYMENTS)).toMatchObject({ ok: false, error: expect.stringMatching(/Stock insuficiente/) });
+    });
+
+    it('skips the stock guard when allowNegativeStock is enabled', async () => {
+        mockConfigFindUnique.mockResolvedValue({ value: 'true' });
+        const tx = makeTx();
+        await processSale('s1', ITEMS, PAYMENTS);
+        expect(tx.product.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'p1' } }));
+    });
+
+    it('merges duplicated lines for the same product', async () => {
+        const tx = makeTx();
+        await processSale('s1', [{ id: 'p1', quantity: 1 }, { id: 'p1', quantity: 1 }], PAYMENTS);
+        expect(tx.product.updateMany).toHaveBeenCalledTimes(1);
+        expect(tx.product.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { stock: { decrement: 2 } } }));
+    });
+});
+
+describe('processSale — totals and payments', () => {
+    it('computes taxes from DB prices and requires payments to match the total', async () => {
+        makeTx({ product: { findMany: vi.fn().mockResolvedValue([{ ...DB_PRODUCT, price: 10000, taxIva: 19 }]), updateMany: vi.fn().mockResolvedValue({ count: 1 }) } });
+        const bad = await processSale('s1', [{ id: 'p1', quantity: 1 }], [{ method: 'CASH', amount: 10000 }]);
+        expect(bad).toMatchObject({ ok: false, error: expect.stringMatching(/no coinciden/) });
+
+        makeTx({ product: { findMany: vi.fn().mockResolvedValue([{ ...DB_PRODUCT, price: 10000, taxIva: 19 }]), updateMany: vi.fn().mockResolvedValue({ count: 1 }) } });
+        const good = await processSale('s1', [{ id: 'p1', quantity: 1 }], [{ method: 'CASH', amount: 11900 }]);
+        expect(good.ok).toBe(true);
+    });
+
+    it('assigns a consecutive number from the register and snapshots product name/code', async () => {
+        const tx = makeTx();
+        const res = await processSale('s1', ITEMS, PAYMENTS);
+        expect(res.ok).toBe(true);
+        expect(tx.register.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'r1' }, data: { nextNumber: { increment: 1 } } }));
+        const data = tx.sale.create.mock.calls[0][0].data;
+        expect(data.number).toBe(7);
+        expect(data.total).toBe(6000);
+        expect(data.details.create[0]).toMatchObject({ productName: 'Café', productCode: 'C1', quantity: 2, unitPrice: 3000 });
+    });
+
+    it('creates one SubAccount per payer linked to a single sale (split bill)', async () => {
+        const tx = makeTx();
+        const res = await processSale('s1', ITEMS,
+            [{ method: 'CASH', amount: 3000, subAccountLabel: 'Ana' }, { method: 'CARD', amount: 3000, subAccountLabel: 'Luis' }],
+            { subAccounts: [{ label: 'Ana', items: [], amount: 3000 }, { label: 'Luis', items: [], amount: 3000 }] });
+        expect(res.ok).toBe(true);
+        expect(tx.sale.create).toHaveBeenCalledTimes(1);
+        expect(tx.product.updateMany).toHaveBeenCalledTimes(1);
+        expect(tx.subAccount.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({ label: 'Ana', total: 3000, paid: true, saleId: 'sale-1' }),
+                expect.objectContaining({ label: 'Luis', total: 3000, paid: true, saleId: 'sale-1' }),
+            ],
+        });
+    });
+
+    it('still supports the legacy single subAccountLabel', async () => {
+        const tx = makeTx();
+        await processSale('s1', ITEMS, PAYMENTS, { subAccountLabel: 'Persona 1' });
+        expect(tx.subAccount.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ label: 'Persona 1', total: 6000 })] });
+    });
+});
+
+describe('cancelSale', () => {
+    it('requires ADMIN', async () => {
+        mockRequireSession.mockRejectedValue(Object.assign(new Error('No tienes permisos para esta acción'), { name: 'AuthError' }));
+        expect(await cancelSale('sale-1', 'error de digitación')).toMatchObject({ ok: false, error: expect.stringMatching(/permisos/) });
+        expect(mockRequireSession).toHaveBeenCalledWith('ADMIN');
+    });
+
+    it('requires a reason', async () => {
+        mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
+        expect(await cancelSale('sale-1', ' ')).toMatchObject({ ok: false, error: expect.stringMatching(/motivo/) });
+    });
+
+    it('restores stock and marks the sale CANCELLED', async () => {
+        mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
+        const tx = makeTx();
+        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'COMPLETED', details: [{ productId: 'p1', quantity: 2 }] });
+        const res = await cancelSale('sale-1', 'cliente se arrepintió');
+        expect(res.ok).toBe(true);
+        expect(tx.product.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { stock: { increment: 2 } } });
+        expect(tx.sale.update).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ status: 'CANCELLED', cancelledById: 'admin', cancelReason: 'cliente se arrepintió' }),
         }));
-        mockTransaction.mockImplementation((fn: any) => txFn(fn));
-        await expect(processSale('s1', ITEMS, PAYMENTS)).rejects.toThrow('Stock insuficiente');
     });
 
-    it('creates a sale and returns it', async () => {
-        mockFindUnique.mockResolvedValue({ id: 's1', status: 'OPEN' });
-        mockFindMany.mockResolvedValue([DB_PRODUCT]);
-        const fakeSale = { id: 'sale-1', details: [], payments: [] };
-        mockTransaction.mockImplementation(async (fn: any) => fn({
-            product: { update: vi.fn() },
-            sale: { create: vi.fn().mockResolvedValue(fakeSale) },
-            subAccount: { create: vi.fn() },
-        }));
-        const result = await processSale('s1', ITEMS, PAYMENTS);
-        expect(result.id).toBe('sale-1');
-    });
-
-    it('creates a SubAccount record when subAccountLabel is provided', async () => {
-        mockFindUnique.mockResolvedValue({ id: 's1', status: 'OPEN' });
-        mockFindMany.mockResolvedValue([DB_PRODUCT]);
-        const fakeSale = { id: 'sale-1', details: [], payments: [] };
-        const mockSubAccountCreate = vi.fn();
-        mockTransaction.mockImplementation(async (fn: any) => fn({
-            product: { update: vi.fn() },
-            sale: { create: vi.fn().mockResolvedValue(fakeSale) },
-            subAccount: { create: mockSubAccountCreate },
-        }));
-        await processSale('s1', ITEMS, PAYMENTS, undefined, 'Persona 1');
-        expect(mockSubAccountCreate).toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({ label: 'Persona 1', paid: true, saleId: 'sale-1' }),
-        }));
+    it('refuses to cancel twice', async () => {
+        mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
+        const tx = makeTx();
+        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'CANCELLED', details: [] });
+        expect(await cancelSale('sale-1', 'otra vez')).toMatchObject({ ok: false, error: expect.stringMatching(/ya fue anulada/) });
     });
 });
