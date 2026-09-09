@@ -50,7 +50,7 @@ export async function previewImport(rows: SiigoRow[]): Promise<PreviewRow[]> {
 
 /** Upserts all rows by code. New → create, changed → update, unchanged → skip. */
 export async function importProducts(rows: SiigoRow[]): Promise<ImportResult> {
-    await requireAdmin();
+    const admin = await requireAdmin();
     const preview = await previewImport(rows);
     const result: ImportResult = { created: 0, updated: 0, unchanged: 0, errors: [] };
 
@@ -70,11 +70,18 @@ export async function importProducts(rows: SiigoRow[]): Promise<ImportResult> {
             };
 
             // Siigo export doesn't include ICA / ImpoConsumo: keep existing values on update.
-            await prisma.product.upsert({
+            const before = row.status === "update" ? await prisma.product.findUnique({ where: { code: row.code }, select: { stock: true } }) : null;
+            const saved = await prisma.product.upsert({
                 where: { code: row.code },
                 create: { ...data, code: row.code, cost: 0, taxIca: 0, taxImpoConsumo: 0 },
                 update: data,
             });
+            const delta = saved.stock - (before?.stock ?? 0);
+            if (delta !== 0) {
+                await prisma.stockMovement.create({
+                    data: { productId: saved.id, type: "IMPORT", quantity: delta, stockAfter: saved.stock, userId: admin.id, reason: "Importación Siigo" },
+                });
+            }
 
             if (row.status === "new") result.created++;
             else result.updated++;

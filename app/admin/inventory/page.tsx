@@ -1,11 +1,12 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { getProducts } from '@/app/actions/product';
+import { getProducts, getStockMovements } from '@/app/actions/product';
 import { getCategories } from '@/app/actions/category';
 import { columns } from './components/columns';
 import { categoryColumns } from './components/category-columns';
 import { DataTable } from './components/data-table';
-import { PackageOpen, FolderTree, FileSpreadsheet } from 'lucide-react';
+import { PackageOpen, FolderTree, FileSpreadsheet, History } from 'lucide-react';
+import { MovementsTable } from './components/MovementsTable';
 import { ProductForm } from './components/product-form';
 import { CategoryForm } from './components/category-form';
 import { CategoryDragList } from './components/CategoryDragList';
@@ -17,7 +18,8 @@ export const metadata: Metadata = {
 
 export default async function InventoryPage() {
     const products = await getProducts(undefined, undefined, { includeInactive: true });
-    const categories = await getCategories(); // Server-side fetch categories
+    const categories = await getCategories();
+    const movements = await getStockMovements({ take: 300 });
 
     return (
         <div className="space-y-6">
@@ -48,7 +50,14 @@ export default async function InventoryPage() {
                     <TabsTrigger value="categories" className="rounded-xl px-6 font-bold flex items-center gap-2">
                         <FolderTree className="w-4 h-4" /> Categorías y Orden
                     </TabsTrigger>
+                    <TabsTrigger value="movements" className="rounded-xl px-6 font-bold flex items-center gap-2">
+                        <History className="w-4 h-4" /> Movimientos
+                    </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="movements" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
+                    <MovementsTable rows={movements} />
+                </TabsContent>
 
                 <TabsContent value="products" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none space-y-4">
                     <div className="flex justify-end">

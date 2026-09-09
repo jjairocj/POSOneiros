@@ -15,6 +15,14 @@ vi.mock('../../lib/prisma', () => ({
             delete: (...a: any[]) => mockDelete(...a),
         },
         saleDetail: { count: vi.fn().mockResolvedValue(0) },
+        stockMovement: { create: vi.fn() },
+        $transaction: async (fn: any) => fn({
+            product: {
+                findUnique: vi.fn().mockResolvedValue({ stock: 10 }),
+                update: (...a: any[]) => { mockUpdate(...a); return Promise.resolve({ stock: 10 }); },
+            },
+            stockMovement: { create: vi.fn() },
+        }),
     },
 }));
 

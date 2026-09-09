@@ -39,6 +39,7 @@ function makeTx(overrides: Partial<Record<string, any>> = {}) {
         },
         payment: { updateMany: vi.fn().mockResolvedValue({}) },
         subAccount: { createMany: vi.fn().mockResolvedValue({}) },
+        stockMovement: { createMany: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
         ...overrides,
     };
     mockTransaction.mockImplementation(async (fn: any) => fn(tx));
@@ -99,9 +100,11 @@ describe('processSale — validation', () => {
 });
 
 describe('processSale — stock', () => {
-    it('decrements stock atomically with a stock >= quantity guard', async () => {
+    it('decrements stock atomically with a stock >= quantity guard and writes a SALE movement', async () => {
         const tx = makeTx();
+        tx.product.findMany.mockResolvedValueOnce([DB_PRODUCT]).mockResolvedValueOnce([{ id: 'p1', stock: 8 }]);
         await processSale('s1', ITEMS, PAYMENTS);
+        expect(tx.stockMovement.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ productId: 'p1', type: 'SALE', quantity: -2, stockAfter: 8, saleId: 'sale-1' })] });
         expect(tx.product.updateMany).toHaveBeenCalledWith({
             where: { id: 'p1', stock: { gte: 2 } },
             data: { stock: { decrement: 2 } },
@@ -189,9 +192,11 @@ describe('cancelSale', () => {
         mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
         const tx = makeTx();
         tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'COMPLETED', details: [{ productId: 'p1', quantity: 2 }] });
+        tx.product.update.mockResolvedValue({ stock: 12 });
         const res = await cancelSale('sale-1', 'cliente se arrepintió');
         expect(res.ok).toBe(true);
         expect(tx.product.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { stock: { increment: 2 } } });
+        expect(tx.stockMovement.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: 'CANCEL', quantity: 2, stockAfter: 12, saleId: 'sale-1' }) });
         expect(tx.sale.update).toHaveBeenCalledWith(expect.objectContaining({
             data: expect.objectContaining({ status: 'CANCELLED', cancelledById: 'admin', cancelReason: 'cliente se arrepintió' }),
         }));

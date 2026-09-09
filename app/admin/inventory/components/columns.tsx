@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProductForm } from "./product-form";
 import { DeleteProductItem } from "./DeleteProductItem";
+import { StockMovementItem } from "./StockMovementItem";
 
 export type ProductColumn = {
   id: string;
@@ -144,6 +145,8 @@ export const columns: ColumnDef<ProductColumn>[] = [
                 }
             />
 
+            <StockMovementItem product={{ id: product.id, name: product.name, stock: product.stock, cost: product.cost }} />
+            <DropdownMenuSeparator />
             <DeleteProductItem productId={product.id} productName={product.name} />
           </DropdownMenuContent>
         </DropdownMenu>

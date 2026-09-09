@@ -110,6 +110,7 @@ export async function processSale(
             let finalTotal = 0;
             let totalDiscount = 0;
             const saleDetails: Prisma.SaleDetailCreateWithoutSaleInput[] = [];
+            const pendingMovements: { productId: string; quantity: number }[] = [];
 
             // Same math as the cart (app/lib/tax.ts), but with DB prices and rates.
             const lines = breakdownLines(
@@ -135,6 +136,7 @@ export async function processSale(
                 if (updated.count === 0) {
                     throw new UserError(`Stock insuficiente para "${product.name}". Quedan ${product.stock}.`);
                 }
+                pendingMovements.push({ productId: product.id, quantity: -quantity });
 
                 finalTotal += line.total;
                 totalDiscount += line.discount;
@@ -186,6 +188,16 @@ export async function processSale(
                 },
             });
 
+            // Kardex entries with the balance after the sale
+            const after = await tx.product.findMany({ where: { id: { in: productIds } }, select: { id: true, stock: true } });
+            const stockById = new Map(after.map((p) => [p.id, p.stock]));
+            await tx.stockMovement.createMany({
+                data: pendingMovements.map((m) => ({
+                    productId: m.productId, type: "SALE", quantity: m.quantity,
+                    stockAfter: stockById.get(m.productId) ?? 0, saleId: newSale.id, userId: user.id,
+                })),
+            });
+
             const subAccounts: SubAccountInput[] = options.subAccounts
                 ?? (options.subAccountLabel ? [{ label: options.subAccountLabel, items, amount: finalTotal }] : []);
             if (subAccounts.length > 0) {
@@ -229,7 +241,10 @@ export async function cancelSale(saleId: string, reason: string): Promise<Action
             if (sale.status === "CANCELLED") throw new UserError("Esta venta ya fue anulada.");
 
             for (const d of sale.details) {
-                await tx.product.update({ where: { id: d.productId }, data: { stock: { increment: d.quantity } } });
+                const p = await tx.product.update({ where: { id: d.productId }, data: { stock: { increment: d.quantity } } });
+                await tx.stockMovement.create({
+                    data: { productId: d.productId, type: "CANCEL", quantity: d.quantity, stockAfter: p.stock, saleId, userId: user.id, reason: trimmed },
+                });
             }
             await tx.payment.updateMany({ where: { saleId }, data: { status: "REFUNDED" } });
             await tx.sale.update({

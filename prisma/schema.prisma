@@ -95,8 +95,27 @@ model Product {
   isFavorite  Boolean     @default(false)
   isActive    Boolean     @default(true)
   saleDetails SaleDetail[]
+  movements   StockMovement[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+/// Kardex: every change to Product.stock, with the balance after it.
+model StockMovement {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  type       String   // SALE | CANCEL | PURCHASE | ADJUSTMENT | WASTE | IMPORT
+  quantity   Float    // signed: negative leaves stock, positive enters
+  stockAfter Float
+  unitCost   Float?   // for PURCHASE: cost paid per unit
+  reason     String?
+  saleId     String?
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([createdAt])
 }
 
 model Customer {

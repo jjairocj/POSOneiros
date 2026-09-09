@@ -90,10 +90,19 @@ export async function createProduct(formData: FormData) {
 
 export async function updateProduct(id: string, formData: FormData) {
     try {
-        await requireAdmin();
+        const admin = await requireAdmin();
         const parsed = parseProductForm(formData);
         if ("error" in parsed) return { success: false, error: parsed.error };
-        await prisma.product.update({ where: { id }, data: parsed.data });
+        await prisma.$transaction(async (tx) => {
+            const before = await tx.product.findUnique({ where: { id }, select: { stock: true } });
+            const updated = await tx.product.update({ where: { id }, data: parsed.data });
+            const delta = updated.stock - (before?.stock ?? 0);
+            if (delta !== 0) {
+                await tx.stockMovement.create({
+                    data: { productId: id, type: "ADJUSTMENT", quantity: delta, stockAfter: updated.stock, userId: admin.id, reason: "Edición manual del producto" },
+                });
+            }
+        });
 
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
@@ -136,5 +145,89 @@ export async function toggleProductFavorite(id: string, isFavorite: boolean) {
     } catch (error: unknown) {
         console.error("Error toggling favorite:", error);
         return { success: false, error: toUserMessage(error) };
+    }
+}
+
+
+export type MovementType = "PURCHASE" | "ADJUSTMENT" | "WASTE";
+
+/**
+ * Manual stock movement from the inventory screen.
+ * PURCHASE adds units (and can update the cost), WASTE removes them,
+ * ADJUSTMENT sets a correction in either direction.
+ */
+export async function adjustStock(input: { productId: string; type: MovementType; quantity: number; reason?: string; unitCost?: number }) {
+    try {
+        const admin = await requireAdmin();
+        const qty = Number(input.quantity);
+        if (!Number.isFinite(qty) || qty === 0) return { success: false, error: "La cantidad debe ser distinta de cero." };
+        if (input.type === "PURCHASE" && qty < 0) return { success: false, error: "Una entrada no puede ser negativa." };
+        if (input.type === "WASTE" && qty < 0) return { success: false, error: "Indica la cantidad de merma en positivo." };
+        if ((input.type === "WASTE" || input.type === "ADJUSTMENT") && !(input.reason ?? "").trim()) {
+            return { success: false, error: "Escribe el motivo." };
+        }
+        const signed = input.type === "WASTE" ? -Math.abs(qty) : qty;
+
+        await prisma.$transaction(async (tx) => {
+            const data: { stock: { increment: number }; cost?: number } = { stock: { increment: signed } };
+            if (input.type === "PURCHASE" && input.unitCost !== undefined && Number.isFinite(input.unitCost) && input.unitCost >= 0) {
+                data.cost = input.unitCost;
+            }
+            const p = await tx.product.update({ where: { id: input.productId }, data });
+            await tx.stockMovement.create({
+                data: {
+                    productId: input.productId, type: input.type, quantity: signed, stockAfter: p.stock,
+                    unitCost: input.type === "PURCHASE" ? input.unitCost ?? null : null,
+                    reason: input.reason?.trim() || null, userId: admin.id,
+                },
+            });
+        });
+
+        revalidatePath("/admin/inventory");
+        revalidatePath("/admin");
+        revalidatePath("/pos");
+        return { success: true };
+    } catch (error: unknown) {
+        console.error("Error adjusting stock:", error);
+        return { success: false, error: toUserMessage(error, "No se pudo registrar el movimiento.") };
+    }
+}
+
+export interface MovementRow {
+    id: string;
+    createdAt: string;
+    type: string;
+    quantity: number;
+    stockAfter: number;
+    unitCost: number | null;
+    reason: string | null;
+    saleId: string | null;
+    productId: string;
+    productName: string;
+    productCode: string;
+    userName: string | null;
+}
+
+/** Latest stock movements, optionally for one product. */
+export async function getStockMovements(opts: { productId?: string; take?: number } = {}): Promise<MovementRow[]> {
+    try {
+        await requireAdmin();
+        const rows = await prisma.stockMovement.findMany({
+            where: opts.productId ? { productId: opts.productId } : {},
+            orderBy: { createdAt: "desc" },
+            take: Math.min(opts.take ?? 200, 1000),
+            include: { product: { select: { name: true, code: true } } },
+        });
+        const userIds = Array.from(new Set(rows.map((r) => r.userId).filter((u): u is string => !!u)));
+        const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }) : [];
+        const nameById = new Map(users.map((u) => [u.id, u.name]));
+        return rows.map((r) => ({
+            id: r.id, createdAt: r.createdAt.toISOString(), type: r.type, quantity: r.quantity, stockAfter: r.stockAfter,
+            unitCost: r.unitCost, reason: r.reason, saleId: r.saleId, productId: r.productId,
+            productName: r.product.name, productCode: r.product.code, userName: r.userId ? nameById.get(r.userId) ?? null : null,
+        }));
+    } catch (error) {
+        console.error("Error fetching movements:", error);
+        return [];
     }
 }

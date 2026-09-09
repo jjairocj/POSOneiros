@@ -59,6 +59,21 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
 
         await requireAdmin();
 
+        if (kind === "movements") {
+            const { start, end, tag } = parseRange(req);
+            const rows = await prisma.stockMovement.findMany({
+                where: { createdAt: { gte: start, lte: end } },
+                include: { product: { select: { name: true, code: true } } },
+                orderBy: { createdAt: "asc" },
+            });
+            const TYPE: Record<string, string> = { SALE: "Venta", CANCEL: "Anulación", PURCHASE: "Entrada", WASTE: "Merma", ADJUSTMENT: "Ajuste", IMPORT: "Importación" };
+            const csv = toCsv(
+                ["Fecha", "Código", "Producto", "Tipo", "Cantidad", "Stock después", "Costo unit.", "Motivo"],
+                rows.map((r) => [fmtDate(r.createdAt), r.product.code, r.product.name, TYPE[r.type] ?? r.type, r.quantity, r.stockAfter, r.unitCost ?? "", r.reason ?? ""])
+            );
+            return csvResponse(`movimientos_${tag}.csv`, csv);
+        }
+
         if (kind === "inventory") {
             const products = await prisma.product.findMany({ include: { category: true }, orderBy: [{ category: { name: "asc" } }, { name: "asc" }] });
             const csv = toCsv(
