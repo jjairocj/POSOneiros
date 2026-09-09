@@ -66,7 +66,9 @@ function parseProductForm(formData: FormData) {
     const imageUrl = formData.get("imageUrl")?.toString().trim() || null;
     const isFavorite = formData.get("isFavorite") === "true";
     const isActive = formData.get("isActive") === null ? true : formData.get("isActive") === "true";
-    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive } } as const;
+    const rawCategory = formData.get("categoryId")?.toString().trim();
+    const categoryId = rawCategory && rawCategory !== "none" ? rawCategory : null;
+    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive, categoryId } } as const;
 }
 
 export async function createProduct(formData: FormData) {

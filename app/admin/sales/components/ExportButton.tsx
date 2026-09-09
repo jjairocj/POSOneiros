@@ -1,70 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import * as XLSX from "xlsx";
-import { Download, Loader2 } from "lucide-react";
+import { Download, FileText, Package, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-
-interface HistoryRow {
-    id: string;
-    shortId: string;
-    createdAt: string;
-    total: number;
-    status: string;
-    sellerName: string;
-    shiftId: string;
-    payments: string;
-}
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Props {
-    data: HistoryRow[];
-    period?: string;
+    /** YYYY-MM-DD range applied to the sales exports. */
+    from: string;
+    to: string;
 }
 
-export function ExportButton({ data, period }: Props) {
-    const [loading, setLoading] = useState(false);
-
-    const handleExport = () => {
-        setLoading(true);
-        try {
-            const rows = data.map((s) => ({
-                "Ticket #": s.shortId,
-                "Fecha": s.createdAt,
-                "Cajero": s.sellerName,
-                "Método de pago": s.payments,
-                "Total (COP)": s.total,
-                "Estado": s.status,
-            }));
-
-            const ws = XLSX.utils.json_to_sheet(rows);
-
-            // Column widths
-            ws["!cols"] = [
-                { wch: 12 }, { wch: 20 }, { wch: 22 },
-                { wch: 22 }, { wch: 14 }, { wch: 12 },
-            ];
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Ventas");
-
-            const fileName = `ventas_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+/** Server-generated CSV downloads (open directly in Excel). */
+export function ExportButton({ from, to }: Props) {
+    const range = `?from=${from}&to=${to}`;
     return (
-        <Button
-            variant="outline"
-            onClick={handleExport}
-            disabled={loading || data.length === 0}
-            className="rounded-xl gap-2 font-semibold"
-        >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Exportar Excel
-        </Button>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="rounded-xl gap-2 font-semibold">
+                    <Download className="w-4 h-4" /> Exportar <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl min-w-56">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Del {from} al {to}</DropdownMenuLabel>
+                <DropdownMenuItem asChild>
+                    <a href={`/api/export/sales${range}`} className="flex items-center gap-2 cursor-pointer"><FileText className="w-4 h-4" /> Ventas (una fila por venta)</a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a href={`/api/export/sales-detail${range}`} className="flex items-center gap-2 cursor-pointer"><FileText className="w-4 h-4" /> Ventas por producto</a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <a href="/api/export/inventory" className="flex items-center gap-2 cursor-pointer"><Package className="w-4 h-4" /> Inventario completo</a>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }

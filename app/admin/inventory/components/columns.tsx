@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProductForm } from "./product-form";
+import { DeleteProductItem } from "./DeleteProductItem";
 
 export type ProductColumn = {
   id: string;
@@ -21,6 +22,8 @@ export type ProductColumn = {
   cost: number;
   stock: number;
   category?: { name: string } | null;
+  categoryId?: string | null;
+  isActive?: boolean;
   taxIva?: number | null;
   taxIca?: number | null;
   taxImpoConsumo?: number | null;
@@ -48,7 +51,14 @@ export const columns: ColumnDef<ProductColumn>[] = [
         </Button>
       )
     },
-    cell: ({ row }) => <div className="font-medium">{row.getValue("name")}</div>,
+    cell: ({ row }) => (
+      <div className="font-medium flex items-center gap-2">
+        {row.getValue("name")}
+        {row.original.isActive === false && (
+          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md uppercase bg-muted text-muted-foreground">Inactivo</span>
+        )}
+      </div>
+    ),
   },
   {
     accessorKey: "category.name",
@@ -124,23 +134,17 @@ export const columns: ColumnDef<ProductColumn>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(product.id)}
-            >
-              Copiar ID del producto
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            
+
             <ProductForm 
                 product={product} 
                 trigger={
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        Editar precio y stock
+                        Editar producto
                     </DropdownMenuItem>
                 }
             />
 
-            <DropdownMenuItem className="text-destructive">Eliminar producto</DropdownMenuItem>
+            <DeleteProductItem productId={product.id} productName={product.name} />
           </DropdownMenuContent>
         </DropdownMenu>
       )

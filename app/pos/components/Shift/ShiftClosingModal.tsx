@@ -181,6 +181,12 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                         </div>
                     </div>
 
+                    <a
+                        href={`/api/export/shift?id=${activeShiftId}`}
+                        className="flex items-center justify-center gap-2 w-full h-11 mb-3 rounded-2xl border border-border text-sm font-semibold text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                    >
+                        Descargar detalle del turno (Excel/CSV)
+                    </a>
                     <Button
                         onClick={handleAcknowledge}
                         className="w-full h-12 rounded-2xl text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"

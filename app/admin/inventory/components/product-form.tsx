@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/product";
+import { getCategories } from "@/app/actions/category";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,6 +27,14 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const isEditing = !!product;
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+    const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "none");
+    const [isActive, setIsActive] = useState<boolean>(product?.isActive ?? true);
+
+    useEffect(() => {
+        if (!open) return;
+        getCategories().then((c) => setCategories(c.map(({ id, name }) => ({ id, name })))).catch(() => setCategories([]));
+    }, [open]);
 
     // Costing Calculator State
     const [cost, setCost] = useState<number>(product?.cost || 0);
@@ -101,6 +110,31 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     className="rounded-xl h-12 bg-muted/50" 
                                     placeholder="Ej: Chocoramo"
                                 />
+                            </div>
+                        </div>
+
+                        {/* Category and status */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label htmlFor="categoryId" className="text-sm font-semibold ml-1">Categoría</label>
+                                <select
+                                    id="categoryId"
+                                    name="categoryId"
+                                    value={categoryId}
+                                    onChange={(e) => setCategoryId(e.target.value)}
+                                    className="w-full h-12 rounded-xl bg-muted/50 border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                >
+                                    <option value="none">Sin categoría</option>
+                                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold ml-1">Disponible en caja</label>
+                                <div className="h-12 flex items-center gap-3 px-3 rounded-xl bg-muted/50 border border-border">
+                                    <Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} />
+                                    <label htmlFor="isActive" className="text-sm text-muted-foreground">{isActive ? "Se puede vender" : "Oculto en el POS"}</label>
+                                    <input type="hidden" name="isActive" value={isActive ? "true" : "false"} />
+                                </div>
                             </div>
                         </div>
 

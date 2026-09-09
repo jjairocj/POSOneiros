@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function InventoryPage() {
-    const products = await getProducts(); // Server-side fetch products
+    const products = await getProducts(undefined, undefined, { includeInactive: true });
     const categories = await getCategories(); // Server-side fetch categories
 
     return (

@@ -5,6 +5,9 @@ import { Toaster } from "sonner";
 import { getSettings } from "./actions/settings";
 import { BusinessInfoProvider } from "./components/BusinessInfoProvider";
 
+// Business settings are read from the DB on every request; never bake them into a static build.
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: {

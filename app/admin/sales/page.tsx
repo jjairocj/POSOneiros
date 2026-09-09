@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { getSalesAnalytics, getSalesHistoryList } from '@/app/actions/report';
 import { subDays } from 'date-fns';
+import { businessDayKey } from '@/app/lib/time';
 import { Receipt, AreaChart as ChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from './components/DashboardTab';
@@ -35,7 +36,7 @@ export default async function SalesPage() {
                         <p className="text-muted-foreground mt-1 text-sm md:text-lg">Analíticas y registro histórico de transacciones.</p>
                     </div>
                 </div>
-                <ExportButton data={history} />
+                <ExportButton from={businessDayKey(startDate)} to={businessDayKey(endDate)} />
             </header>
 
             {/* Content Tabs */}
