@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { differenceInDays } from "date-fns";
 import { startOfBusinessDay as startOfDay, endOfBusinessDay as endOfDay, businessDayKey, businessDayLabel } from "@/app/lib/time";
 import { requireAdmin } from "@/lib/auth";
+import { toUserMessage } from "@/lib/result";
 
 interface AnalyticsFilters {
     startDate?: Date;
@@ -152,7 +153,7 @@ export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
 
     } catch (error: unknown) {
         console.error("Error fetching sales analytics:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: toUserMessage(error, "No se pudieron cargar las analíticas.") };
     }
 }
 
@@ -234,6 +235,6 @@ export async function getSaleForPrint(saleId: string) {
         };
     } catch (err: unknown) {
         console.error(err);
-        return { success: false, error: err.message };
+        return { success: false, error: toUserMessage(err, "No se pudo cargar el comprobante.") };
     }
 }
