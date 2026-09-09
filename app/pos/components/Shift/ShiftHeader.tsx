@@ -13,7 +13,9 @@ interface ShiftHeaderProps {
 }
 
 export default function ShiftHeader({ activeShift, userName, userRole }: ShiftHeaderProps) {
-    const [isClosingInfo, setIsClosingInfo] = useState(false);
+    // Keep the id in state: after closeShift revalidates /pos, activeShift becomes null
+    // and the summary modal must stay mounted until the cashier acknowledges it.
+    const [closingShiftId, setClosingShiftId] = useState<string | null>(null);
     const [isOpeningInfo, setIsOpeningInfo] = useState(false);
 
     return (
@@ -60,7 +62,7 @@ export default function ShiftHeader({ activeShift, userName, userRole }: ShiftHe
                     <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => setIsClosingInfo(true)}
+                        onClick={() => setClosingShiftId(activeShift.id)}
                         className="font-semibold hover:-translate-y-0.5 transition-transform"
                     >
                         <LogOut className="w-4 h-4 sm:mr-2" />
@@ -73,10 +75,10 @@ export default function ShiftHeader({ activeShift, userName, userRole }: ShiftHe
             </div>
 
             {isOpeningInfo && <ShiftOpeningModal onClose={() => setIsOpeningInfo(false)} />}
-            {isClosingInfo && activeShift && (
+            {closingShiftId && (
                 <ShiftClosingModal
-                    activeShiftId={activeShift.id}
-                    onCancel={() => setIsClosingInfo(false)}
+                    activeShiftId={closingShiftId}
+                    onCancel={() => setClosingShiftId(null)}
                 />
             )}
         </div>
