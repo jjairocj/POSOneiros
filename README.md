@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Oneiros POS
 
-## Getting Started
+Punto de venta para negocios de comida y retail en Colombia. Un solo proyecto Next.js hace de frontend (caja táctil y back-office) y backend (Server Actions sobre PostgreSQL).
 
-First, run the development server:
+## Stack
+
+- Next.js 16 (App Router, Server Actions), React 19, TypeScript
+- Prisma 7 + PostgreSQL
+- NextAuth v4 (credenciales, sesión JWT de 12 h)
+- Zustand (carrito persistido en el dispositivo), Tailwind 4 + shadcn/ui
+- Vitest + Testing Library
+
+## Puesta en marcha
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env        # completa DATABASE_URL, NEXTAUTH_SECRET y SEED_ADMIN_*
+npm install
+npm run db:migrate          # aplica prisma/migrations
+npm run db:seed             # crea roles, sucursal, caja y el admin de SEED_ADMIN_*
+npm run dev                 # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Genera el secreto con `openssl rand -base64 32`. El seed se niega a correr en producción salvo que definas `ALLOW_SEED=true` para la primera carga.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Script | Qué hace |
+|---|---|
+| `npm run dev` / `build` / `start` | Next.js |
+| `npm test` | tests unitarios (Vitest) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm run db:migrate` | `prisma migrate deploy` |
+| `npm run db:seed` | seed inicial |
 
-## Learn More
+## Estructura
 
-To learn more about Next.js, take a look at the following resources:
+| Ruta | Contenido |
+|---|---|
+| `app/pos` | Caja: catálogo, carrito multi-orden, checkout, cuenta dividida, recibo, turnos |
+| `app/admin` | Back-office: resumen, inventario e importador Siigo, ventas e historial, usuarios y cajas, configuración |
+| `app/actions` | Server Actions (toda la lógica de negocio). Devuelven `{ ok, data }` o `{ ok: false, error }` |
+| `app/api/export/[kind]` | CSV de ventas, ventas por producto, inventario y turno |
+| `lib/auth.ts` | `requireSession()` / `requireAdmin()`: toda acción de escritura pasa por aquí |
+| `lib/result.ts` | `ActionResult`, `UserError`, traducción de errores de Prisma a mensajes de usuario |
+| `app/lib/time.ts` | Fechas en `America/Bogota` (el servidor puede correr en UTC) |
+| `prisma/` | Esquema, migraciones y seed |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Reglas de negocio importantes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- El servidor es la fuente de verdad de precios e impuestos; el cliente solo envía ids, cantidades y pagos.
+- El stock se descuenta con `updateMany` condicionado a `stock >= cantidad`, así dos cajas no venden la misma última unidad. `allowNegativeStock` en configuración lo desactiva.
+- Cuenta dividida = una sola venta con varios pagos (una `SubAccount` por persona).
+- Anular una venta (solo admin) devuelve el stock y la deja como `CANCELLED` en el historial.
+- Cierre de caja: esperado = base + pagos en efectivo. Tarjeta y transferencia no van al cajón.
+- Cada caja lleva su consecutivo (`Register.nextNumber`) que se imprime como `PREFIJO-N`.
 
-## Deploy on Vercel
+## Producción
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Base de datos gestionada con backups automáticos (Neon, Supabase, Railway). Prueba una restauración antes de lanzar.
+- Variables por ambiente en la plataforma de despliegue; nunca reutilices el `NEXTAUTH_SECRET` local.
+- Añade un monitor de errores (Sentry tiene plan gratuito y SDK para Next.js).
+- Exporta el CSV del turno al cerrar caja como copia de seguridad legible.

@@ -32,6 +32,7 @@ export function ExportButton({ from, to }: Props) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
+                    {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- file download, not a page */}
                     <a href="/api/export/inventory" className="flex items-center gap-2 cursor-pointer"><Package className="w-4 h-4" /> Inventario completo</a>
                 </DropdownMenuItem>
             </DropdownMenuContent>
