@@ -26,13 +26,15 @@ export const authOptions: NextAuthOptions = {
                 email: { label: "Email", type: "email", placeholder: "correo@negocio.com" },
                 password: { label: "Password", type: "password" }
             },
-            async authorize(credentials) {
+            async authorize(credentials, req) {
                 if (!credentials?.email || !credentials?.password) {
                     return null;
                 }
                 const email = credentials.email.trim().toLowerCase();
+                const ip = (req?.headers?.["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()
+                    ?? (req?.headers?.["x-real-ip"] as string | undefined) ?? "";
 
-                const remaining = lockRemaining(email);
+                const remaining = lockRemaining(email, ip);
                 if (remaining > 0) {
                     const minutes = Math.ceil(remaining / 60000);
                     throw new Error(`LOCKED:${minutes}`);
@@ -49,12 +51,12 @@ export const authOptions: NextAuthOptions = {
                     : (await bcrypt.compare(credentials.password, "$2a$12$CwTycUXWue0Thq9StjUM0uJ8bSuw4t7Xbv9m0Rz8RVYbFJ4dwpXG6"), false);
 
                 if (!user || !isPasswordValid) {
-                    const r = recordFailure(email);
+                    const r = recordFailure(email, ip);
                     if (r.locked) throw new Error("LOCKED:15");
                     if (r.remainingAttempts <= 2) throw new Error(`ATTEMPTS:${r.remainingAttempts}`);
                     return null;
                 }
-                recordSuccess(email);
+                recordSuccess(email, ip);
 
                 return {
                     id: user.id,
