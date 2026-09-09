@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Receipt, Users, Settings, LogOut, LineChart, Sun, Moon } from "lucide-react";
+import { Package, Receipt, Users, Settings, LogOut, LineChart, Sun, Moon, KeyRound } from "lucide-react";
+import ChangePasswordModal from "@/app/components/ChangePasswordModal";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -18,6 +19,7 @@ export default function AdminSidebar() {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const [changingPw, setChangingPw] = useState(false);
     useEffect(() => setMounted(true), []);
     const dark = theme === "dark";
 
@@ -81,6 +83,13 @@ export default function AdminSidebar() {
                 >
                     Ir al Punto de Venta (TPV)
                 </Link>
+                <button
+                    onClick={() => setChangingPw(true)}
+                    className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted transition-colors font-medium"
+                >
+                    <KeyRound className="w-5 h-5" />
+                    <span>Cambiar contraseña</span>
+                </button>
                 <button 
                     onClick={handleLogout}
                     className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-destructive hover:bg-destructive/10 transition-colors font-medium border border-transparent hover:border-destructive/20"
@@ -89,6 +98,7 @@ export default function AdminSidebar() {
                     <span>Cerrar Sesión</span>
                 </button>
             </div>
+            {changingPw && <ChangePasswordModal onClose={() => setChangingPw(false)} />}
         </aside>
     );
 }

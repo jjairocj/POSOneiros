@@ -25,7 +25,14 @@ export default function LoginPage() {
     });
 
     if (res?.error) {
-      setError("Credenciales inválidas.");
+      const err = res.error;
+      if (err.startsWith("LOCKED:")) {
+        setError(`Demasiados intentos fallidos. Espera ${err.split(":")[1]} minutos e intenta de nuevo.`);
+      } else if (err.startsWith("ATTEMPTS:")) {
+        setError(`Correo o contraseña incorrectos. Te quedan ${err.split(":")[1]} intentos antes de bloquear la cuenta.`);
+      } else {
+        setError("Correo o contraseña incorrectos.");
+      }
       setLoading(false);
     } else {
       router.push("/pos");

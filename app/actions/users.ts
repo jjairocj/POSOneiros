@@ -175,3 +175,24 @@ export async function getBranches() {
         return [];
     }
 }
+
+
+/** Any signed-in user can change their own password after proving the current one. */
+export async function changeOwnPassword(currentPassword: string, newPassword: string) {
+    try {
+        const me = await requireSession();
+        if (!newPassword || newPassword.length < 6) return { success: false, error: "La nueva contraseña debe tener al menos 6 caracteres." };
+        if (newPassword === currentPassword) return { success: false, error: "La nueva contraseña debe ser distinta a la actual." };
+
+        const user = await prisma.user.findUnique({ where: { id: me.id } });
+        if (!user) return { success: false, error: "Usuario no encontrado." };
+        const valid = await bcrypt.compare(currentPassword ?? "", user.password);
+        if (!valid) return { success: false, error: "La contraseña actual no es correcta." };
+
+        await prisma.user.update({ where: { id: me.id }, data: { password: await bcrypt.hash(newPassword, 12) } });
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error changing password:", error);
+        return { success: false, error: toUserMessage(error) };
+    }
+}

@@ -2,7 +2,8 @@
 
 import { signOut } from "next-auth/react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { LogOut, LayoutDashboard, BarChart2, ChevronDown, Sun, Moon } from "lucide-react";
+import { LogOut, LayoutDashboard, BarChart2, ChevronDown, Sun, Moon, KeyRound } from "lucide-react";
+import ChangePasswordModal from "@/app/components/ChangePasswordModal";
 import { useTheme } from "next-themes";
 
 interface POSUserMenuProps {
@@ -12,6 +13,7 @@ interface POSUserMenuProps {
 
 export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
   const [open, setOpen] = useState(false);
+  const [changingPw, setChangingPw] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { theme, setTheme } = useTheme();
@@ -115,6 +117,13 @@ export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
               )}
 
               <button
+                onClick={() => { setOpen(false); setChangingPw(true); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+              >
+                <KeyRound className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                Cambiar contraseña
+              </button>
+              <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/10 transition-colors whitespace-nowrap"
               >
@@ -125,6 +134,7 @@ export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
           </div>
         </>
       )}
+      {changingPw && <ChangePasswordModal onClose={() => setChangingPw(false)} />}
     </div>
   );
 }

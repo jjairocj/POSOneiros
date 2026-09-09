@@ -2,6 +2,7 @@ import NextAuth, { NextAuthOptions, DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { lockRemaining, recordFailure, recordSuccess } from "@/lib/login-throttle";
 
 declare module "next-auth" {
     interface Session extends DefaultSession {
@@ -29,21 +30,31 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.email || !credentials?.password) {
                     return null;
                 }
+                const email = credentials.email.trim().toLowerCase();
+
+                const remaining = lockRemaining(email);
+                if (remaining > 0) {
+                    const minutes = Math.ceil(remaining / 60000);
+                    throw new Error(`LOCKED:${minutes}`);
+                }
 
                 const user = await prisma.user.findUnique({
-                    where: { email: credentials.email.trim().toLowerCase() },
+                    where: { email },
                     include: { role: true }
                 });
 
-                if (!user) {
+                // Same cost whether or not the user exists (no account enumeration by timing).
+                const isPasswordValid = user
+                    ? await bcrypt.compare(credentials.password, user.password)
+                    : (await bcrypt.compare(credentials.password, "$2a$12$CwTycUXWue0Thq9StjUM0uJ8bSuw4t7Xbv9m0Rz8RVYbFJ4dwpXG6"), false);
+
+                if (!user || !isPasswordValid) {
+                    const r = recordFailure(email);
+                    if (r.locked) throw new Error("LOCKED:15");
+                    if (r.remainingAttempts <= 2) throw new Error(`ATTEMPTS:${r.remainingAttempts}`);
                     return null;
                 }
-
-                const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
-
-                if (!isPasswordValid) {
-                    return null;
-                }
+                recordSuccess(email);
 
                 return {
                     id: user.id,
