@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { differenceInDays } from "date-fns";
 import { startOfBusinessDay as startOfDay, endOfBusinessDay as endOfDay, businessDayKey, businessDayLabel } from "@/app/lib/time";
 import { requireAdmin } from "@/lib/auth";
@@ -16,7 +17,7 @@ export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
     const { startDate, endDate, shiftId } = filters;
 
     // Date range for query
-    const where: any = {
+    const where: Prisma.SaleWhereInput = {
         status: "COMPLETED"
     };
 
@@ -149,7 +150,7 @@ export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
             }
         }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error fetching sales analytics:", error);
         return { success: false, error: error.message };
     }
@@ -160,7 +161,7 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
     await requireAdmin();
     const { startDate, endDate, shiftId } = filters;
 
-    const where: any = {};
+    const where: Prisma.SaleWhereInput = {};
     if (shiftId) {
         where.shiftId = shiftId;
     } else if (startDate && endDate) {
@@ -194,7 +195,7 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
             status: sale.status,
             sellerName: sale.shift?.user?.name || "Desconocido",
             shiftId: sale.shiftId,
-            payments: sale.payments.map((p: any) => p.method).join(", ")
+            payments: sale.payments.map((p) => p.method).join(", ")
         }));
 
     } catch (err) {
@@ -231,7 +232,7 @@ export async function getSaleForPrint(saleId: string) {
                 }))
             }
         };
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error(err);
         return { success: false, error: err.message };
     }

@@ -4,7 +4,8 @@
 export function playSaleSound() {
     if (typeof window === "undefined") return;
     try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new AudioCtx();
 
         const notes = [523.25, 659.25, 783.99]; // C5 E5 G5
         notes.forEach((freq, i) => {

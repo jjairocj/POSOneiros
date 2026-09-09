@@ -65,7 +65,7 @@ export async function createUser(data: {
         });
         revalidatePath("/admin/users");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating user:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -90,7 +90,7 @@ export async function updateUser(
             const adminRole = await prisma.role.findUnique({ where: { name: "ADMIN" } });
             if (adminRole && data.roleId !== adminRole.id) return { success: false, error: "No puedes quitarte el rol de administrador a ti mismo." };
         }
-        const updateData: any = {
+        const updateData: { name: string; email: string; roleId: string; branchId: string | null; password?: string } = {
             name: data.name,
             email: data.email,
             roleId: data.roleId,
@@ -107,7 +107,7 @@ export async function updateUser(
         });
         revalidatePath("/admin/users");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating user:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -140,7 +140,7 @@ export async function deleteUser(id: string) {
         await prisma.user.delete({ where: { id } });
         revalidatePath("/admin/users");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error deleting user:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -191,7 +191,7 @@ export async function changeOwnPassword(currentPassword: string, newPassword: st
 
         await prisma.user.update({ where: { id: me.id }, data: { password: await bcrypt.hash(newPassword, 12) } });
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error changing password:", error);
         return { success: false, error: toUserMessage(error) };
     }

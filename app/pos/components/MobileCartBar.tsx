@@ -19,11 +19,12 @@ export default function MobileCartBar({ activeShiftId }: MobileCartBarProps) {
   const prevCount = useRef(itemCount);
 
   useEffect(() => {
-    if (itemCount > prevCount.current) {
-      setBounce(true);
-      setTimeout(() => setBounce(false), 500);
-    }
+    const grew = itemCount > prevCount.current;
     prevCount.current = itemCount;
+    if (!grew) return;
+    const start = requestAnimationFrame(() => setBounce(true));
+    const stop = setTimeout(() => setBounce(false), 500);
+    return () => { cancelAnimationFrame(start); clearTimeout(stop); };
   }, [itemCount]);
 
   return (

@@ -5,8 +5,10 @@ import { Star } from "lucide-react";
 import { toggleProductFavorite } from "@/app/actions/product";
 import { useState, useTransition } from "react";
 
+import type { CatalogProduct } from "@/app/types/cart";
+
 interface ProductCardProps {
-    product: any;
+    product: CatalogProduct;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {

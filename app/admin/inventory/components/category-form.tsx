@@ -40,7 +40,7 @@ export function CategoryForm({ category, trigger }: CategoryFormProps) {
             } else {
                 setError(result.error || "Ocurrió un error inesperado.");
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             setError(err.message || "Error de comunicación con el servidor");
         } finally {
             setLoading(false);

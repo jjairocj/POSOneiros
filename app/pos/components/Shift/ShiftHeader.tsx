@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { LogOut, MonitorPlay, ShoppingBag } from "lucide-react";
 import POSUserMenu from "../POSUserMenu";
 
+/** Only what the header needs; the page passes the full Prisma shift. */
+type ActiveShift = { id: string; register?: { name: string } | null; _count?: { sales: number } } | null;
+
 interface ShiftHeaderProps {
-  activeShift: any;
+  activeShift: ActiveShift;
   userName: string;
   userRole: string;
 }

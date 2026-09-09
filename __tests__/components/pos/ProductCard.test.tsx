@@ -13,7 +13,7 @@ vi.mock('../../../app/actions/product', () => ({
 }));
 
 const BASE_PRODUCT = {
-    id: 'p1', name: 'Café Especial', price: 3500, stock: 10,
+    id: 'p1', code: 'CAF-1', name: 'Café Especial', price: 3500, stock: 10, isActive: true,
     isFavorite: false, imageUrl: null, categoryId: null,
     taxIva: 0, taxIca: 0, taxImpoConsumo: 0,
 };

@@ -44,7 +44,7 @@ export async function createRegister(data: {
         });
         revalidatePath("/admin/users");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating register:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -67,7 +67,7 @@ export async function updateRegister(
         });
         revalidatePath("/admin/users");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating register:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -90,7 +90,7 @@ export async function deleteRegister(id: string) {
         await prisma.register.delete({ where: { id } });
         revalidatePath("/admin/users");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error deleting register:", error);
         return { success: false, error: toUserMessage(error) };
     }

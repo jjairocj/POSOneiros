@@ -1,3 +1,18 @@
+/** Product as served by getProducts() to the POS catalog. */
+export interface CatalogProduct extends ProductInput {
+    code: string;
+    stock: number;
+    isFavorite: boolean;
+    isActive: boolean;
+    category?: { id: string; name: string } | null;
+}
+
+export interface CatalogCategory {
+    id: string;
+    name: string;
+    sortOrder?: number;
+}
+
 export interface ProductInput {
     id: string;
     name: string;

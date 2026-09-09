@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { Activity, DollarSign, Wallet, CreditCard, MonitorSmartphone } from "lucide-react";
 
-interface DashboardData {
+export interface DashboardData {
     kpis: {
         totalRevenue: number;
         totalSalesCount: number;
@@ -132,7 +132,7 @@ export function DashboardTab({ data }: { data: DashboardData }) {
                                 />
                                 <Tooltip 
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(value: any) => [formatCurrency(value as number), "Ventas"]}
+                                    formatter={(value) => [formatCurrency(Number(value)), "Ventas"]}
                                     labelStyle={{ fontWeight: 'bold', color: '#111' }}
                                 />
                                 <Area type="monotone" dataKey="total" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
@@ -163,7 +163,7 @@ export function DashboardTab({ data }: { data: DashboardData }) {
                                         ))}
                                     </Pie>
                                     <Tooltip 
-                                        formatter={(value: any) => formatCurrency(value as number)}
+                                        formatter={(value) => formatCurrency(Number(value))}
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
                                     <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />

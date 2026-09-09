@@ -82,7 +82,7 @@ export async function createProduct(formData: FormData) {
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating product:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -98,7 +98,7 @@ export async function updateProduct(id: string, formData: FormData) {
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating product:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -117,7 +117,7 @@ export async function deleteProduct(id: string) {
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error deleting product:", error);
         return { success: false, error: toUserMessage(error, "No se pudo eliminar el producto.") };
     }
@@ -133,7 +133,7 @@ export async function toggleProductFavorite(id: string, isFavorite: boolean) {
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error toggling favorite:", error);
         return { success: false, error: toUserMessage(error) };
     }

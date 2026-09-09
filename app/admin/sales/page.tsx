@@ -4,7 +4,7 @@ import { subDays } from 'date-fns';
 import { businessDayKey } from '@/app/lib/time';
 import { Receipt, AreaChart as ChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DashboardTab } from './components/DashboardTab';
+import { DashboardTab, type DashboardData } from './components/DashboardTab';
 import { HistoryTab } from './components/HistoryTab';
 import { ExportButton } from './components/ExportButton';
 
@@ -53,7 +53,7 @@ export default async function SalesPage() {
                 {/* Tab: Dashboard / Analytics */}
                 <TabsContent value="dashboard" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
                     {analytics.success ? (
-                        <DashboardTab data={analytics as any} />
+                        <DashboardTab data={analytics as DashboardData} />
                     ) : (
                         <div className="text-destructive font-bold p-6 bg-destructive/10 rounded-2xl border border-destructive/20">
                             Error cargando analíticas: {analytics.error}

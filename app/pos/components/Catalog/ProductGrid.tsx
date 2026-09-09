@@ -6,10 +6,11 @@ import { getProducts } from "@/app/actions/product";
 import { getCategories } from "@/app/actions/category";
 import OrderSwitcher from "./OrderSwitcher";
 import { Loader2, Search, X } from "lucide-react";
+import type { CatalogProduct, CatalogCategory } from "@/app/types/cart";
 
 export default function ProductGrid() {
-    const [products, setProducts] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [products, setProducts] = useState<CatalogProduct[]>([]);
+    const [categories, setCategories] = useState<CatalogCategory[]>([]);
     const [activeCategoryId, setActiveCategoryId] = useState('favorites');
     const [isPending, startTransition] = useTransition();
     const [initialized, setInitialized] = useState(false);

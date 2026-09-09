@@ -1,8 +1,10 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
 
+import type { CatalogCategory } from "@/app/types/cart";
+
 interface CategorySelectorProps {
-    categories: any[];
+    categories: CatalogCategory[];
     activeCategoryId: string;
     onSelect: (id: string) => void;
 }

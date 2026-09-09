@@ -5,7 +5,8 @@ import { Package, Receipt, Users, Settings, LogOut, LineChart, Sun, Moon, KeyRou
 import ChangePasswordModal from "@/app/components/ChangePasswordModal";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMounted } from "@/app/lib/useMounted";
 
 const NAV_ITEMS = [
     { name: "Resumen", href: "/admin", icon: LineChart },
@@ -18,9 +19,8 @@ const NAV_ITEMS = [
 export default function AdminSidebar() {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
-    const [mounted, setMounted] = useState(false);
+    const mounted = useMounted();
     const [changingPw, setChangingPw] = useState(false);
-    useEffect(() => setMounted(true), []);
     const dark = theme === "dark";
 
     const handleLogout = async () => {

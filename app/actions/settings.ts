@@ -87,7 +87,7 @@ export async function saveSettings(data: SettingsData): Promise<{ success: boole
     revalidatePath("/pos");
     revalidatePath("/", "layout");
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error saving settings:", error);
     return { success: false, error: toUserMessage(error) };
   }

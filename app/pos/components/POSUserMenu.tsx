@@ -1,7 +1,8 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useMounted } from "@/app/lib/useMounted";
 import { LogOut, LayoutDashboard, BarChart2, ChevronDown, Sun, Moon, KeyRound } from "lucide-react";
 import ChangePasswordModal from "@/app/components/ChangePasswordModal";
 import { useTheme } from "next-themes";
@@ -17,8 +18,7 @@ export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
   const dark = theme === "dark";
   const isAdmin = userRole === "ADMIN";
   const initial = userName?.charAt(0).toUpperCase() ?? "U";

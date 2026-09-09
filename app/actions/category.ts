@@ -38,7 +38,7 @@ export async function createCategory(formData: FormData) {
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error creating category:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -59,7 +59,7 @@ export async function updateCategory(id: string, formData: FormData) {
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating category:", error);
         return { success: false, error: toUserMessage(error) };
     }
@@ -75,7 +75,7 @@ export async function deleteCategory(id: string) {
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         // If there are linked products, it will fail
         console.error("Error deleting category:", error);
         return { success: false, error: toUserMessage(error, "No se puede eliminar una categoría que contiene productos.") };
@@ -98,7 +98,7 @@ export async function updateCategoryOrders(updates: { id: string, sortOrder: num
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error updating category orders:", error);
         return { success: false, error: toUserMessage(error, "Error al reordenar las categorías.") };
     }

@@ -25,7 +25,7 @@ export default async function Home() {
     redirect("/login");
   }
 
-  if ((session.user as any).role === "ADMIN") {
+  if (session.user.role === "ADMIN") {
     redirect("/admin");
   }
 

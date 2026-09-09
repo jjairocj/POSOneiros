@@ -13,7 +13,7 @@ export default async function POSPage() {
   ]);
 
   const userName = session?.user?.name ?? "Usuario";
-  const userRole = (session?.user as any)?.role ?? "CASHIER";
+  const userRole = session?.user?.role ?? "CASHIER";
 
   return (
     <div className="flex flex-col h-screen bg-background">
