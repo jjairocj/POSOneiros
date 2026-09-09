@@ -31,8 +31,12 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
                 const email = credentials.email.trim().toLowerCase();
-                const ip = (req?.headers?.["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()
-                    ?? (req?.headers?.["x-real-ip"] as string | undefined) ?? "";
+                // Best-effort client IP. Behind Vercel/nginx the proxy sets x-real-ip; the LAST
+                // x-forwarded-for entry is the one added by the trusted proxy. Either can be
+                // spoofed when self-hosted without a proxy, which is why the throttle also
+                // keeps an account-wide cap independent of IP.
+                const xff = (req?.headers?.["x-forwarded-for"] as string | undefined)?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+                const ip = (req?.headers?.["x-real-ip"] as string | undefined)?.trim() || xff[xff.length - 1] || "";
 
                 const remaining = lockRemaining(email, ip);
                 if (remaining > 0) {

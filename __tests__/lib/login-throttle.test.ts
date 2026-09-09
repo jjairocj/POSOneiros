@@ -14,6 +14,14 @@ describe('login throttle', () => {
         expect(lockRemaining('a@x.com', '9.9.9.9', t0 + 1000)).toBe(0);
     });
 
+    it('rotating IPs cannot bypass the account-wide cap (20 fails)', () => {
+        const t0 = 5_000;
+        for (let i = 0; i < 19; i++) recordFailure('d@x.com', `10.0.0.${i}`, t0);
+        expect(lockRemaining('d@x.com', '10.0.0.99', t0)).toBe(0);
+        expect(recordFailure('d@x.com', '10.0.0.200', t0).locked).toBe(true);
+        expect(lockRemaining('d@x.com', 'any-other-ip', t0 + 1)).toBeGreaterThan(0);
+    });
+
     it('a successful login clears the counter', () => {
         recordFailure('b@x.com', 'ip');
         recordFailure('b@x.com', 'ip');

@@ -4,6 +4,8 @@
  * with two users; swap for a Redis/DB store if the app runs on many instances.
  */
 const MAX_FAILS = 5;
+/** Account-wide cap regardless of IP: X-Forwarded-For is spoofable, so IP rotation must not bypass the lock. */
+const MAX_FAILS_PER_ACCOUNT = 20;
 const LOCK_MS = 15 * 60 * 1000;
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ENTRIES = 5000; // bound memory: evict the oldest entries beyond this
@@ -30,27 +32,39 @@ function evictIfNeeded(now: number) {
 }
 
 /** Milliseconds remaining on the lock, or 0 if the email may try to log in. */
-export function lockRemaining(email: string, ip = "", now = Date.now()): number {
-    const e = attempts.get(key(email, ip));
+function remainingFor(k: string, now: number): number {
+    const e = attempts.get(k);
     if (!e) return 0;
     if (e.lockedUntil > now) return e.lockedUntil - now;
-    if (now - e.firstFailAt > WINDOW_MS) attempts.delete(key(email, ip));
+    if (now - e.firstFailAt > WINDOW_MS) attempts.delete(k);
     return 0;
+}
+
+/** Locked if either the (email, ip) pair or the account as a whole is locked. */
+export function lockRemaining(email: string, ip = "", now = Date.now()): number {
+    return Math.max(remainingFor(key(email, ip), now), remainingFor(key(email, "*"), now));
+}
+
+function bump(k: string, max: number, now: number): Entry {
+    const e = attempts.get(k);
+    const fresh = !e || now - e.firstFailAt > WINDOW_MS;
+    const next: Entry = fresh ? { fails: 1, firstFailAt: now, lockedUntil: 0 } : { ...e!, fails: e!.fails + 1 };
+    if (next.fails >= max) next.lockedUntil = now + LOCK_MS;
+    attempts.set(k, next);
+    return next;
 }
 
 export function recordFailure(email: string, ip = "", now = Date.now()): { locked: boolean; remainingAttempts: number } {
     evictIfNeeded(now);
-    const k = key(email, ip);
-    const e = attempts.get(k);
-    const fresh = !e || now - e.firstFailAt > WINDOW_MS;
-    const next: Entry = fresh ? { fails: 1, firstFailAt: now, lockedUntil: 0 } : { ...e!, fails: e!.fails + 1 };
-    if (next.fails >= MAX_FAILS) next.lockedUntil = now + LOCK_MS;
-    attempts.set(k, next);
-    return { locked: next.lockedUntil > now, remainingAttempts: Math.max(0, MAX_FAILS - next.fails) };
+    const pair = bump(key(email, ip), MAX_FAILS, now);
+    const account = bump(key(email, "*"), MAX_FAILS_PER_ACCOUNT, now);
+    const locked = pair.lockedUntil > now || account.lockedUntil > now;
+    return { locked, remainingAttempts: Math.max(0, Math.min(MAX_FAILS - pair.fails, MAX_FAILS_PER_ACCOUNT - account.fails)) };
 }
 
 export function recordSuccess(email: string, ip = ""): void {
     attempts.delete(key(email, ip));
+    attempts.delete(key(email, "*"));
 }
 
 /** Test helper. */
