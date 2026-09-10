@@ -195,6 +195,33 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
           />
         </div>
 
+        {data.showLogoOnReceipt === "true" && (
+          <div className={styles.field}>
+            <label className={styles.label}>URL del logo</label>
+            <div className={styles.logoRow}>
+              <Input
+                value={data.businessLogoUrl}
+                onChange={(e) => updateField("businessLogoUrl", e.target.value)}
+                placeholder="https://ejemplo.com/logo.png"
+              />
+              <div className={styles.logoPreview}>
+                {data.businessLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-size logo URL
+                  <img
+                    src={data.businessLogoUrl}
+                    alt="Vista previa del logo"
+                    onLoad={(e) => e.currentTarget.classList.remove(styles.logoError)}
+                    onError={(e) => e.currentTarget.classList.add(styles.logoError)}
+                  />
+                ) : (
+                  <span className={styles.logoPlaceholder}>Sin logo</span>
+                )}
+              </div>
+            </div>
+            <p className={styles.switchDesc}>Pega la URL pública (https://) de una imagen. Si no carga, el recibo usa solo el nombre del negocio.</p>
+          </div>
+        )}
+
         <div className={styles.switchRow}>
           <div className={styles.switchInfo}>
             <span className={styles.switchLabel}>Mostrar desglose de impuestos</span>

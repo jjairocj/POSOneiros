@@ -27,6 +27,8 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const isEditing = !!product;
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [imageUrl, setImageUrl] = useState(product?.imageUrl || "");
+    const [imageFailed, setImageFailed] = useState(false);
     const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
     const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "none");
     const [isActive, setIsActive] = useState<boolean>(product?.isActive ?? true);
@@ -146,12 +148,32 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     URL de la Imagen
                                     <span className="text-xs font-normal text-muted-foreground">(Opcional)</span>
                                 </label>
-                                <Input
-                                    name="imageUrl"
-                                    defaultValue={product?.imageUrl || ""}
-                                    className="rounded-xl h-11 bg-muted/50"
-                                    placeholder="https://ejemplo.com/imagen.jpg"
-                                />
+                                <div className="flex items-center gap-3">
+                                    <Input
+                                        name="imageUrl"
+                                        value={imageUrl}
+                                        onChange={(e) => { setImageUrl(e.target.value); setImageFailed(false); }}
+                                        className="rounded-xl h-11 bg-muted/50"
+                                        placeholder="https://ejemplo.com/imagen.jpg"
+                                    />
+                                    <div className="shrink-0 w-11 h-11 rounded-xl border bg-muted/30 flex items-center justify-center overflow-hidden">
+                                        {imageUrl && !imageFailed ? (
+                                            // eslint-disable-next-line @next/next/no-img-element -- external product photo, unknown size
+                                            <img
+                                                src={imageUrl}
+                                                alt="Vista previa"
+                                                className="w-full h-full object-cover"
+                                                onLoad={() => setImageFailed(false)}
+                                                onError={() => setImageFailed(true)}
+                                            />
+                                        ) : (
+                                            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                                        )}
+                                    </div>
+                                </div>
+                                {imageUrl && imageFailed && (
+                                    <p className="text-xs text-destructive ml-1">No se pudo cargar esta imagen. Revisa la URL o prueba con otra.</p>
+                                )}
                             </div>
                             <div className="flex items-center gap-3 h-11 px-4 rounded-xl border bg-muted/30 w-fit">
                                 <Switch

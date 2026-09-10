@@ -50,6 +50,15 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
     return (
         <div id="print-receipt" className="text-black bg-white w-[80mm] p-4 text-sm font-mono mx-auto">
             <div className="text-center mb-4">
+                {business?.showLogoOnReceipt !== "false" && business?.businessLogoUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element -- printed receipt markup, not a Next page image
+                    <img
+                        src={business.businessLogoUrl}
+                        alt=""
+                        className="max-h-16 mx-auto mb-2 object-contain"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    />
+                )}
                 <h1 className="text-xl font-bold uppercase mb-1">{business?.businessName || "Oneiros POS"}</h1>
                 {business?.businessNit && <p className="text-xs">NIT: {business.businessNit}</p>}
                 {business?.businessAddress && <p className="text-xs">{business.businessAddress}</p>}

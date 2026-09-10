@@ -16,6 +16,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     const [isFavorite, setIsFavorite] = useState(product.isFavorite || false);
     const [isPending, startTransition] = useTransition();
     const [added, setAdded] = useState(false);
+    const [imageFailed, setImageFailed] = useState(false);
 
     const handleToggleFavorite = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -53,10 +54,11 @@ export default function ProductCard({ product }: ProductCardProps) {
         >
             {/* Image area */}
             <div className="aspect-square bg-muted/50 flex items-center justify-center overflow-hidden relative">
-                {product.imageUrl ? (
+                {product.imageUrl && !imageFailed ? (
                     <img
                         src={product.imageUrl}
                         alt={product.name}
+                        onError={() => setImageFailed(true)}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                 ) : (

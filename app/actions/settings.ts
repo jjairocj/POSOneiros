@@ -19,6 +19,7 @@ export type SettingsData = {
   // Sección 3 — Recibo/Ticket
   receiptFooter: string;
   showLogoOnReceipt: string; // "true" | "false"
+  businessLogoUrl: string; // image URL shown on the receipt header when showLogoOnReceipt is on
   showTaxBreakdown: string; // "true" | "false"
 };
 
@@ -34,6 +35,7 @@ const DEFAULT_SETTINGS: SettingsData = {
   cityCountry: "",
   receiptFooter: "¡Gracias por su compra!",
   showLogoOnReceipt: "true",
+  businessLogoUrl: "",
   showTaxBreakdown: "true",
 };
 
@@ -56,6 +58,7 @@ export async function getSettings(): Promise<SettingsData> {
       cityCountry: map["cityCountry"] ?? DEFAULT_SETTINGS.cityCountry,
       receiptFooter: map["receiptFooter"] ?? DEFAULT_SETTINGS.receiptFooter,
       showLogoOnReceipt: map["showLogoOnReceipt"] ?? DEFAULT_SETTINGS.showLogoOnReceipt,
+      businessLogoUrl: map["businessLogoUrl"] ?? DEFAULT_SETTINGS.businessLogoUrl,
       showTaxBreakdown: map["showTaxBreakdown"] ?? DEFAULT_SETTINGS.showTaxBreakdown,
     };
   } catch (error) {
@@ -74,6 +77,10 @@ export async function saveSettings(data: SettingsData): Promise<{ success: boole
       .map(([key, value]) => [key, String(value ?? "")] as [string, string]);
     const iva = Number(data.defaultTaxIva);
     if (!Number.isFinite(iva) || iva < 0 || iva > 100) return { success: false, error: "El IVA por defecto debe estar entre 0 y 100." };
+    const logoUrl = data.businessLogoUrl?.trim();
+    if (logoUrl && !/^https:\/\//.test(logoUrl)) {
+      return { success: false, error: "La URL del logo debe empezar con https://." };
+    }
     await Promise.all(
       entries.map(([key, value]) =>
         prisma.systemConfig.upsert({
