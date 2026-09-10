@@ -2,7 +2,7 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { requireSession } from "@/lib/auth";
+import { requireSession, requireManager, roleAtLeast } from "@/lib/auth";
 import { fail, ok, toUserMessage, UserError, type ActionResult } from "@/lib/result";
 import { breakdownLines } from "@/app/lib/tax";
 import type { OrderDiscount } from "@/app/types/cart";
@@ -98,7 +98,7 @@ export async function processSale(
         // ── Shift ───────────────────────────────────────────────────────
         const shift = await prisma.shift.findUnique({ where: { id: activeShiftId }, include: { register: true } });
         if (!shift || shift.status !== "OPEN") return fail("El turno no está abierto. Abre un turno para vender.");
-        if (shift.userId !== user.id && user.role !== "ADMIN") return fail("Este turno pertenece a otro usuario.");
+        if (shift.userId !== user.id && !roleAtLeast(user.role, "SUPERVISOR")) return fail("Este turno pertenece a otro usuario.");
 
         const allowNegative = (await prisma.systemConfig.findUnique({ where: { key: "allowNegativeStock" } }))?.value === "true";
 
@@ -231,7 +231,7 @@ export async function processSale(
  */
 export async function cancelSale(saleId: string, reason: string): Promise<ActionResult> {
     try {
-        const user = await requireSession("ADMIN");
+        const user = await requireManager();
         const trimmed = (reason ?? "").trim();
         if (trimmed.length < 3) return fail("Escribe el motivo de la anulación.");
 

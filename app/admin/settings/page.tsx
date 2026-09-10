@@ -1,4 +1,7 @@
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getSettings } from "@/app/actions/settings";
 import { SettingsForm } from "./components/SettingsForm";
 import { SlidersHorizontal } from "lucide-react";
@@ -7,7 +10,18 @@ export const metadata: Metadata = {
   title: "Oneiros Admin | Ajustes del Sistema",
 };
 
+
+/**
+ * ADMIN only, even though the /admin section otherwise allows SUPERVISOR
+ * in: staff accounts, cash registers and business settings can lock people
+ * out or misconfigure the whole store if touched by the wrong role. The
+ * proxy and admin/layout.tsx already got the manager tier in past this
+ * point; this is the authoritative, always-fresh check for this one page.
+ */
 export default async function SettingsPage() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "ADMIN") redirect("/admin");
+
   const settings = await getSettings();
 
   return (

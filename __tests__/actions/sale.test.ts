@@ -12,8 +12,11 @@ vi.mock('../../lib/prisma', () => ({
         $transaction: (...a: any[]) => mockTransaction(...a),
     },
 }));
+const ROLE_RANK: Record<string, number> = { CASHIER: 0, SUPERVISOR: 1, ADMIN: 2 };
 vi.mock('../../lib/auth', () => ({
     requireSession: (...a: any[]) => mockRequireSession(...a),
+    requireManager: () => mockRequireSession('SUPERVISOR'),
+    roleAtLeast: (role: string, min: string) => ROLE_RANK[role] >= ROLE_RANK[min],
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
@@ -86,6 +89,12 @@ describe('processSale — validation', () => {
         mockRequireSession.mockResolvedValue({ id: 'u2', role: 'CASHIER' });
         makeTx();
         expect(await processSale('s1', ITEMS, PAYMENTS)).toMatchObject({ ok: false, error: expect.stringMatching(/otro usuario/) });
+    });
+
+    it('allows a SUPERVISOR to sell on a cashier\'s open shift', async () => {
+        mockRequireSession.mockResolvedValue({ id: 'u2', role: 'SUPERVISOR' });
+        makeTx();
+        expect((await processSale('s1', ITEMS, PAYMENTS)).ok).toBe(true);
     });
 
     it('fails when a product is missing', async () => {
@@ -177,10 +186,10 @@ describe('processSale — totals and payments', () => {
 });
 
 describe('cancelSale', () => {
-    it('requires ADMIN', async () => {
+    it('requires SUPERVISOR or higher (blocks CASHIER)', async () => {
         mockRequireSession.mockRejectedValue(Object.assign(new Error('No tienes permisos para esta acción'), { name: 'AuthError' }));
         expect(await cancelSale('sale-1', 'error de digitación')).toMatchObject({ ok: false, error: expect.stringMatching(/permisos/) });
-        expect(mockRequireSession).toHaveBeenCalledWith('ADMIN');
+        expect(mockRequireSession).toHaveBeenCalledWith('SUPERVISOR');
     });
 
     it('requires a reason', async () => {

@@ -14,6 +14,12 @@ async function main() {
     });
 
     await prisma.role.upsert({
+        where: { name: "SUPERVISOR" },
+        update: {},
+        create: { name: "SUPERVISOR", permissions: ["POS", "REPORTS", "INVENTORY", "VOID_SALE"] },
+    });
+
+    await prisma.role.upsert({
         where: { name: "CASHIER" },
         update: {},
         create: { name: "CASHIER", permissions: ["POS"] },

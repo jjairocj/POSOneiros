@@ -15,13 +15,14 @@ import AdminMobileNav from "./components/AdminMobileNav";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
     const session = await getServerSession(authOptions);
     if (!session?.user) redirect("/login");
-    if (session.user.role !== "ADMIN") redirect("/pos");
+    if (session.user.role === "CASHIER") redirect("/pos");
+    const role = session.user.role as "ADMIN" | "SUPERVISOR";
 
     return (
         <div className="min-h-screen bg-muted/40 font-sans flex text-foreground pb-20 md:pb-0">
             {/* Sidebar (Fixed width 64 = 16rem/256px) - Hidden on mobile */}
             <div className="hidden md:block">
-                <AdminSidebar />
+                <AdminSidebar role={role} />
             </div>
             
             {/* Main Content wrapper */}
@@ -33,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
             {/* Mobile Bottom Navigation */}
             <div className="md:hidden">
-                <AdminMobileNav />
+                <AdminMobileNav role={role} />
             </div>
         </div>
     );

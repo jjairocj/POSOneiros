@@ -1,5 +1,6 @@
 "use client";
 
+import { roleLabel, ROLE_BADGE_CLASS } from "./role-labels";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -109,18 +110,13 @@ export function createUserColumns(
             header: "Rol",
             cell: ({ row }) => {
                 const roleName: string = row.original.role?.name || "—";
-                const colorMap: Record<string, string> = {
-                    ADMIN: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-                    SUPERVISOR: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-                    CASHIER: "bg-green-500/15 text-green-700 dark:text-green-300",
-                };
                 return (
                     <span
                         className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                            colorMap[roleName] || "bg-muted text-muted-foreground"
+                            ROLE_BADGE_CLASS[roleName] || "bg-muted text-muted-foreground"
                         }`}
                     >
-                        {roleName}
+                        {roleLabel(roleName)}
                     </span>
                 );
             },

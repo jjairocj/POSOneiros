@@ -9,7 +9,7 @@
 
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireSession } from "@/lib/auth";
+import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fail, ok, toUserMessage, type ActionResult } from "@/lib/result";
 import { businessHour } from "@/app/lib/time";
 import { getServerSession } from "next-auth/next";
@@ -121,7 +121,7 @@ export async function closeShift(shiftId: string, closeAmount: number): Promise<
         });
 
         if (!shift || shift.status !== "OPEN") return fail("El turno no está abierto.");
-        if (shift.userId !== user.id && user.role !== "ADMIN") return fail("Este turno pertenece a otro usuario.");
+        if (shift.userId !== user.id && !roleAtLeast(user.role, "SUPERVISOR")) return fail("Este turno pertenece a otro usuario.");
 
         const completed = shift.sales.filter((s) => s.status === "COMPLETED");
         const cancelledCount = shift.sales.length - completed.length;

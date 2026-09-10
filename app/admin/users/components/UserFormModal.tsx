@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { UserPlus, Save, Loader2 } from "lucide-react";
 import type { UserColumn } from "./user-columns";
+import { roleLabel, ROLE_DESCRIPTION } from "./role-labels";
 import { toast } from "sonner";
 
 interface UserFormModalProps {
@@ -26,6 +27,8 @@ interface UserFormModalProps {
 export function UserFormModal({ user, roles, branches, trigger }: UserFormModalProps) {
     const isEditing = !!user;
     const [open, setOpen] = useState(false);
+    const [roleId, setRoleId] = useState(user?.role?.id || "");
+    const selectedRoleName = roles.find((r) => r.id === roleId)?.name;
     const [loading, setLoading] = useState(false);
 
     const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -128,16 +131,20 @@ export function UserFormModal({ user, roles, branches, trigger }: UserFormModalP
                                 <select
                                     name="roleId"
                                     required
-                                    defaultValue={user?.role?.id || ""}
+                                    value={roleId}
+                                    onChange={(e) => setRoleId(e.target.value)}
                                     className="w-full rounded-xl h-12 bg-muted/50 border border-input px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                 >
                                     <option value="" disabled>Seleccionar rol</option>
                                     {roles.map((r) => (
                                         <option key={r.id} value={r.id}>
-                                            {r.name}
+                                            {roleLabel(r.name)}
                                         </option>
                                     ))}
                                 </select>
+                                {selectedRoleName && (
+                                    <p className="text-xs text-muted-foreground ml-1">{ROLE_DESCRIPTION[selectedRoleName]}</p>
+                                )}
                             </div>
 
                             <div className="space-y-1.5">

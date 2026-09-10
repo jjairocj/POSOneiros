@@ -1,5 +1,9 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
 import { ArrowLeft, FileSpreadsheet } from "lucide-react";
 import ImportWizard from "./components/ImportWizard";
 
@@ -7,7 +11,18 @@ export const metadata: Metadata = {
     title: "Oneiros Admin | Importar desde Siigo",
 };
 
-export default function ImportPage() {
+
+/**
+ * ADMIN only, even though the /admin section otherwise allows SUPERVISOR
+ * in: staff accounts, cash registers and business settings can lock people
+ * out or misconfigure the whole store if touched by the wrong role. The
+ * proxy and admin/layout.tsx already got the manager tier in past this
+ * point; this is the authoritative, always-fresh check for this one page.
+ */
+export default async function ImportPage() {
+    const session = await getServerSession(authOptions);
+    if (session?.user?.role !== "ADMIN") redirect("/admin/inventory");
+
     return (
         <div className="space-y-6">
             <header className="flex items-center gap-4 mb-10">

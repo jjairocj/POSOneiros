@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getProducts, getStockMovements } from '@/app/actions/product';
 import { getCategories } from '@/app/actions/category';
 import { columns } from './components/columns';
@@ -17,6 +19,8 @@ export const metadata: Metadata = {
 };
 
 export default async function InventoryPage() {
+    const session = await getServerSession(authOptions);
+    const isAdmin = session?.user?.role === "ADMIN";
     const products = await getProducts(undefined, undefined, { includeInactive: true });
     const categories = await getCategories();
     const movements = await getStockMovements({ take: 300 });
@@ -33,13 +37,15 @@ export default async function InventoryPage() {
                         <p className="text-muted-foreground mt-1 text-lg">Administra el catálogo de productos y el orden del POS.</p>
                     </div>
                 </div>
-                <Link
-                    href="/admin/inventory/import"
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-sm transition-colors"
-                >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    Importar desde Siigo
-                </Link>
+                {isAdmin && (
+                    <Link
+                        href="/admin/inventory/import"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-sm transition-colors"
+                    >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        Importar desde Siigo
+                    </Link>
+                )}
             </header>
 
             <Tabs defaultValue="products" className="space-y-6">

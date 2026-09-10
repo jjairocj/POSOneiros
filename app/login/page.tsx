@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, useSession, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import styles from "./login.module.css";
 
@@ -21,7 +21,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      router.replace(session.user.role === "ADMIN" ? "/admin" : "/pos");
+      const r = session.user.role;
+      router.replace(r === "ADMIN" || r === "SUPERVISOR" ? "/admin" : "/pos");
     }
   }, [status, session, router]);
 
@@ -47,7 +48,8 @@ export default function LoginPage() {
       }
       setLoading(false);
     } else {
-      router.push("/pos");
+      const fresh = await getSession();
+      router.push(fresh?.user?.role === "ADMIN" || fresh?.user?.role === "SUPERVISOR" ? "/admin" : "/pos");
     }
   };
 

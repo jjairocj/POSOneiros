@@ -1,4 +1,7 @@
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getUsers, getRoles, getBranches } from "@/app/actions/users";
 import { getRegisters } from "@/app/actions/registers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +15,18 @@ export const metadata: Metadata = {
     title: "Oneiros Admin | Usuarios y Cajas",
 };
 
+
+/**
+ * ADMIN only, even though the /admin section otherwise allows SUPERVISOR
+ * in: staff accounts, cash registers and business settings can lock people
+ * out or misconfigure the whole store if touched by the wrong role. The
+ * proxy and admin/layout.tsx already got the manager tier in past this
+ * point; this is the authoritative, always-fresh check for this one page.
+ */
 export default async function UsersPage() {
+    const session = await getServerSession(authOptions);
+    if (session?.user?.role !== "ADMIN") redirect("/admin");
+
     const [users, registers, roles, branches] = await Promise.all([
         getUsers(),
         getRegisters(),

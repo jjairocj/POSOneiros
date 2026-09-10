@@ -29,9 +29,11 @@ export default withAuth(
             return NextResponse.redirect(new URL("/login", req.url));
         }
 
-        // RBAC: Protect /admin route. Same staleness caveat as above; the
-        // authoritative role check is admin/layout.tsx's fresh session read.
-        if (req.nextUrl.pathname.startsWith("/admin") && token?.role !== "ADMIN") {
+        // RBAC: /admin is for ADMIN and SUPERVISOR; CASHIER stays in /pos.
+        // Same staleness caveat as above; the authoritative check is
+        // admin/layout.tsx's fresh session read (and each ADMIN-only
+        // sub-page, e.g. users/settings/import, does its own further check).
+        if (req.nextUrl.pathname.startsWith("/admin") && token?.role === "CASHIER") {
             return NextResponse.redirect(new URL("/pos", req.url));
         }
 

@@ -1,7 +1,7 @@
 "use server";
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireSession, requireAdmin } from "@/lib/auth";
+import { requireSession, requireManager } from "@/lib/auth";
 import { toUserMessage } from "@/lib/result";
 
 export async function getProducts(categoryId?: string, search?: string, opts: { includeInactive?: boolean } = {}) {
@@ -74,7 +74,7 @@ function parseProductForm(formData: FormData) {
 
 export async function createProduct(formData: FormData) {
     try {
-        await requireAdmin();
+        await requireManager();
         const parsed = parseProductForm(formData);
         if ("error" in parsed) return { success: false, error: parsed.error };
         await prisma.product.create({ data: parsed.data });
@@ -90,7 +90,7 @@ export async function createProduct(formData: FormData) {
 
 export async function updateProduct(id: string, formData: FormData) {
     try {
-        const admin = await requireAdmin();
+        const manager = await requireManager();
         const parsed = parseProductForm(formData);
         if ("error" in parsed) return { success: false, error: parsed.error };
         await prisma.$transaction(async (tx) => {
@@ -99,7 +99,7 @@ export async function updateProduct(id: string, formData: FormData) {
             const delta = updated.stock - (before?.stock ?? 0);
             if (delta !== 0) {
                 await tx.stockMovement.create({
-                    data: { productId: id, type: "ADJUSTMENT", quantity: delta, stockAfter: updated.stock, userId: admin.id, reason: "Edición manual del producto" },
+                    data: { productId: id, type: "ADJUSTMENT", quantity: delta, stockAfter: updated.stock, userId: manager.id, reason: "Edición manual del producto" },
                 });
             }
         });
@@ -115,7 +115,7 @@ export async function updateProduct(id: string, formData: FormData) {
 
 export async function deleteProduct(id: string) {
     try {
-        await requireAdmin();
+        await requireManager();
         const salesCount = await prisma.saleDetail.count({ where: { productId: id } });
         if (salesCount > 0) {
             // Keep history intact: deactivate instead of deleting.
@@ -158,7 +158,7 @@ export type MovementType = "PURCHASE" | "ADJUSTMENT" | "WASTE";
  */
 export async function adjustStock(input: { productId: string; type: MovementType; quantity: number; reason?: string; unitCost?: number }) {
     try {
-        const admin = await requireAdmin();
+        const manager = await requireManager();
         const qty = Number(input.quantity);
         if (!Number.isFinite(qty) || qty === 0) return { success: false, error: "La cantidad debe ser distinta de cero." };
         if (input.type === "PURCHASE" && qty < 0) return { success: false, error: "Una entrada no puede ser negativa." };
@@ -178,7 +178,7 @@ export async function adjustStock(input: { productId: string; type: MovementType
                 data: {
                     productId: input.productId, type: input.type, quantity: signed, stockAfter: p.stock,
                     unitCost: input.type === "PURCHASE" ? input.unitCost ?? null : null,
-                    reason: input.reason?.trim() || null, userId: admin.id,
+                    reason: input.reason?.trim() || null, userId: manager.id,
                 },
             });
         });
@@ -211,7 +211,7 @@ export interface MovementRow {
 /** Latest stock movements, optionally for one product. */
 export async function getStockMovements(opts: { productId?: string; take?: number } = {}): Promise<MovementRow[]> {
     try {
-        await requireAdmin();
+        await requireManager();
         const rows = await prisma.stockMovement.findMany({
             where: opts.productId ? { productId: opts.productId } : {},
             orderBy: { createdAt: "desc" },

@@ -51,9 +51,21 @@ Genera el secreto con `openssl rand -base64 32`. El seed se niega a correr en pr
 - El servidor es la fuente de verdad de precios e impuestos; el cliente solo envía ids, cantidades y pagos.
 - El stock se descuenta con `updateMany` condicionado a `stock >= cantidad`, así dos cajas no venden la misma última unidad. `allowNegativeStock` en configuración lo desactiva.
 - Cuenta dividida = una sola venta con varios pagos (una `SubAccount` por persona).
-- Anular una venta (solo admin) devuelve el stock y la deja como `CANCELLED` en el historial.
+- Anular una venta (supervisor o admin) devuelve el stock y la deja como `CANCELLED` en el historial.
 - Cierre de caja: esperado = base + pagos en efectivo. Tarjeta y transferencia no van al cajón.
 - Cada caja lleva su consecutivo (`Register.nextNumber`) que se imprime como `PREFIJO-N`.
+
+## Roles
+
+Modelo de tres niveles (`lib/auth.ts`), jerárquico: cada rol también pasa las verificaciones de los roles por debajo de él.
+
+| Rol | Puede |
+|---|---|
+| **Cajero** (`CASHIER`) | Solo `/pos`: vender, aplicar descuentos, dividir cuenta, abrir/cerrar su propio turno, clientes, cambiar su contraseña. |
+| **Supervisor** (`SUPERVISOR`) | Todo lo del cajero, más: dashboard y reportes, inventario y categorías, movimientos de stock (entrada/merma/ajuste), anular una venta, actuar sobre el turno de otro cajero. No ve Usuarios y Cajas, Ajustes, ni el importador de Siigo. |
+| **Administrador** (`ADMIN`) | Todo. Único rol que gestiona personal, cajas físicas, configuración del negocio e importaciones masivas. |
+
+`requireSession(minimumRole?)` en `lib/auth.ts` es la única fuente de verdad para las Server Actions; `requireManager()` y `requireAdmin()` son atajos. El proxy y los layouts de `/admin` hacen un filtro barato (y a veces desactualizado) por conveniencia — la decisión real siempre es la de la acción o la página que vuelve a consultar la sesión.
 
 ## Producción
 

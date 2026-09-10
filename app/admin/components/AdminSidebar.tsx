@@ -9,14 +9,15 @@ import { useState } from "react";
 import { useMounted } from "@/app/lib/useMounted";
 
 const NAV_ITEMS = [
-    { name: "Resumen", href: "/admin", icon: LineChart },
-    { name: "Inventario", href: "/admin/inventory", icon: Package },
-    { name: "Ventas", href: "/admin/sales", icon: Receipt },
-    { name: "Usuarios y Cajas", href: "/admin/users", icon: Users },
-    { name: "Ajustes", href: "/admin/settings", icon: Settings },
+    { name: "Resumen", href: "/admin", icon: LineChart, adminOnly: false },
+    { name: "Inventario", href: "/admin/inventory", icon: Package, adminOnly: false },
+    { name: "Ventas", href: "/admin/sales", icon: Receipt, adminOnly: false },
+    { name: "Usuarios y Cajas", href: "/admin/users", icon: Users, adminOnly: true },
+    { name: "Ajustes", href: "/admin/settings", icon: Settings, adminOnly: true },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ role }: { role: "ADMIN" | "SUPERVISOR" }) {
+    const items = NAV_ITEMS.filter((item) => !item.adminOnly || role === "ADMIN");
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const mounted = useMounted();
@@ -41,7 +42,7 @@ export default function AdminSidebar() {
 
             {/* Navigation Links */}
             <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1.5">
-                {NAV_ITEMS.map((item) => {
+                {items.map((item) => {
                     const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
                     
                     return (
