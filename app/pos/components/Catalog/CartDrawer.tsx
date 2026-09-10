@@ -147,7 +147,7 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
     };
 
     return (
-        <div className="flex flex-col h-full bg-card border-l border-border shadow-2xl rounded-l-3xl overflow-hidden">
+        <div className="flex flex-col w-full h-full bg-card border-l border-border shadow-2xl rounded-l-3xl overflow-hidden">
             {/* Header */}
             <div className="px-6 pt-5 pb-4 flex justify-between items-center border-b border-border/50">
                 <h2 className="text-xl font-bold tracking-tight text-card-foreground">
