@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import AppShell from "./components/Nav/AppShell";
@@ -7,6 +8,12 @@ import { BusinessInfoProvider } from "./components/BusinessInfoProvider";
 
 // Business settings are read from the DB on every request; never bake them into a static build.
 export const dynamic = "force-dynamic";
+
+// Internal tool on a deliberately unlisted subdomain — never index it.
+// Paired with app/robots.ts and the X-Robots-Tag header in next.config.ts.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 export default async function RootLayout({
   children,
