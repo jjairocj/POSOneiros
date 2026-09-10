@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { getActiveShift } from "../actions/shift";
@@ -7,13 +8,16 @@ import CartDrawer from "./components/Catalog/CartDrawer";
 import MobileCartBar from "./components/MobileCartBar";
 
 export default async function POSPage() {
-  const [session, activeShift] = await Promise.all([
-    getServerSession(authOptions),
-    getActiveShift(),
-  ]);
+  // Same reasoning as admin/layout.tsx: getServerSession() re-runs the jwt
+  // callback (and its passwordChangedAt check) on every request, unlike the
+  // proxy's raw JWT decode, so this redirect can't go stale.
+  const session = await getServerSession(authOptions);
+  if (!session?.user) redirect("/login");
 
-  const userName = session?.user?.name ?? "Usuario";
-  const userRole = session?.user?.role ?? "CASHIER";
+  const activeShift = await getActiveShift();
+
+  const userName = session.user.name ?? "Usuario";
+  const userRole = session.user.role;
 
   return (
     <div className="flex flex-col h-screen bg-background">
