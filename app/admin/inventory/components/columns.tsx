@@ -1,19 +1,9 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ProductForm } from "./product-form";
-import { DeleteProductItem } from "./DeleteProductItem";
-import { StockMovementItem } from "./StockMovementItem";
+import { RowActions } from "./RowActions";
 
 export type ProductColumn = {
   id: string;
@@ -122,35 +112,6 @@ export const columns: ColumnDef<ProductColumn>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      const product = row.original
- 
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-
-            <ProductForm 
-                product={product} 
-                trigger={
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        Editar producto
-                    </DropdownMenuItem>
-                }
-            />
-
-            <StockMovementItem product={{ id: product.id, name: product.name, stock: product.stock, cost: product.cost }} />
-            <DropdownMenuSeparator />
-            <DeleteProductItem productId={product.id} productName={product.name} />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
+    cell: ({ row }) => <RowActions product={row.original} />,
   },
 ]
