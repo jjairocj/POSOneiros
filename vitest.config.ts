@@ -11,5 +11,19 @@ export default defineConfig({
         alias: {
             '@': path.resolve(__dirname, './'),
         },
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'html', 'json-summary'],
+            include: ['app/**/*.{ts,tsx}', 'lib/**/*.ts'],
+            exclude: [
+                'app/**/*.d.ts',
+                'app/**/layout.tsx',
+                'app/**/loading.tsx',
+                'app/**/error.tsx',
+                'app/**/page.tsx', // server components, need a live DB — not this suite's style
+                'app/generated/**',
+                '**/*.module.css',
+            ],
+        },
     },
 });
