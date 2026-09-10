@@ -15,5 +15,5 @@ export function UsersTable({ users, roles, branches }: UsersTableProps) {
         () => createUserColumns(roles, branches),
         [roles, branches]
     );
-    return <DataTable columns={columns} data={users} />;
+    return <DataTable columns={columns} data={users} filterPlaceholder="Filtrar por nombre de usuario..." emptyMessage="No se encontraron usuarios. Crea uno nuevo o ajusta los filtros." />;
 }

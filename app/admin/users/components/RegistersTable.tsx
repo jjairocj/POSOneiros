@@ -14,5 +14,5 @@ export function RegistersTable({ registers, branches }: RegistersTableProps) {
         () => createRegisterColumns(branches),
         [branches]
     );
-    return <DataTable columns={columns} data={registers} />;
+    return <DataTable columns={columns} data={registers} filterPlaceholder="Filtrar por nombre de caja..." emptyMessage="No se encontraron cajas. Crea una nueva o ajusta los filtros." />;
 }

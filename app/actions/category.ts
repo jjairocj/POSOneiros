@@ -10,7 +10,10 @@ export async function getCategories() {
             orderBy: [
                 { sortOrder: 'asc' },
                 { name: 'asc' }
-            ]
+            ],
+            include: {
+                _count: { select: { products: true } },
+            },
         });
 
         return categories.map(c => ({

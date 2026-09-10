@@ -27,11 +27,17 @@ import { Button } from "@/components/ui/button"
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  /** Text search box placeholder. Defaults to the product-catalog wording. */
+  filterPlaceholder?: string
+  /** No-results message for the desktop table. */
+  emptyMessage?: string
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  filterPlaceholder = "Filtrar por nombre de producto...",
+  emptyMessage = "No se encontraron productos o categorías. Añade uno nuevo o ajusta los filtros.",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -57,7 +63,7 @@ export function DataTable<TData, TValue>({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Input
-          placeholder="Filtrar por nombre de producto..."
+          placeholder={filterPlaceholder}
           value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
             table.getColumn("name")?.setFilterValue(event.target.value)
@@ -139,7 +145,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-40 text-center text-muted-foreground">
-                  No se encontraron productos o categorías. Añade uno nuevo o ajusta los filtros.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}

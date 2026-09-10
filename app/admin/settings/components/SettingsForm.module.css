@@ -177,6 +177,10 @@
 
 /* Submit bar */
 .submitBar {
+  /* margin-top (not the .form padding-bottom, which trails *after* this
+     element) is what reserves clearance above the sticky bar so it never
+     overlaps the last section's content once stuck to the viewport bottom. */
+  margin-top: 2rem;
   position: sticky;
   bottom: 1.5rem;
   display: flex;

@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Printer, ReceiptText, Ban } from "lucide-react";
+
+const METHOD_LABEL: Record<string, string> = { CASH: "Efectivo", CARD: "Tarjeta", TRANSFER: "Transferencia" };
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Receipt, { type ReceiptSale } from "@/app/pos/components/Checkout/Receipt";
@@ -147,7 +149,7 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                     <div className="flex flex-wrap gap-1">
                         {methods.split(', ').map((m, i) => (
                             <span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded-md uppercase">
-                                {m}
+                                {METHOD_LABEL[m] ?? m}
                             </span>
                         ))}
                     </div>
@@ -292,7 +294,7 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                                         <div className="flex flex-wrap gap-1 justify-end">
                                             {sale.payments.split(', ').map((m, i) => (
                                                 <span key={i} className="px-1.5 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded-md uppercase">
-                                                    {m}
+                                                    {METHOD_LABEL[m] ?? m}
                                                 </span>
                                             ))}
                                         </div>
