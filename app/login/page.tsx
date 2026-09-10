@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import styles from "./login.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
+  // useSession() fetches /api/auth/session, which always re-runs the jwt
+  // callback (unlike the proxy's raw cookie decode), so this correctly
+  // skips the redirect for a session that looks logged-in but was actually
+  // invalidated (e.g. a password change) — that visitor sees the form and
+  // has to log in again, instead of bouncing forever between here and /pos.
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      router.replace(session.user.role === "ADMIN" ? "/admin" : "/pos");
+    }
+  }, [status, session, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
