@@ -70,6 +70,7 @@ Modelo de tres niveles (`lib/auth.ts`), jerárquico: cada rol también pasa las 
 ## Producción
 
 - Base de datos gestionada con backups automáticos (Neon, Supabase, Railway). Prueba una restauración antes de lanzar.
+- **Neon:** usa el connection string "Pooled" (host con `-pooler`) como `DATABASE_URL` de la app. Para `prisma migrate deploy/dev` u otros comandos puntuales, usa el endpoint sin `-pooler` (ver `.env.example`) — el pooler de Neon reutiliza sesiones y puede arrastrar configuración (`search_path`) de un cliente anterior. El plan gratuito "duerme" la base tras un rato inactivo; la primera consulta tras eso tarda un poco más (normal, no es un error).
 - Variables por ambiente en la plataforma de despliegue; nunca reutilices el `NEXTAUTH_SECRET` local.
 - Añade un monitor de errores (Sentry tiene plan gratuito y SDK para Next.js).
 - Exporta el CSV del turno al cerrar caja como copia de seguridad legible.
