@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { PackagePlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { receiveProductLot } from "@/app/actions/lots";
+import { getSuppliers, type SupplierRow } from "@/app/actions/suppliers";
 
 /** Health-authority traceability: every delivery of a LOT-tracked product
  * gets its own lot number and optional expiration date (see docs/16). */
@@ -15,8 +16,14 @@ export function ReceiveLotModal({ product, onClose }: { product: { id: string; n
     const [lotNumber, setLotNumber] = useState("");
     const [expirationDate, setExpirationDate] = useState("");
     const [quantity, setQuantity] = useState("");
+    const [supplierId, setSupplierId] = useState("");
+    const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        getSuppliers().then((all) => setSuppliers(all.filter((s) => s.isActive)));
+    }, []);
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,6 +35,7 @@ export function ReceiveLotModal({ product, onClose }: { product: { id: string; n
                 lotNumber: lotNumber.trim() || undefined,
                 expirationDate: expirationDate || null,
                 quantity: Number(quantity),
+                supplierId: supplierId || null,
             });
             if (!res.ok) { setError(res.error); return; }
             toast.success(`Lote registrado para "${product.name}".`);
@@ -64,6 +72,20 @@ export function ReceiveLotModal({ product, onClose }: { product: { id: string; n
                         <label htmlFor="lot-qty" className="text-sm font-semibold ml-1">Cantidad recibida</label>
                         <Input id="lot-qty" type="number" min="0" step="any" inputMode="decimal" required autoFocus value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-11 rounded-xl bg-muted/50" />
                     </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label htmlFor="lot-supplier" className="text-sm font-semibold ml-1">Proveedor <span className="font-normal text-muted-foreground">(opcional)</span></label>
+                    <select
+                        id="lot-supplier"
+                        value={supplierId}
+                        onChange={(e) => setSupplierId(e.target.value)}
+                        className="h-11 rounded-xl bg-muted/50 w-full px-3 border border-input text-sm"
+                    >
+                        <option value="">Sin especificar</option>
+                        {suppliers.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
                 </div>
                 <p className="text-xs text-muted-foreground ml-1">Ej: una caja con 8 bolsas x 4 sobres = 32 unidades, un solo lote/vencimiento para toda la entrega.</p>
 

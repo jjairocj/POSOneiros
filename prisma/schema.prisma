@@ -118,12 +118,31 @@ model ProductLot {
   receivedDate      DateTime  @default(now())
   quantityReceived  Float
   quantityRemaining Float
+  supplierId        String?
+  supplier          Supplier? @relation(fields: [supplierId], references: [id])
   movements         StockMovement[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@index([productId, expirationDate])
   @@index([expirationDate])
+}
+
+/// Who a lot (product or raw material) was received from. Optional on every
+/// lot — traceability wants it recorded when known, but doesn't require it.
+model Supplier {
+  id              String           @id @default(uuid())
+  name            String
+  taxId           String?
+  phone           String?
+  email           String?
+  address         String?
+  notes           String?
+  isActive        Boolean          @default(true)
+  productLots     ProductLot[]
+  rawMaterialLots RawMaterialLot[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 }
 
 /// Bulk ingredient log (coffee beans, soft-serve mix) for products that are
@@ -149,6 +168,8 @@ model RawMaterialLot {
   status        String      @default("ACTIVE") // ACTIVE | DEPLETED
   notes         String?
   createdById   String?
+  supplierId    String?
+  supplier      Supplier?   @relation(fields: [supplierId], references: [id])
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

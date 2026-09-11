@@ -6,13 +6,15 @@ import { getEffectivePermissions, hasPermission } from '@/lib/auth';
 import { getProducts, getStockMovements } from '@/app/actions/product';
 import { getCategories } from '@/app/actions/category';
 import { getRawMaterials } from '@/app/actions/lots';
+import { getSuppliers } from '@/app/actions/suppliers';
 import { ProductsTab } from './components/ProductsTab';
 import { categoryColumns } from './components/category-columns';
-import { PackageOpen, FolderTree, FileSpreadsheet, History, FlaskConical } from 'lucide-react';
+import { PackageOpen, FolderTree, FileSpreadsheet, History, FlaskConical, Truck } from 'lucide-react';
 import { MovementsTable } from './components/MovementsTable';
 import { CategoryForm } from './components/category-form';
 import { CategoryDragList } from './components/CategoryDragList';
 import { RawMaterialsTable } from './components/RawMaterialsTable';
+import { SuppliersTable } from './components/SuppliersTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const metadata: Metadata = {
@@ -30,6 +32,7 @@ export default async function InventoryPage() {
     const categories = canManageCatalog ? await getCategories() : [];
     const movements = canReceiveInventory ? await getStockMovements({ take: 300 }) : [];
     const rawMaterials = canReceiveInventory ? await getRawMaterials() : [];
+    const suppliers = canReceiveInventory ? await getSuppliers() : [];
     const defaultTab = canManageCatalog ? "products" : canReceiveInventory ? "movements" : "products";
 
     return (
@@ -73,6 +76,9 @@ export default async function InventoryPage() {
                             <TabsTrigger value="insumos" className="rounded-xl px-6 font-bold flex items-center gap-2">
                                 <FlaskConical className="w-4 h-4" /> Insumos
                             </TabsTrigger>
+                            <TabsTrigger value="suppliers" className="rounded-xl px-6 font-bold flex items-center gap-2">
+                                <Truck className="w-4 h-4" /> Proveedores
+                            </TabsTrigger>
                         </>
                     )}
                 </TabsList>
@@ -102,7 +108,13 @@ export default async function InventoryPage() {
 
                 {canReceiveInventory && (
                     <TabsContent value="insumos" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
-                        <RawMaterialsTable materials={rawMaterials} />
+                        <RawMaterialsTable materials={rawMaterials} suppliers={suppliers} />
+                    </TabsContent>
+                )}
+
+                {canReceiveInventory && (
+                    <TabsContent value="suppliers" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
+                        <SuppliersTable suppliers={suppliers} />
                     </TabsContent>
                 )}
             </Tabs>

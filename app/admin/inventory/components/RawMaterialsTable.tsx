@@ -6,6 +6,7 @@ import { FlaskConical, PackagePlus, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createRawMaterial, receiveRawMaterialLot, markRawMaterialLotDepleted, type RawMaterialRow } from "@/app/actions/lots";
+import type { SupplierRow } from "@/app/actions/suppliers";
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { timeZone: "America/Bogota" });
 
@@ -33,16 +34,20 @@ function NewMaterialForm() {
     );
 }
 
-function OpenLotForm({ materialId, onDone }: { materialId: string; onDone: () => void }) {
+function OpenLotForm({ materialId, suppliers, onDone }: { materialId: string; suppliers: SupplierRow[]; onDone: () => void }) {
     const router = useRouter();
     const [lotNumber, setLotNumber] = useState("");
     const [expirationDate, setExpirationDate] = useState("");
+    const [supplierId, setSupplierId] = useState("");
     const [loading, setLoading] = useState(false);
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        const res = await receiveRawMaterialLot({ rawMaterialId: materialId, lotNumber: lotNumber.trim() || undefined, expirationDate: expirationDate || null });
+        const res = await receiveRawMaterialLot({
+            rawMaterialId: materialId, lotNumber: lotNumber.trim() || undefined,
+            expirationDate: expirationDate || null, supplierId: supplierId || null,
+        });
         setLoading(false);
         if (!res.ok) { toast.error(res.error); return; }
         toast.success("Lote registrado.");
@@ -60,13 +65,22 @@ function OpenLotForm({ materialId, onDone }: { materialId: string; onDone: () =>
                 <label className="text-xs font-semibold ml-1">Vencimiento</label>
                 <Input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} className="h-9 rounded-lg bg-background" />
             </div>
+            <div className="space-y-1">
+                <label className="text-xs font-semibold ml-1">Proveedor</label>
+                <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="h-9 rounded-lg bg-background border border-input text-sm px-2">
+                    <option value="">Sin especificar</option>
+                    {suppliers.filter((s) => s.isActive).map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                </select>
+            </div>
             <Button type="submit" size="sm" disabled={loading} className="h-9 rounded-lg font-bold">Registrar</Button>
             <Button type="button" size="sm" variant="ghost" onClick={onDone} className="h-9 rounded-lg">Cancelar</Button>
         </form>
     );
 }
 
-export function RawMaterialsTable({ materials }: { materials: RawMaterialRow[] }) {
+export function RawMaterialsTable({ materials, suppliers }: { materials: RawMaterialRow[]; suppliers: SupplierRow[] }) {
     const router = useRouter();
     const [openingFor, setOpeningFor] = useState<string | null>(null);
 
@@ -121,9 +135,10 @@ export function RawMaterialsTable({ materials }: { materials: RawMaterialRow[] }
                                     {m.activeLot.lotNumber ? `Lote ${m.activeLot.lotNumber}` : "Sin número de lote"}
                                     {" · "}Abierto {fmtDate(m.activeLot.receivedDate)}
                                     {m.activeLot.expirationDate && ` · Vence ${fmtDate(m.activeLot.expirationDate)}`}
+                                    {m.activeLot.supplierName && ` · ${m.activeLot.supplierName}`}
                                 </p>
                             )}
-                            {openingFor === m.id && <OpenLotForm materialId={m.id} onDone={() => setOpeningFor(null)} />}
+                            {openingFor === m.id && <OpenLotForm materialId={m.id} suppliers={suppliers} onDone={() => setOpeningFor(null)} />}
                         </li>
                     ))}
                 </ul>

@@ -13,6 +13,7 @@ export interface ReceiveProductLotInput {
     lotNumber?: string;
     expirationDate?: string | null; // "YYYY-MM-DD", optional
     quantity: number;
+    supplierId?: string | null;
 }
 
 /**
@@ -39,6 +40,7 @@ export async function receiveProductLot(input: ReceiveProductLotInput): Promise<
                     expirationDate: input.expirationDate ? new Date(input.expirationDate) : null,
                     quantityReceived: input.quantity,
                     quantityRemaining: input.quantity,
+                    supplierId: input.supplierId || null,
                 },
             });
             const updated = await tx.product.update({
@@ -73,6 +75,7 @@ export interface ProductLotRow {
     receivedDate: string;
     quantityReceived: number;
     quantityRemaining: number;
+    supplierName: string | null;
 }
 
 /** Lots for one product, most recently received first. */
@@ -81,14 +84,14 @@ export async function getProductLots(productId: string): Promise<ProductLotRow[]
         await requirePermission("RECEIVE_INVENTORY");
         const lots = await prisma.productLot.findMany({
             where: { productId },
-            include: { product: { select: { name: true } } },
+            include: { product: { select: { name: true } }, supplier: { select: { name: true } } },
             orderBy: { receivedDate: "desc" },
         });
         return lots.map((l) => ({
             id: l.id, productId: l.productId, productName: l.product.name,
             lotNumber: l.lotNumber, expirationDate: l.expirationDate?.toISOString() ?? null,
             receivedDate: l.receivedDate.toISOString(), quantityReceived: l.quantityReceived,
-            quantityRemaining: l.quantityRemaining,
+            quantityRemaining: l.quantityRemaining, supplierName: l.supplier?.name ?? null,
         }));
     } catch (error) {
         console.error("[getProductLots]", error);
@@ -106,6 +109,7 @@ export interface RawMaterialRow {
         lotNumber: string | null;
         expirationDate: string | null;
         receivedDate: string;
+        supplierName: string | null;
     } | null;
 }
 
@@ -114,7 +118,12 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
     try {
         await requirePermission("RECEIVE_INVENTORY");
         const materials = await prisma.rawMaterial.findMany({
-            include: { lots: { where: { status: "ACTIVE" }, orderBy: { receivedDate: "desc" }, take: 1 } },
+            include: {
+                lots: {
+                    where: { status: "ACTIVE" }, orderBy: { receivedDate: "desc" }, take: 1,
+                    include: { supplier: { select: { name: true } } },
+                },
+            },
             orderBy: { name: "asc" },
         });
         return materials.map((m) => ({
@@ -124,6 +133,7 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
                     id: m.lots[0].id, lotNumber: m.lots[0].lotNumber,
                     expirationDate: m.lots[0].expirationDate?.toISOString() ?? null,
                     receivedDate: m.lots[0].receivedDate.toISOString(),
+                    supplierName: m.lots[0].supplier?.name ?? null,
                 }
                 : null,
         }));
@@ -153,6 +163,7 @@ export interface ReceiveRawMaterialLotInput {
     lotNumber?: string;
     expirationDate?: string | null;
     notes?: string;
+    supplierId?: string | null;
 }
 
 /**
@@ -176,6 +187,7 @@ export async function receiveRawMaterialLot(input: ReceiveRawMaterialLotInput): 
                     expirationDate: input.expirationDate ? new Date(input.expirationDate) : null,
                     notes: input.notes?.trim() || null,
                     createdById: manager.id,
+                    supplierId: input.supplierId || null,
                 },
             });
         });
