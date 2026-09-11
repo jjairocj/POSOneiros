@@ -245,13 +245,15 @@ model SaleDetail {
 }
 
 model Payment {
-  id           String   @id @default(uuid())
-  saleId       String
-  sale         Sale     @relation(fields: [saleId], references: [id])
-  method       String   // CASH, CARD, TRANSFER
-  amount       Float
-  status       String   @default("PAID")
-  createdAt    DateTime @default(now())
+  id               String   @id @default(uuid())
+  saleId           String
+  sale             Sale     @relation(fields: [saleId], references: [id])
+  method           String   // CASH, CARD, TRANSFER
+  amount           Float
+  status           String   @default("PAID")
+  /** Which subaccount (person) made this payment, for split-bill sales — printed on the receipt as a per-person breakdown. Null for a regular (non-split) sale. */
+  subAccountLabel  String?
+  createdAt        DateTime @default(now())
 }
 
 model SystemConfig {

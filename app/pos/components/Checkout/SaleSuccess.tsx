@@ -18,11 +18,17 @@ export function printReceipt() {
     content.classList.add("block");
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
+    // Width comes from Receipt.tsx's inline style (Ajustes → Recibo/Ticket,
+    // 48mm by default) — @page size must match it exactly, or the browser
+    // fits/clips the content against its own default page size instead.
+    const widthMm = parseFloat(receiptNode.style.width) || 48;
     doc.open();
-    // @page size in mm, matching the 58mm thermal roll (Receipt.tsx targets
-    // a 48mm printable area within it) — without this Chrome defaults to
-    // Letter/A4 and either scales the ticket down or splits it across pages.
-    doc.write(`<html><head>${styles}<style>@page{size:58mm auto;margin:0}body{margin:0;padding:0;background:white}</style></head><body>${content.outerHTML}</body></html>`);
+    // box-sizing:border-box so the receipt's own padding can't push it past
+    // widthMm, and margin:0 on BOTH html and body — some print pipelines add
+    // hardware/driver margins back in even when only body is zeroed, which
+    // is what clips a wide-looking receipt down to a narrower printable
+    // area. @page size drives the actual paper/printable width.
+    doc.write(`<html><head>${styles}<style>*{box-sizing:border-box}@page{size:${widthMm}mm auto;margin:0}html,body{margin:0;padding:0;background:white;width:${widthMm}mm}</style></head><body>${content.outerHTML}</body></html>`);
     doc.close();
     iframe.contentWindow?.focus();
     setTimeout(() => {
@@ -80,8 +86,12 @@ export default function SaleSuccess({
                     </Button>
                 )}
             </div>
+            {/* Receipt.tsx's own root div carries id="print-receipt" and the
+                configured width — don't duplicate the id here, or
+                getElementById in printReceipt() grabs this unstyled
+                wrapper instead and the width setting is silently ignored. */}
             {sale && (
-                <div className="hidden" id="print-receipt">
+                <div className="hidden">
                     <Receipt sale={sale} subAccountLabel={subAccountLabel} />
                 </div>
             )}

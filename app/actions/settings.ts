@@ -21,6 +21,7 @@ export type SettingsData = {
   showLogoOnReceipt: string; // "true" | "false"
   businessLogoUrl: string; // image URL shown on the receipt header when showLogoOnReceipt is on
   showTaxBreakdown: string; // "true" | "false"
+  receiptWidthMm: string; // numeric string e.g. "48" — printable width; many 58mm-roll printers only print ~44-48mm
 };
 
 const DEFAULT_SETTINGS: SettingsData = {
@@ -37,6 +38,7 @@ const DEFAULT_SETTINGS: SettingsData = {
   showLogoOnReceipt: "true",
   businessLogoUrl: "",
   showTaxBreakdown: "true",
+  receiptWidthMm: "48",
 };
 
 export async function getSettings(): Promise<SettingsData> {
@@ -60,6 +62,7 @@ export async function getSettings(): Promise<SettingsData> {
       showLogoOnReceipt: map["showLogoOnReceipt"] ?? DEFAULT_SETTINGS.showLogoOnReceipt,
       businessLogoUrl: map["businessLogoUrl"] ?? DEFAULT_SETTINGS.businessLogoUrl,
       showTaxBreakdown: map["showTaxBreakdown"] ?? DEFAULT_SETTINGS.showTaxBreakdown,
+      receiptWidthMm: map["receiptWidthMm"] ?? DEFAULT_SETTINGS.receiptWidthMm,
     };
   } catch (error) {
     console.error("Error fetching settings:", error);
@@ -77,6 +80,8 @@ export async function saveSettings(data: SettingsData): Promise<{ success: boole
       .map(([key, value]) => [key, String(value ?? "")] as [string, string]);
     const iva = Number(data.defaultTaxIva);
     if (!Number.isFinite(iva) || iva < 0 || iva > 100) return { success: false, error: "El IVA por defecto debe estar entre 0 y 100." };
+    const width = Number(data.receiptWidthMm);
+    if (!Number.isFinite(width) || width < 30 || width > 120) return { success: false, error: "El ancho del recibo debe estar entre 30 y 120 mm." };
     const logoUrl = data.businessLogoUrl?.trim();
     if (logoUrl && !/^https:\/\//.test(logoUrl)) {
       return { success: false, error: "La URL del logo debe empezar con https://." };

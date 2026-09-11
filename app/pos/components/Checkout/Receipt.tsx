@@ -31,7 +31,7 @@ export interface ReceiptSale {
     shift?: { register?: { name: string; prefix?: string | null } | null; user?: { name: string } | null } | null;
     customer?: { fullName: string; documentId?: string | null; phone?: string | null; email?: string | null } | null;
     details: ReceiptDetail[];
-    payments: { method: string; amount: number }[];
+    payments: { method: string; amount: number; subAccountLabel?: string | null }[];
 }
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("es-CO")}`;
@@ -53,15 +53,31 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
     const ica = sale.details.reduce((acc, d) => acc + d.taxIcaAmount, 0);
     const impo = sale.details.reduce((acc, d) => acc + d.taxImpoConsumoAmount, 0);
     const paid = sale.payments.reduce((acc, p) => acc + p.amount, 0);
+    const widthMm = Number(business?.receiptWidthMm) || 48;
+
+    // Split-bill sales carry a subAccountLabel per payment — group them so the
+    // ticket shows who paid what instead of a flat, unlabeled list of amounts.
+    const hasSubAccountPayments = sale.payments.some((p) => p.subAccountLabel);
+    const paymentsByPerson: { label: string; payments: typeof sale.payments }[] = [];
+    if (hasSubAccountPayments) {
+        for (const p of sale.payments) {
+            const label = p.subAccountLabel || "Sin asignar";
+            let group = paymentsByPerson.find((g) => g.label === label);
+            if (!group) { group = { label, payments: [] }; paymentsByPerson.push(group); }
+            group.payments.push(p);
+        }
+    }
 
     return (
-        // 58mm thermal paper (Xprinter and similar): ~48mm is the actual
-        // printable area once the printer's own margins are subtracted, so
-        // the receipt targets that width, not the full 58mm. Two columns
-        // (item — total) instead of three: a third "unit price" column
-        // doesn't fit legibly at this width, and the unit price alone isn't
-        // worth losing legibility on the total, which is what matters most.
-        <div id="print-receipt" className="text-black bg-white w-[48mm] p-1 text-[10px] leading-tight font-mono mx-auto">
+        // 58mm thermal paper (Xprinter and similar): the printable area is
+        // narrower than the nominal roll width once the printer's own
+        // hardware margins are subtracted, so the receipt targets a
+        // configurable width (Ajustes → Recibo/Ticket), 48mm by default, not
+        // the full 58mm. Two columns (item — total) instead of three: a
+        // third "unit price" column doesn't fit legibly at this width, and
+        // the unit price alone isn't worth losing legibility on the total,
+        // which is what matters most.
+        <div id="print-receipt" style={{ width: `${widthMm}mm` }} className="text-black bg-white p-1 text-[10px] leading-tight font-mono mx-auto">
             <div className="text-center mb-2">
                 {business?.showLogoOnReceipt !== "false" && business?.businessLogoUrl && (
                     // eslint-disable-next-line @next/next/no-img-element -- printed receipt markup, not a Next page image
@@ -122,12 +138,32 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
                     TOTAL: {money(sale.total)}
                 </p>
                 <div className="space-y-0.5 mb-1">
-                    {sale.payments.map((p, idx) => (
-                        <div key={idx} className="flex justify-between">
-                            <span>{METHOD_LABEL[p.method] ?? p.method}:</span>
-                            <span>{money(p.amount)}</span>
-                        </div>
-                    ))}
+                    {hasSubAccountPayments ? (
+                        paymentsByPerson.map((group, gi) => {
+                            const groupTotal = group.payments.reduce((acc, p) => acc + p.amount, 0);
+                            return (
+                                <div key={gi} className="border-t border-black border-dotted pt-0.5 mt-0.5 first:border-t-0 first:pt-0 first:mt-0">
+                                    <p className="font-bold">{group.label}</p>
+                                    {group.payments.map((p, pi) => (
+                                        <div key={pi} className="flex justify-between pl-1">
+                                            <span>{METHOD_LABEL[p.method] ?? p.method}:</span>
+                                            <span>{money(p.amount)}</span>
+                                        </div>
+                                    ))}
+                                    <div className="flex justify-between pl-1 font-bold">
+                                        <span>Subtotal:</span><span>{money(groupTotal)}</span>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        sale.payments.map((p, idx) => (
+                            <div key={idx} className="flex justify-between">
+                                <span>{METHOD_LABEL[p.method] ?? p.method}:</span>
+                                <span>{money(p.amount)}</span>
+                            </div>
+                        ))
+                    )}
                     {paid > sale.total + 0.5 && (
                         <div className="flex justify-between"><span>Cambio:</span><span>{money(paid - sale.total)}</span></div>
                     )}

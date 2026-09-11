@@ -24,7 +24,7 @@ const validSettings = (overrides: Partial<SettingsData> = {}): SettingsData => (
     businessPhone: '3000000000', businessEmail: 'a@b.com',
     allowNegativeStock: 'false', defaultTaxIva: '19', currency: 'COP', cityCountry: 'Bogotá',
     receiptFooter: 'Gracias', showLogoOnReceipt: 'true', businessLogoUrl: 'https://x.com/logo.png',
-    showTaxBreakdown: 'true',
+    showTaxBreakdown: 'true', receiptWidthMm: '48',
     ...overrides,
 });
 

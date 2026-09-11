@@ -206,7 +206,7 @@ export async function processSale(
                     total: finalTotal,
                     discount: totalDiscount,
                     details: { create: saleDetails },
-                    payments: { create: payments.map((p) => ({ method: p.method, amount: round(p.amount) })) },
+                    payments: { create: payments.map((p) => ({ method: p.method, amount: round(p.amount), subAccountLabel: p.subAccountLabel ?? null })) },
                 },
                 include: {
                     details: { include: { product: true } },

@@ -232,6 +232,24 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
             onCheckedChange={(v) => updateField("showTaxBreakdown", String(v))}
           />
         </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Ancho de impresión (mm)</label>
+          <Input
+            type="number"
+            min="30"
+            max="120"
+            step="1"
+            value={data.receiptWidthMm}
+            onChange={(e) => updateField("receiptWidthMm", e.target.value)}
+            placeholder="Ej: 48"
+          />
+          <p className={styles.switchDesc}>
+            Ancho real que tu impresora puede imprimir, no el ancho nominal del rollo. Un rollo de
+            58mm suele imprimir solo ~44-48mm de contenido; si el recibo sale cortado al imprimir,
+            reduce este valor.
+          </p>
+        </div>
       </section>
 
       {/* Submit */}
