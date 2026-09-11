@@ -49,3 +49,6 @@ next-env.d.ts
 *.pdf
 *.png
 !public/**/*.png
+
+# Obsidian vault state (local to whoever opens docs/ as a vault)
+.obsidian/

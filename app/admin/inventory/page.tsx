@@ -6,12 +6,10 @@ import { getEffectivePermissions, hasPermission } from '@/lib/auth';
 import { getProducts, getStockMovements } from '@/app/actions/product';
 import { getCategories } from '@/app/actions/category';
 import { getRawMaterials } from '@/app/actions/lots';
-import { buildColumns } from './components/columns';
+import { ProductsTab } from './components/ProductsTab';
 import { categoryColumns } from './components/category-columns';
-import { DataTable } from './components/data-table';
 import { PackageOpen, FolderTree, FileSpreadsheet, History, FlaskConical } from 'lucide-react';
 import { MovementsTable } from './components/MovementsTable';
-import { ProductForm } from './components/product-form';
 import { CategoryForm } from './components/category-form';
 import { CategoryDragList } from './components/CategoryDragList';
 import { RawMaterialsTable } from './components/RawMaterialsTable';
@@ -88,12 +86,7 @@ export default async function InventoryPage() {
                 <TabsContent value="products" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none space-y-4">
                     {/* Cashier with only RECEIVE_INVENTORY sees the catalog read-only —
                         no "new product" button, and RowActions hides edit/delete itself. */}
-                    {canManageCatalog && (
-                        <div className="flex justify-end">
-                            <ProductForm />
-                        </div>
-                    )}
-                    <DataTable columns={buildColumns({ canManageCatalog, canReceiveInventory })} data={products} />
+                    <ProductsTab data={products} canManageCatalog={canManageCatalog} canReceiveInventory={canReceiveInventory} />
                 </TabsContent>
 
                 {canManageCatalog && (
