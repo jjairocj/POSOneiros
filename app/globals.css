@@ -4,6 +4,39 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Glass chrome (nav bars, sticky headers) — never used over a critical
+ * number (totals live on solid `bg-card` surfaces, see docs/15).
+ *
+ * Respects the OS "reduce transparency" accessibility setting the same way
+ * Apple's own Liquid Glass does: when it's on, drop the blur and fall back
+ * to a fully opaque surface instead of a translucent one. NN/g's
+ * glassmorphism guidance (nngroup.com/articles/glassmorphism) flags variable
+ * background contrast as the main accessibility risk of this pattern — this
+ * is the cheapest, most direct mitigation for it.
+ */
+.glass-chrome {
+  background-color: color-mix(in oklch, var(--background) 75%, transparent);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-chrome {
+    background-color: var(--background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Ledger-style numerals: every digit takes the same width, so prices and
+   totals align into neat columns instead of jittering as amounts change
+   (a "1" no longer sits narrower than an "8"). Global because money, dates
+   and quantities appear throughout the app, not just the POS. */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -55,7 +88,11 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /* Brand accent (indigo). Neutrals stay grayscale everywhere else — this is
+     the ONE color used for primary actions (checkout, totals), per the 2026
+     "sparing but high-contrast accent" trend, not a full re-theme.
+     #4f46e5 on white = 6.29:1 contrast (verified), comfortably AA/AAA. */
+  --primary: #4f46e5; /* indigo-600 */
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -89,7 +126,12 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
+  /* Same brand accent, lightened for a dark background — indigo-400 with
+     near-black text keeps the existing "inverted" button pattern (light
+     bg + dark text) this theme already used, just recolored.
+     Text #2e2e2e on #818cf8 = 4.55:1 (verified), fine for the bold/large
+     text these buttons always use. */
+  --primary: #818cf8; /* indigo-400 */
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);

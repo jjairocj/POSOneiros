@@ -29,17 +29,25 @@ export default function ShiftHeader({ activeShift, userName, userRole }: ShiftHe
                     Oneiros POS
                 </h1>
 
+                {/*
+                  Badge colors are hardcoded Tailwind shades (not the `destructive`/`primary`
+                  design tokens) chosen specifically so text-on-tinted-background clears WCAG AA
+                  (4.5:1) at the tint's exact opacity — verified numerically, not eyeballed, per
+                  NN/g's glassmorphism guidance (nngroup.com/articles/glassmorphism) that flags
+                  translucent badges as the highest-risk contrast pattern. Don't restyle these
+                  with a semantic token without re-checking contrast at the new opacity.
+                */}
                 {!activeShift ? (
-                    <span className="flex items-center px-2.5 py-1 rounded-full bg-destructive/20 border border-destructive/30 text-destructive text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                    <span className="flex items-center px-2.5 py-1 rounded-full bg-red-500/12 border border-red-500/30 text-red-700 dark:text-red-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
                         Sin turno activo
                     </span>
                 ) : (
                     <>
-                        <span className="flex items-center px-2.5 py-1 rounded-full bg-primary/15 border border-primary/25 text-primary text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                        <span className="flex items-center px-2.5 py-1 rounded-full bg-primary/12 border border-primary/30 text-foreground text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
                             <span className="hidden sm:inline">Turno:&nbsp;</span>
                             {activeShift.register?.name || "Caja Fija"}
                         </span>
-                        <span className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                        <span className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/12 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
                             <ShoppingBag className="w-3 h-3" />
                             {(activeShift._count?.sales ?? 0)}{" "}
                             {(activeShift._count?.sales ?? 0) === 1 ? "venta" : "ventas"}
