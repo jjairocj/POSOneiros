@@ -5,6 +5,7 @@ import ShiftOpeningModal from "./ShiftOpeningModal";
 import { Button } from "@/components/ui/button";
 import { LogOut, MonitorPlay, ShoppingBag } from "lucide-react";
 import POSUserMenu from "../POSUserMenu";
+import type { PermissionKey } from "@/lib/permissions";
 
 /** Only what the header needs; the page passes the full Prisma shift. */
 type ActiveShift = { id: string; register?: { name: string } | null; _count?: { sales: number } } | null;
@@ -13,9 +14,10 @@ interface ShiftHeaderProps {
   activeShift: ActiveShift;
   userName: string;
   userRole: string;
+  permissions?: PermissionKey[] | "ALL";
 }
 
-export default function ShiftHeader({ activeShift, userName, userRole }: ShiftHeaderProps) {
+export default function ShiftHeader({ activeShift, userName, userRole, permissions = "ALL" }: ShiftHeaderProps) {
     // Keep the id in state: after closeShift revalidates /pos, activeShift becomes null
     // and the summary modal must stay mounted until the cashier acknowledges it.
     const [closingShiftId, setClosingShiftId] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export default function ShiftHeader({ activeShift, userName, userRole }: ShiftHe
                     </Button>
                 )}
 
-                <POSUserMenu userName={userName} userRole={userRole} />
+                <POSUserMenu userName={userName} userRole={userRole} permissions={permissions} />
             </div>
 
             {isOpeningInfo && <ShiftOpeningModal onClose={() => setIsOpeningInfo(false)} />}

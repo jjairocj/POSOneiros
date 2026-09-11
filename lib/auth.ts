@@ -1,8 +1,8 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
-import { PERMISSION_KEYS, type PermissionKey } from "@/lib/permissions";
-export { PERMISSION_KEYS, PERMISSION_LABEL, type PermissionKey } from "@/lib/permissions";
+import { PERMISSION_KEYS, hasPermission, type PermissionKey } from "@/lib/permissions";
+export { PERMISSION_KEYS, PERMISSION_LABEL, hasPermission, type PermissionKey } from "@/lib/permissions";
 
 export type Role = "ADMIN" | "SUPERVISOR" | "CASHIER";
 
@@ -105,8 +105,4 @@ export async function getEffectivePermissions(): Promise<PermissionKey[] | "ALL"
     if (user.role === "ADMIN") return "ALL";
     const role = await prisma.role.findUnique({ where: { name: user.role }, select: { permissions: true } });
     return ((role?.permissions ?? []).filter((p): p is PermissionKey => (PERMISSION_KEYS as readonly string[]).includes(p)));
-}
-
-export function hasPermission(permissions: PermissionKey[] | "ALL", key: PermissionKey): boolean {
-    return permissions === "ALL" || permissions.includes(key);
 }

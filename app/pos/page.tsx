@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]/route";
+import { getEffectivePermissions } from "@/lib/auth";
 import { getActiveShift } from "../actions/shift";
 import ShiftHeader from "./components/Shift/ShiftHeader";
 import ProductGrid from "./components/Catalog/ProductGrid";
@@ -18,6 +19,10 @@ export default async function POSPage() {
 
   const userName = session.user.name ?? "Usuario";
   const userRole = session.user.role;
+  // Which /admin destinations this session may reach — including a CASHIER
+  // granted a delegable permission in Ajustes → Roles y Permisos, who used
+  // to have no way back into /admin from here at all. See POSUserMenu.
+  const permissions = await getEffectivePermissions();
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -29,6 +34,7 @@ export default async function POSPage() {
           activeShift={activeShift}
           userName={userName}
           userRole={userRole}
+          permissions={permissions}
         />
       </header>
 

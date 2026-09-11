@@ -3,16 +3,22 @@
 import { signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import { useMounted } from "@/app/lib/useMounted";
-import { LogOut, LayoutDashboard, BarChart2, ChevronDown, Sun, Moon, KeyRound } from "lucide-react";
+import { LogOut, LayoutDashboard, BarChart2, Package, ChevronDown, Sun, Moon, KeyRound } from "lucide-react";
 import ChangePasswordModal from "@/app/components/ChangePasswordModal";
 import { useTheme } from "next-themes";
+import { hasPermission, type PermissionKey } from "@/lib/permissions";
 
 interface POSUserMenuProps {
   userName: string;
   userRole: string;
+  /** "ALL" for ADMIN; otherwise the role's configured delegable
+   * permissions (often empty, for a CASHIER nobody has granted anything).
+   * Drives which /admin links appear below — a CASHIER granted
+   * RECEIVE_INVENTORY, say, now has a real way to reach it from here. */
+  permissions?: PermissionKey[] | "ALL";
 }
 
-export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
+export default function POSUserMenu({ userName, userRole, permissions = "ALL" }: POSUserMenuProps) {
   const [open, setOpen] = useState(false);
   const [changingPw, setChangingPw] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
@@ -20,7 +26,9 @@ export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
   const dark = theme === "dark";
-  const isAdmin = userRole === "ADMIN";
+  const canViewDashboard = hasPermission(permissions, "VIEW_DASHBOARD");
+  const canOpenInventory = hasPermission(permissions, "RECEIVE_INVENTORY") || hasPermission(permissions, "MANAGE_CATALOG");
+  const canViewReports = hasPermission(permissions, "VIEW_REPORTS");
   const initial = userName?.charAt(0).toUpperCase() ?? "U";
 
   useEffect(() => {
@@ -94,24 +102,41 @@ export default function POSUserMenu({ userName, userRole }: POSUserMenuProps) {
               </button>
             </div>
 
-            {/* Navigation links */}
+            {/* Navigation links — each shown only if this session's permissions
+                actually unlock the destination (see admin/layout.tsx for the
+                same logic on the /admin side: this is what closes the loop for
+                a CASHIER granted a delegable permission, who otherwise had no
+                way to reach it from the POS screen at all). */}
             <div className="py-1.5">
-              {isAdmin && (
+              {(canViewDashboard || canOpenInventory || canViewReports) && (
                 <>
-                  <a
-                    href="/admin"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-                  >
-                    <LayoutDashboard className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    Panel Admin
-                  </a>
-                  <a
-                    href="/admin/sales"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-                  >
-                    <BarChart2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    Reportes y Ventas
-                  </a>
+                  {canViewDashboard && (
+                    <a
+                      href="/admin"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      Panel Admin
+                    </a>
+                  )}
+                  {canOpenInventory && (
+                    <a
+                      href="/admin/inventory"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                    >
+                      <Package className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      Inventario
+                    </a>
+                  )}
+                  {canViewReports && (
+                    <a
+                      href="/admin/sales"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                    >
+                      <BarChart2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      Reportes y Ventas
+                    </a>
+                  )}
                   <div className="h-px bg-border/50 my-1 mx-3" />
                 </>
               )}

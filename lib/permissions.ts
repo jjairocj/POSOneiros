@@ -30,3 +30,7 @@ export const PERMISSION_LABEL: Record<PermissionKey, string> = {
     VOID_SALE: "Anular una venta",
     VIEW_REPORTS: "Ver reportes e historial de ventas",
 };
+
+export function hasPermission(permissions: PermissionKey[] | "ALL", key: PermissionKey): boolean {
+    return permissions === "ALL" || permissions.includes(key);
+}
