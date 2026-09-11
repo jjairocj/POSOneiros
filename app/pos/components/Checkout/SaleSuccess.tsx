@@ -19,7 +19,10 @@ export function printReceipt() {
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
     doc.open();
-    doc.write(`<html><head>${styles}<style>@page{margin:0}body{margin:0;padding:0;background:white}</style></head><body>${content.outerHTML}</body></html>`);
+    // @page size in mm, matching the 58mm thermal roll (Receipt.tsx targets
+    // a 48mm printable area within it) — without this Chrome defaults to
+    // Letter/A4 and either scales the ticket down or splits it across pages.
+    doc.write(`<html><head>${styles}<style>@page{size:58mm auto;margin:0}body{margin:0;padding:0;background:white}</style></head><body>${content.outerHTML}</body></html>`);
     doc.close();
     iframe.contentWindow?.focus();
     setTimeout(() => {

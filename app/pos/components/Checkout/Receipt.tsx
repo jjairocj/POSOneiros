@@ -48,62 +48,61 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
     const paid = sale.payments.reduce((acc, p) => acc + p.amount, 0);
 
     return (
-        <div id="print-receipt" className="text-black bg-white w-[80mm] p-4 text-sm font-mono mx-auto">
-            <div className="text-center mb-4">
+        // 58mm thermal paper (Xprinter and similar): ~48mm is the actual
+        // printable area once the printer's own margins are subtracted, so
+        // the receipt targets that width, not the full 58mm. Two columns
+        // (item — total) instead of three: a third "unit price" column
+        // doesn't fit legibly at this width, and the unit price alone isn't
+        // worth losing legibility on the total, which is what matters most.
+        <div id="print-receipt" className="text-black bg-white w-[48mm] p-1 text-[10px] leading-tight font-mono mx-auto">
+            <div className="text-center mb-2">
                 {business?.showLogoOnReceipt !== "false" && business?.businessLogoUrl && (
                     // eslint-disable-next-line @next/next/no-img-element -- printed receipt markup, not a Next page image
                     <img
                         src={business.businessLogoUrl}
                         alt=""
-                        className="max-h-16 mx-auto mb-2 object-contain"
+                        className="max-h-10 mx-auto mb-1 object-contain"
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
                     />
                 )}
-                <h1 className="text-xl font-bold uppercase mb-1">{business?.businessName || "Oneiros POS"}</h1>
-                {business?.businessNit && <p className="text-xs">NIT: {business.businessNit}</p>}
-                {business?.businessAddress && <p className="text-xs">{business.businessAddress}</p>}
-                {business?.cityCountry && <p className="text-xs">{business.cityCountry}</p>}
-                {business?.businessPhone && <p className="text-xs">Tel: {business.businessPhone}</p>}
+                <h1 className="text-xs font-bold uppercase mb-0.5 leading-tight">{business?.businessName || "Oneiros POS"}</h1>
+                {business?.businessNit && <p>NIT: {business.businessNit}</p>}
+                {business?.businessAddress && <p>{business.businessAddress}</p>}
+                {business?.cityCountry && <p>{business.cityCountry}</p>}
+                {business?.businessPhone && <p>Tel: {business.businessPhone}</p>}
             </div>
 
-            <div className="border-t border-b border-black py-2 mb-4 text-xs">
-                <p><strong>Comprobante de venta:</strong> #{receiptNumber(sale)}</p>
+            <div className="border-t border-b border-black border-dashed py-1 mb-2">
+                <p>#{receiptNumber(sale)}</p>
                 {sale.status === "CANCELLED" && <p className="font-bold">*** ANULADO ***</p>}
-                {subAccountLabel && <p><strong>Cuenta:</strong> {subAccountLabel}</p>}
-                <p><strong>Fecha:</strong> {new Date(sale.createdAt).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p>
-                <p><strong>Caja:</strong> {sale.shift?.register?.name ?? sale.shiftId.slice(0, 8)}</p>
-                {sale.shift?.user?.name && <p><strong>Atendió:</strong> {sale.shift.user.name}</p>}
+                {subAccountLabel && <p>Cuenta: {subAccountLabel}</p>}
+                <p>{new Date(sale.createdAt).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p>
+                <p>Caja: {sale.shift?.register?.name ?? sale.shiftId.slice(0, 8)}</p>
+                {sale.shift?.user?.name && <p>Atendió: {sale.shift.user.name}</p>}
             </div>
 
-            <table className="w-full text-xs text-left mb-4">
-                <thead>
-                    <tr className="border-b border-black/50">
-                        <th className="font-bold pb-1 w-1/2">Cant x Artículo</th>
-                        <th className="font-bold pb-1 w-1/4 text-right">Vr. Unit</th>
-                        <th className="font-bold pb-1 w-1/4 text-right">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {sale.details.map((detail, idx) => (
-                        <tr key={idx} className="align-top">
-                            <td className="py-1 pr-1">{detail.quantity}x {detail.productName || detail.product?.name}</td>
-                            <td className="py-1 text-right">{money(detail.unitPrice)}</td>
-                            <td className="py-1 text-right">{money(detail.subtotal)}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <div className="mb-2">
+                {sale.details.map((detail, idx) => (
+                    <div key={idx} className="mb-1">
+                        <div>{detail.quantity}x {detail.productName || detail.product?.name}</div>
+                        <div className="flex justify-between">
+                            <span>{money(detail.unitPrice)} c/u</span>
+                            <span className="font-bold">{money(detail.subtotal)}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
 
-            <div className="border-t border-black pt-2 mb-4 text-sm flex flex-col items-end">
+            <div className="border-t border-black pt-1 mb-2 flex flex-col items-stretch">
                 {(sale.discount ?? 0) > 0 && (
-                    <div className="w-full text-xs flex justify-between mb-1">
+                    <div className="flex justify-between mb-1">
                         <span>Descuento:</span><span>-{money(sale.discount ?? 0)}</span>
                     </div>
                 )}
-                <p className="font-bold text-lg border-b border-black border-dashed mb-2 pb-1 w-full text-right">
+                <p className="font-bold text-xs border-b border-black border-dashed mb-1 pb-1 text-right">
                     TOTAL: {money(sale.total)}
                 </p>
-                <div className="w-full text-xs space-y-1 mb-2">
+                <div className="space-y-0.5 mb-1">
                     {sale.payments.map((p, idx) => (
                         <div key={idx} className="flex justify-between">
                             <span>{METHOD_LABEL[p.method] ?? p.method}:</span>
@@ -117,8 +116,8 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
             </div>
 
             {showTaxes && (
-                <div className="border-t border-black pt-2 mb-4 text-xs">
-                    <p className="font-bold mb-1">Discriminación de impuestos</p>
+                <div className="border-t border-black pt-1 mb-2">
+                    <p className="font-bold mb-0.5">Impuestos</p>
                     <div className="flex justify-between"><span>Base:</span><span>{money(base - sale.details.reduce((acc, d) => acc + (d.discount ?? 0), 0))}</span></div>
                     {iva > 0 && <div className="flex justify-between"><span>IVA:</span><span>{money(iva)}</span></div>}
                     {ica > 0 && <div className="flex justify-between"><span>ICA:</span><span>{money(ica)}</span></div>}
@@ -126,7 +125,7 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
                 </div>
             )}
 
-            <div className="text-center text-xs mt-4">
+            <div className="text-center mt-2">
                 <p>{business?.receiptFooter || "¡Gracias por su compra!"}</p>
             </div>
         </div>
