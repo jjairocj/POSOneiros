@@ -42,7 +42,12 @@ function makeTx(overrides: Partial<Record<string, any>> = {}) {
         },
         payment: { updateMany: vi.fn().mockResolvedValue({}) },
         subAccount: { createMany: vi.fn().mockResolvedValue({}) },
-        stockMovement: { createMany: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
+        stockMovement: {
+            createMany: vi.fn().mockResolvedValue({}),
+            create: vi.fn().mockResolvedValue({}),
+            findMany: vi.fn().mockResolvedValue([]),
+        },
+        productLot: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
         ...overrides,
     };
     mockTransaction.mockImplementation(async (fn: any) => fn(tx));
@@ -185,6 +190,37 @@ describe('processSale — totals and payments', () => {
     });
 });
 
+describe('processSale — trackingMode NONE and LOT', () => {
+    it('NONE: sells without touching stock or writing a movement', async () => {
+        const tx = makeTx({ product: { findMany: vi.fn().mockResolvedValue([{ ...DB_PRODUCT, trackingMode: 'NONE' }]), updateMany: vi.fn(), update: vi.fn() } });
+        const res = await processSale('s1', ITEMS, PAYMENTS);
+        expect(res.ok).toBe(true);
+        expect(tx.product.updateMany).not.toHaveBeenCalled();
+        expect(tx.stockMovement.createMany).not.toHaveBeenCalled();
+    });
+
+    it('LOT: consumes FEFO, splitting across lots when one doesn\'t cover the sale', async () => {
+        const tx = makeTx({
+            product: { findMany: vi.fn().mockResolvedValue([{ ...DB_PRODUCT, trackingMode: 'LOT' }]), updateMany: vi.fn().mockResolvedValue({ count: 1 }), update: vi.fn() },
+        });
+        tx.product.findMany.mockResolvedValueOnce([{ ...DB_PRODUCT, trackingMode: 'LOT' }]).mockResolvedValueOnce([{ id: 'p1', stock: 8 }]);
+        tx.productLot.findMany.mockResolvedValue([
+            { id: 'lot-old', quantityRemaining: 1, expirationDate: new Date('2026-01-01'), receivedDate: new Date('2025-12-01') },
+            { id: 'lot-new', quantityRemaining: 5, expirationDate: new Date('2026-06-01'), receivedDate: new Date('2026-01-01') },
+        ]);
+        const res = await processSale('s1', ITEMS, PAYMENTS); // buys quantity 2
+        expect(res.ok).toBe(true);
+        expect(tx.productLot.update).toHaveBeenCalledWith({ where: { id: 'lot-old' }, data: { quantityRemaining: { decrement: 1 } } });
+        expect(tx.productLot.update).toHaveBeenCalledWith({ where: { id: 'lot-new' }, data: { quantityRemaining: { decrement: 1 } } });
+        expect(tx.stockMovement.createMany).toHaveBeenCalledWith({
+            data: expect.arrayContaining([
+                expect.objectContaining({ lotId: 'lot-old', quantity: -1 }),
+                expect.objectContaining({ lotId: 'lot-new', quantity: -1 }),
+            ]),
+        });
+    });
+});
+
 describe('cancelSale', () => {
     it('requires SUPERVISOR or higher (blocks CASHIER)', async () => {
         mockRequireSession.mockRejectedValue(Object.assign(new Error('No tienes permisos para esta acción'), { name: 'AuthError' }));
@@ -200,7 +236,8 @@ describe('cancelSale', () => {
     it('restores stock and marks the sale CANCELLED', async () => {
         mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
         const tx = makeTx();
-        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'COMPLETED', details: [{ productId: 'p1', quantity: 2 }] });
+        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'COMPLETED' });
+        tx.stockMovement.findMany.mockResolvedValue([{ productId: 'p1', quantity: -2, lotId: null }]);
         tx.product.update.mockResolvedValue({ stock: 12 });
         const res = await cancelSale('sale-1', 'cliente se arrepintió');
         expect(res.ok).toBe(true);
@@ -211,10 +248,32 @@ describe('cancelSale', () => {
         }));
     });
 
+    it('restores the specific lot a sale consumed from', async () => {
+        mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
+        const tx = makeTx();
+        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'COMPLETED' });
+        tx.stockMovement.findMany.mockResolvedValue([{ productId: 'p1', quantity: -2, lotId: 'lot-1' }]);
+        tx.product.update.mockResolvedValue({ stock: 12 });
+        const res = await cancelSale('sale-1', 'producto vencido');
+        expect(res.ok).toBe(true);
+        expect(tx.productLot.update).toHaveBeenCalledWith({ where: { id: 'lot-1' }, data: { quantityRemaining: { increment: 2 } } });
+        expect(tx.stockMovement.create).toHaveBeenCalledWith({ data: expect.objectContaining({ lotId: 'lot-1' }) });
+    });
+
+    it('a NONE-tracked line (never decremented) has nothing to restore', async () => {
+        mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
+        const tx = makeTx();
+        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'COMPLETED' });
+        tx.stockMovement.findMany.mockResolvedValue([]); // NONE products never created a SALE movement
+        const res = await cancelSale('sale-1', 'venta duplicada');
+        expect(res.ok).toBe(true);
+        expect(tx.product.update).not.toHaveBeenCalled();
+    });
+
     it('refuses to cancel twice', async () => {
         mockRequireSession.mockResolvedValue({ id: 'admin', role: 'ADMIN' });
         const tx = makeTx();
-        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'CANCELLED', details: [] });
+        tx.sale.findUnique.mockResolvedValue({ id: 'sale-1', status: 'CANCELLED' });
         expect(await cancelSale('sale-1', 'otra vez')).toMatchObject({ ok: false, error: expect.stringMatching(/ya fue anulada/) });
     });
 });

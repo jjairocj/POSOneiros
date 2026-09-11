@@ -47,12 +47,13 @@ const makeProduct = (overrides = {}) => ({
 
 function makeTx(overrides: Partial<Record<string, any>> = {}) {
     const tx = {
+        ...overrides,
         product: {
             findUnique: vi.fn().mockResolvedValue({ stock: 10 }),
             update: vi.fn().mockResolvedValue({ stock: 10 }),
+            ...overrides.product,
         },
-        stockMovement: { create: vi.fn().mockResolvedValue({}) },
-        ...overrides,
+        stockMovement: { create: vi.fn().mockResolvedValue({}), ...overrides.stockMovement },
     };
     mockTransaction.mockImplementation(async (fn: any) => fn(tx));
     return tx;

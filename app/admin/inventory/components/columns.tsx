@@ -20,6 +20,7 @@ export type ProductColumn = {
   taxImpoConsumo?: number | null;
   imageUrl?: string | null;
   isFavorite?: boolean;
+  trackingMode?: string;
 };
 
 export const columns: ColumnDef<ProductColumn>[] = [

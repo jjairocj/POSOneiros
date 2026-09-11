@@ -1,7 +1,9 @@
 import { getDashboardData } from "@/app/actions/dashboard";
+import { getExpiringItems } from "@/app/actions/lots";
 import { formatMoney } from "@/app/lib/money";
 import { SalesHourChart } from "./components/SalesHourChart";
 import { LowStockPanel } from "./inventory/components/LowStockPanel";
+import { ExpiringLotsPanel } from "./inventory/components/ExpiringLotsPanel";
 import {
     TrendingUp,
     ShoppingCart,
@@ -22,7 +24,7 @@ const METHOD_LABELS: Record<string, string> = {
 };
 
 export default async function AdminDashboardPage() {
-    const data = await getDashboardData();
+    const [data, expiringItems] = await Promise.all([getDashboardData(), getExpiringItems(7)]);
     const { kpis, hourlySales, topProducts, recentSales, lowStockProducts } = data;
 
     const maxQty = topProducts[0]?.totalQty ?? 1;
@@ -168,6 +170,17 @@ export default async function AdminDashboardPage() {
                         Alertas de Stock
                     </h2>
                     <LowStockPanel products={lowStockProducts} />
+                </div>
+            )}
+
+            {/* Expiring lots (products + raw materials) — health-authority traceability */}
+            {expiringItems.length > 0 && (
+                <div>
+                    <h2 className="text-lg font-bold tracking-tight mb-3 flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-amber-500" />
+                        Próximos a Vencer
+                    </h2>
+                    <ExpiringLotsPanel items={expiringItems} />
                 </div>
             )}
 

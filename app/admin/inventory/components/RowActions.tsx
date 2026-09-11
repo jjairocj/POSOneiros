@@ -8,6 +8,7 @@ import {
 import { ProductForm } from "./product-form";
 import { DeleteProductItem } from "./DeleteProductItem";
 import { StockMovementModal } from "./StockMovementModal";
+import { ReceiveLotModal } from "./ReceiveLotModal";
 import type { ProductColumn } from "./columns";
 
 /**
@@ -17,6 +18,8 @@ import type { ProductColumn } from "./columns";
  */
 export function RowActions({ product }: { product: ProductColumn }) {
   const [movementOpen, setMovementOpen] = useState(false);
+  const [lotOpen, setLotOpen] = useState(false);
+  const isLotTracked = product.trackingMode === "LOT";
   return (
     <>
       <DropdownMenu>
@@ -32,7 +35,12 @@ export function RowActions({ product }: { product: ProductColumn }) {
             product={product}
             trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar producto</DropdownMenuItem>}
           />
-          <DropdownMenuItem onSelect={() => setMovementOpen(true)}>Entrada / merma / ajuste</DropdownMenuItem>
+          {isLotTracked && (
+            <DropdownMenuItem onSelect={() => setLotOpen(true)}>Recibir lote</DropdownMenuItem>
+          )}
+          <DropdownMenuItem onSelect={() => setMovementOpen(true)}>
+            {isLotTracked ? "Merma / ajuste (sin lote)" : "Entrada / merma / ajuste"}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DeleteProductItem productId={product.id} productName={product.name} />
         </DropdownMenuContent>
@@ -41,6 +49,12 @@ export function RowActions({ product }: { product: ProductColumn }) {
         <StockMovementModal
           product={{ id: product.id, name: product.name, stock: product.stock, cost: product.cost }}
           onClose={() => setMovementOpen(false)}
+        />
+      )}
+      {lotOpen && (
+        <ReceiveLotModal
+          product={{ id: product.id, name: product.name, stock: product.stock }}
+          onClose={() => setLotOpen(false)}
         />
       )}
     </>

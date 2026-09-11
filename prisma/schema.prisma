@@ -94,10 +94,66 @@ model Product {
   imageUrl    String?     // Already existed
   isFavorite  Boolean     @default(false)
   isActive    Boolean     @default(true)
+  // SIMPLE: just `stock`, no lots (default, most products).
+  // LOT: health-authority traceability — every receipt creates a ProductLot
+  // (lot number + optional expiration), sales consume FEFO automatically.
+  // NONE: not stock-tracked at all (e.g. coffee-by-the-cup, soft-serve).
+  trackingMode String     @default("SIMPLE")
   saleDetails SaleDetail[]
   movements   StockMovement[]
+  lots        ProductLot[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+/// One receipt of a lot-tracked product (e.g. one case of Buldak ramen).
+/// `quantityRemaining` is decremented FEFO as sales consume it; a lot with
+/// 0 remaining is exhausted but kept for traceability, never deleted.
+model ProductLot {
+  id                String    @id @default(uuid())
+  productId         String
+  product           Product   @relation(fields: [productId], references: [id])
+  lotNumber         String?   // as printed by the manufacturer; optional (some suppliers don't print one)
+  expirationDate    DateTime? @db.Date // optional: alcohol has a lot but no expiration
+  receivedDate      DateTime  @default(now())
+  quantityReceived  Float
+  quantityRemaining Float
+  movements         StockMovement[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([productId, expirationDate])
+  @@index([expirationDate])
+}
+
+/// Bulk ingredient log (coffee beans, soft-serve mix) for products that are
+/// sold without per-unit inventory (Product.trackingMode = "NONE"). Deliberately
+/// NOT linked to sales — building recipe/BOM consumption per cup would be far
+/// more than the health-traceability requirement actually asks for. Registering
+/// a new lot for the same RawMaterial auto-marks the previous one DEPLETED.
+model RawMaterial {
+  id        String            @id @default(uuid())
+  name      String            @unique // e.g. "Café en grano", "Mezcla de helado"
+  lots      RawMaterialLot[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model RawMaterialLot {
+  id            String      @id @default(uuid())
+  rawMaterialId String
+  rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  lotNumber     String?
+  expirationDate DateTime?  @db.Date
+  receivedDate  DateTime    @default(now())
+  status        String      @default("ACTIVE") // ACTIVE | DEPLETED
+  notes         String?
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([rawMaterialId, status])
+  @@index([expirationDate])
 }
 
 /// Kardex: every change to Product.stock, with the balance after it.
@@ -112,10 +168,13 @@ model StockMovement {
   reason     String?
   saleId     String?
   userId     String?
+  lotId      String?
+  lot        ProductLot? @relation(fields: [lotId], references: [id])
   createdAt  DateTime @default(now())
 
   @@index([productId, createdAt])
   @@index([createdAt])
+  @@index([lotId])
 }
 
 model Customer {

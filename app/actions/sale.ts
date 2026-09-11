@@ -110,7 +110,7 @@ export async function processSale(
             let finalTotal = 0;
             let totalDiscount = 0;
             const saleDetails: Prisma.SaleDetailCreateWithoutSaleInput[] = [];
-            const pendingMovements: { productId: string; quantity: number }[] = [];
+            const pendingMovements: { productId: string; quantity: number; lotId?: string | null }[] = [];
 
             // Same math as the cart (app/lib/tax.ts), but with DB prices and rates.
             const lines = breakdownLines(
@@ -128,15 +128,42 @@ export async function processSale(
                 const line = lines[idx];
                 if (!product.isActive) throw new UserError(`"${product.name}" está desactivado y no se puede vender.`);
 
-                // Atomic, race-safe decrement: only succeeds if enough stock remains.
-                const updated = await tx.product.updateMany({
-                    where: allowNegative ? { id: product.id } : { id: product.id, stock: { gte: quantity } },
-                    data: { stock: { decrement: quantity } },
-                });
-                if (updated.count === 0) {
-                    throw new UserError(`Stock insuficiente para "${product.name}". Quedan ${product.stock}.`);
+                // NONE: not stock-tracked at all (coffee-by-the-cup, soft-serve) —
+                // sell freely, no stock decrement, no Kardex entry. See docs/16.
+                if (product.trackingMode !== "NONE") {
+                    // Atomic, race-safe decrement: only succeeds if enough stock remains.
+                    const updated = await tx.product.updateMany({
+                        where: allowNegative ? { id: product.id } : { id: product.id, stock: { gte: quantity } },
+                        data: { stock: { decrement: quantity } },
+                    });
+                    if (updated.count === 0) {
+                        throw new UserError(`Stock insuficiente para "${product.name}". Quedan ${product.stock}.`);
+                    }
+
+                    if (product.trackingMode === "LOT") {
+                        // FEFO, transparent to the cashier: consume whichever lot expires
+                        // soonest first, splitting across lots if one doesn't cover the sale.
+                        const lots = await tx.productLot.findMany({
+                            where: { productId: product.id, quantityRemaining: { gt: 0 } },
+                            orderBy: [{ expirationDate: { sort: "asc", nulls: "last" } }, { receivedDate: "asc" }],
+                        });
+                        let left = quantity;
+                        for (const lot of lots) {
+                            if (left <= 0) break;
+                            const take = Math.min(lot.quantityRemaining, left);
+                            await tx.productLot.update({ where: { id: lot.id }, data: { quantityRemaining: { decrement: take } } });
+                            pendingMovements.push({ productId: product.id, quantity: -take, lotId: lot.id });
+                            left -= take;
+                        }
+                        if (left > 0) {
+                            // Registered lots don't cover the sale (data entry gap) — still
+                            // record the shortfall so Product.stock and the Kardex agree.
+                            pendingMovements.push({ productId: product.id, quantity: -left, lotId: null });
+                        }
+                    } else {
+                        pendingMovements.push({ productId: product.id, quantity: -quantity });
+                    }
                 }
-                pendingMovements.push({ productId: product.id, quantity: -quantity });
 
                 finalTotal += line.total;
                 totalDiscount += line.discount;
@@ -191,12 +218,15 @@ export async function processSale(
             // Kardex entries with the balance after the sale
             const after = await tx.product.findMany({ where: { id: { in: productIds } }, select: { id: true, stock: true } });
             const stockById = new Map(after.map((p) => [p.id, p.stock]));
-            await tx.stockMovement.createMany({
-                data: pendingMovements.map((m) => ({
-                    productId: m.productId, type: "SALE", quantity: m.quantity,
-                    stockAfter: stockById.get(m.productId) ?? 0, saleId: newSale.id, userId: user.id,
-                })),
-            });
+            if (pendingMovements.length > 0) {
+                await tx.stockMovement.createMany({
+                    data: pendingMovements.map((m) => ({
+                        productId: m.productId, type: "SALE", quantity: m.quantity,
+                        stockAfter: stockById.get(m.productId) ?? 0, saleId: newSale.id, userId: user.id,
+                        lotId: m.lotId ?? null,
+                    })),
+                });
+            }
 
             const subAccounts: SubAccountInput[] = options.subAccounts
                 ?? (options.subAccountLabel ? [{ label: options.subAccountLabel, items, amount: finalTotal }] : []);
@@ -236,14 +266,26 @@ export async function cancelSale(saleId: string, reason: string): Promise<Action
         if (trimmed.length < 3) return fail("Escribe el motivo de la anulación.");
 
         await prisma.$transaction(async (tx) => {
-            const sale = await tx.sale.findUnique({ where: { id: saleId }, include: { details: true } });
+            const sale = await tx.sale.findUnique({ where: { id: saleId } });
             if (!sale) throw new UserError("La venta no existe.");
             if (sale.status === "CANCELLED") throw new UserError("Esta venta ya fue anulada.");
 
-            for (const d of sale.details) {
-                const p = await tx.product.update({ where: { id: d.productId }, data: { stock: { increment: d.quantity } } });
+            // Reverse the exact SALE movements this sale created (not sale.details):
+            // a LOT-tracked line may have split across several lots, and a NONE-tracked
+            // line never created a movement in the first place, so there's nothing to
+            // restore for it — both fall out naturally from working off these rows.
+            const saleMovements = await tx.stockMovement.findMany({ where: { saleId, type: "SALE" } });
+            for (const m of saleMovements) {
+                const restore = -m.quantity; // was recorded negative
+                const p = await tx.product.update({ where: { id: m.productId }, data: { stock: { increment: restore } } });
+                if (m.lotId) {
+                    await tx.productLot.update({ where: { id: m.lotId }, data: { quantityRemaining: { increment: restore } } });
+                }
                 await tx.stockMovement.create({
-                    data: { productId: d.productId, type: "CANCEL", quantity: d.quantity, stockAfter: p.stock, saleId, userId: user.id, reason: trimmed },
+                    data: {
+                        productId: m.productId, type: "CANCEL", quantity: restore, stockAfter: p.stock,
+                        saleId, userId: user.id, reason: trimmed, lotId: m.lotId,
+                    },
                 });
             }
             await tx.payment.updateMany({ where: { saleId }, data: { status: "REFUNDED" } });

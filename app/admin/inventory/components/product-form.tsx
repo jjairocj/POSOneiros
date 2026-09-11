@@ -32,6 +32,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
     const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "none");
     const [isActive, setIsActive] = useState<boolean>(product?.isActive ?? true);
+    const [trackingMode, setTrackingMode] = useState<string>(product?.trackingMode ?? "SIMPLE");
 
     useEffect(() => {
         if (!open) return;
@@ -138,6 +139,28 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     <input type="hidden" name="isActive" value={isActive ? "true" : "false"} />
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label htmlFor="trackingMode" className="text-sm font-semibold ml-1">Seguimiento de inventario</label>
+                            <select
+                                id="trackingMode"
+                                name="trackingMode"
+                                value={trackingMode}
+                                onChange={(e) => setTrackingMode(e.target.value)}
+                                className="w-full h-12 rounded-xl bg-muted/50 border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            >
+                                <option value="SIMPLE">Simple — solo cantidad en existencia</option>
+                                <option value="LOT">Por lote — exige lote/vencimiento al recibir mercancía</option>
+                                <option value="NONE">Sin inventario — no se cuenta (ej. café, helado soft)</option>
+                            </select>
+                            <p className="text-xs text-muted-foreground ml-1">
+                                {trackingMode === "LOT"
+                                    ? "La entrada de mercancía se hace desde \"Recibir lote\" en la tabla de inventario, no aquí."
+                                    : trackingMode === "NONE"
+                                        ? "Este producto se podrá vender siempre, sin descontar existencias."
+                                        : "Como hoy: un número de existencias, sin lote."}
+                            </p>
                         </div>
 
                         {/* Image URL and Favorite */}

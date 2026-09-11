@@ -4,14 +4,16 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getProducts, getStockMovements } from '@/app/actions/product';
 import { getCategories } from '@/app/actions/category';
+import { getRawMaterials } from '@/app/actions/lots';
 import { columns } from './components/columns';
 import { categoryColumns } from './components/category-columns';
 import { DataTable } from './components/data-table';
-import { PackageOpen, FolderTree, FileSpreadsheet, History } from 'lucide-react';
+import { PackageOpen, FolderTree, FileSpreadsheet, History, FlaskConical } from 'lucide-react';
 import { MovementsTable } from './components/MovementsTable';
 import { ProductForm } from './components/product-form';
 import { CategoryForm } from './components/category-form';
 import { CategoryDragList } from './components/CategoryDragList';
+import { RawMaterialsTable } from './components/RawMaterialsTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const metadata: Metadata = {
@@ -24,6 +26,7 @@ export default async function InventoryPage() {
     const products = await getProducts(undefined, undefined, { includeInactive: true });
     const categories = await getCategories();
     const movements = await getStockMovements({ take: 300 });
+    const rawMaterials = await getRawMaterials();
 
     return (
         <div className="space-y-6">
@@ -59,6 +62,9 @@ export default async function InventoryPage() {
                     <TabsTrigger value="movements" className="rounded-xl px-6 font-bold flex items-center gap-2">
                         <History className="w-4 h-4" /> Movimientos
                     </TabsTrigger>
+                    <TabsTrigger value="insumos" className="rounded-xl px-6 font-bold flex items-center gap-2">
+                        <FlaskConical className="w-4 h-4" /> Insumos
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="movements" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
@@ -79,6 +85,10 @@ export default async function InventoryPage() {
                     <div className="bg-transparent border-none p-0 shadow-none">
                         <CategoryDragList initialCategories={categories} />
                     </div>
+                </TabsContent>
+
+                <TabsContent value="insumos" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
+                    <RawMaterialsTable materials={rawMaterials} />
                 </TabsContent>
             </Tabs>
         </div>
