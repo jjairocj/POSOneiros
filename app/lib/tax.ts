@@ -83,3 +83,61 @@ export function calculateOrderTotals(items: CartItem[], orderDiscount?: OrderDis
         total: sum("total"),
     };
 }
+
+/** One subaccount's assigned quantity per item, for splitOrderByItems. */
+export interface SubAccountAllocation {
+    id: string;
+    items: { id: string; quantity: number }[];
+}
+
+const LINE_FIELD_FOR: Record<keyof OrderTotals, keyof LineBreakdown> = {
+    subtotal: "base", discount: "discount", taxIva: "taxIva", taxIca: "taxIca", taxImpoConsumo: "taxImpoConsumo", total: "total",
+};
+
+/**
+ * Splits an order's real totals (line discounts AND the order-level discount,
+ * both already baked into `breakdownLines`) across several subaccounts by
+ * item assignment — exactly: the grand sum across all subaccounts always
+ * equals calculateOrderTotals(orderItems, orderDiscount), even when a single
+ * item's quantity is split across people. calculateOrderTotals(sa.items)
+ * alone can't do this: computed on a subaccount's items in isolation, it has
+ * no way to know its fair share of a discount applied to the *whole* order.
+ *
+ * Per item, each unit gets an equal integer-peso share (floor); any leftover
+ * pesos (always < that item's quantity, since it's a remainder of a
+ * floor-division) go to whichever subaccount holds the last assigned unit —
+ * the same "remainder to the last share" rule prorateOrderDiscount already
+ * uses for lines, applied here to a line's units instead.
+ */
+export function splitOrderByItems(
+    orderItems: CartItem[],
+    orderDiscount: OrderDiscount | null | undefined,
+    allocations: SubAccountAllocation[]
+): Record<string, OrderTotals> {
+    const orderLines = breakdownLines(orderItems, orderDiscount);
+    const result: Record<string, OrderTotals> = {};
+    for (const a of allocations) result[a.id] = { ...ZERO_TOTALS };
+
+    orderItems.forEach((item, idx) => {
+        const line = orderLines[idx];
+        const qty = item.quantity;
+        if (qty <= 0) return;
+
+        const touching = allocations
+            .map((a) => ({ id: a.id, q: a.items.find((i) => i.id === item.id)?.quantity ?? 0 }))
+            .filter((t) => t.q > 0);
+        if (touching.length === 0) return;
+
+        (Object.keys(LINE_FIELD_FOR) as (keyof OrderTotals)[]).forEach((field) => {
+            const lineVal = line[LINE_FIELD_FOR[field]];
+            const perUnit = Math.floor(lineVal / qty);
+            const remainder = lineVal - perUnit * qty;
+            touching.forEach((t, ti) => {
+                const share = perUnit * t.q + (ti === touching.length - 1 ? remainder : 0);
+                result[t.id][field] += share;
+            });
+        });
+    });
+
+    return result;
+}

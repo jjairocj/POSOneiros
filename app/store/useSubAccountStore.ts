@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
-import { SubAccount, CartItem, SubAccountPayment } from "@/app/types/cart";
-import { calculateOrderTotals } from "@/app/lib/tax";
+import { SubAccount, CartItem, OrderDiscount, SubAccountPayment } from "@/app/types/cart";
+import { splitOrderByItems } from "@/app/lib/tax";
 
 function makeId(): string {
     return `sub-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -21,12 +21,25 @@ function makeSubAccount(label: string): SubAccount {
     };
 }
 
-function recalc(sa: SubAccount): SubAccount {
-    return { ...sa, ...calculateOrderTotals(sa.items) };
-}
-
 function roundTo50(amount: number): number {
     return Math.round(amount / 50) * 50;
+}
+
+/**
+ * Recomputes every subaccount's totals together via splitOrderByItems, so
+ * each one gets its fair share of the order-level discount — not just its
+ * own items' totals in isolation (which has no way to know about a discount
+ * applied to the whole order). Subaccounts using an equal-split
+ * `customAmount` instead of item assignment (empty `items`) just get zeros
+ * here; their card shows `customAmount` instead, see SplitBillModal.
+ */
+function recalcAll(subAccounts: SubAccount[], orderItems: CartItem[], orderDiscount: OrderDiscount | null): SubAccount[] {
+    const shares = splitOrderByItems(
+        orderItems,
+        orderDiscount,
+        subAccounts.map((sa) => ({ id: sa.id, items: sa.items.map((i) => ({ id: i.id, quantity: i.quantity })) }))
+    );
+    return subAccounts.map((sa) => ({ ...sa, ...shares[sa.id] }));
 }
 
 interface SubAccountStore {
@@ -34,8 +47,12 @@ interface SubAccountStore {
     subAccounts: SubAccount[];
     pendingItemId: string | null;
     pendingQty: number;
+    /** The full order being split — needed so each subaccount's totals can
+     * be computed relative to the whole order's discount, not in isolation. */
+    orderItems: CartItem[];
+    orderDiscount: OrderDiscount | null;
 
-    initSplit: (items: CartItem[]) => void;
+    initSplit: (items: CartItem[], orderDiscount?: OrderDiscount | null) => void;
     cancelSplit: () => void;
     addSubAccount: () => void;
     removeSubAccount: (id: string) => void;
@@ -55,17 +72,22 @@ export const useSubAccountStore = create<SubAccountStore>((set, get) => ({
     pendingItemId: null,
     pendingQty: 1,
 
-    initSplit: () => {
+    orderItems: [],
+    orderDiscount: null,
+
+    initSplit: (items, orderDiscount = null) => {
         set({
             active: true,
             subAccounts: [makeSubAccount("Persona 1"), makeSubAccount("Persona 2")],
             pendingItemId: null,
             pendingQty: 1,
+            orderItems: items,
+            orderDiscount,
         });
     },
 
     cancelSplit: () => {
-        set({ active: false, subAccounts: [], pendingItemId: null, pendingQty: 1 });
+        set({ active: false, subAccounts: [], pendingItemId: null, pendingQty: 1, orderItems: [], orderDiscount: null });
     },
 
     addSubAccount: () => {
@@ -94,34 +116,41 @@ export const useSubAccountStore = create<SubAccountStore>((set, get) => ({
     },
 
     assignItem: (subAccountId, item, quantity) => {
-        set(state => ({
-            subAccounts: state.subAccounts.map(sa => {
-                if (sa.id !== subAccountId) return sa;
-                const existing = sa.items.find(i => i.id === item.id);
-                let newItems: CartItem[];
-                if (existing) {
-                    newItems = sa.items.map(i =>
-                        i.id === item.id ? { ...i, quantity: i.quantity + quantity } : i
-                    );
-                } else {
-                    newItems = [...sa.items, { ...item, quantity }];
-                }
-                return recalc({ ...sa, items: newItems });
-            }),
+        const { subAccounts, orderItems, orderDiscount } = get();
+        const updated = subAccounts.map(sa => {
+            if (sa.id !== subAccountId) return sa;
+            const existing = sa.items.find(i => i.id === item.id);
+            let newItems: CartItem[];
+            if (existing) {
+                newItems = sa.items.map(i =>
+                    i.id === item.id ? { ...i, quantity: i.quantity + quantity } : i
+                );
+            } else {
+                newItems = [...sa.items, { ...item, quantity }];
+            }
+            return { ...sa, items: newItems };
+        });
+        set({
+            subAccounts: recalcAll(updated, orderItems, orderDiscount),
             pendingItemId: null,
             pendingQty: 1,
-        }));
+        });
     },
 
     unassignItem: (subAccountId, itemId) => {
-        set(state => ({
-            subAccounts: state.subAccounts.map(sa => {
-                if (sa.id !== subAccountId) return sa;
-                return recalc({ ...sa, items: sa.items.filter(i => i.id !== itemId) });
-            }),
-        }));
+        const { subAccounts, orderItems, orderDiscount } = get();
+        const updated = subAccounts.map(sa =>
+            sa.id === subAccountId ? { ...sa, items: sa.items.filter(i => i.id !== itemId) } : sa
+        );
+        set({ subAccounts: recalcAll(updated, orderItems, orderDiscount) });
     },
 
+    // "Dividir equitativamente" is a distinct mode from item assignment: it
+    // splits the order's real (discount-aware) total as pure money, with no
+    // item-level pretense — each subaccount's `items` stays empty (never the
+    // full order duplicated into every person's card, which used to render
+    // as if everyone had ordered everything) and `customAmount` is what's
+    // actually charged.
     splitEqually: (items, cartTotal) => {
         const { subAccounts } = get();
         const n = subAccounts.length;
@@ -133,7 +162,7 @@ export const useSubAccountStore = create<SubAccountStore>((set, get) => ({
 
         set({
             subAccounts: subAccounts.map((sa, i) =>
-                recalc({ ...sa, items, customAmount: i === 0 ? firstAmount : perPerson })
+                ({ ...sa, items: [], subtotal: 0, taxIva: 0, taxIca: 0, taxImpoConsumo: 0, total: 0, customAmount: i === 0 ? firstAmount : perPerson })
             ),
             pendingItemId: null,
         });

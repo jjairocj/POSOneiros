@@ -256,7 +256,7 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                         type="button"
                         onClick={() => {
                         if (!activeShiftId) { setIsOpeningShift(true); return; }
-                        initSplit(items);
+                        initSplit(items, orderDiscount);
                         setIsSplitOpen(true);
                     }}
                         className="w-full py-2.5 text-sm font-semibold rounded-2xl border border-border text-muted-foreground hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2 mb-3"

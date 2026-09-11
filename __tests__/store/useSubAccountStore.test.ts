@@ -19,6 +19,8 @@ beforeEach(() => {
             subAccounts: [],
             pendingItemId: null,
             pendingQty: 1,
+            orderItems: [],
+            orderDiscount: null,
         });
     });
 });
@@ -135,6 +137,73 @@ describe('useSubAccountStore — markPaid / allPaid', () => {
             getStore().subAccounts.forEach(sa => getStore().markPaid(sa.id));
         });
         expect(getStore().allPaid()).toBe(true);
+    });
+});
+
+describe('useSubAccountStore — splitEqually leaves items empty', () => {
+    it('does not duplicate the full order into every subaccount\'s items', () => {
+        // Regression: splitEqually used to set every subaccount's `items` to
+        // the entire order, so each person's card rendered as if they'd
+        // ordered everything — and that duplicated list got persisted as
+        // each SubAccount's items in the DB.
+        act(() => getStore().initSplit(ITEMS));
+        act(() => getStore().splitEqually(ITEMS, 8000));
+        const { subAccounts } = getStore();
+        expect(subAccounts[0].items).toEqual([]);
+        expect(subAccounts[1].items).toEqual([]);
+    });
+});
+
+describe('useSubAccountStore — order-level discount is prorated across item-based splits', () => {
+    it('a fixed-amount order discount is shared, not applied in full to each subaccount', () => {
+        // Order: Café x2 ($6000) + Agua x1 ($2000) = $8000, minus a $2000
+        // fixed order discount → real total $6000. Split Café to Persona 1,
+        // Agua to Persona 2. Before the fix, each subaccount computed its
+        // total from calculateOrderTotals(sa.items) alone — with no idea an
+        // order-level discount existed — so they'd sum to $8000, not $6000,
+        // and the split could never reconcile with the real (discounted)
+        // order total.
+        act(() => getStore().initSplit(ITEMS, { type: 'amount', value: 2000 }));
+        const [p1, p2] = getStore().subAccounts;
+        act(() => getStore().assignItem(p1.id, ITEMS[0], 2)); // Café x2, $6000 of $8000 pre-discount
+        act(() => getStore().assignItem(p2.id, ITEMS[1], 1)); // Agua x1, $2000 of $8000 pre-discount
+
+        const { subAccounts } = getStore();
+        const sum = subAccounts.reduce((a, sa) => a + sa.total, 0);
+        expect(sum).toBe(6000); // exactly the discounted order total, not 8000
+        // Discount prorated by each subaccount's share of the pre-discount base:
+        // Persona 1 had 6000/8000 = 75% of the base → 75% of the $2000 discount ($1500)
+        expect(subAccounts[0].total).toBe(4500); // 6000 - 1500
+        expect(subAccounts[1].total).toBe(1500); // 2000 - 500
+    });
+
+    it('a percent order discount applies the same rate to every subaccount, summing exactly', () => {
+        act(() => getStore().initSplit(ITEMS, { type: 'percent', value: 10 })); // 10% off $8000 → $7200
+        const [p1, p2] = getStore().subAccounts;
+        act(() => getStore().assignItem(p1.id, ITEMS[0], 2));
+        act(() => getStore().assignItem(p2.id, ITEMS[1], 1));
+
+        const { subAccounts } = getStore();
+        const sum = subAccounts.reduce((a, sa) => a + sa.total, 0);
+        expect(sum).toBe(7200);
+        expect(subAccounts[0].total).toBe(5400); // 6000 - 10%
+        expect(subAccounts[1].total).toBe(1800); // 2000 - 10%
+    });
+
+    it('splitting one line\'s quantity across many subaccounts still sums exactly (rounding remainder)', () => {
+        // The "absurd" case: an item whose price doesn't divide evenly by
+        // its own quantity, split across several people.
+        const oddItem: CartItem = { id: 'p3', name: 'Torta', price: 10000, quantity: 3, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 };
+        act(() => getStore().initSplit([oddItem], { type: 'amount', value: 1000 })); // $30000 - $1000 = $29000, not divisible by 3
+        act(() => getStore().addSubAccount()); // 3 subaccounts total
+        const [p1, p2, p3] = getStore().subAccounts;
+        act(() => getStore().assignItem(p1.id, oddItem, 1));
+        act(() => getStore().assignItem(p2.id, oddItem, 1));
+        act(() => getStore().assignItem(p3.id, oddItem, 1));
+
+        const { subAccounts } = getStore();
+        const sum = subAccounts.reduce((a, sa) => a + sa.total, 0);
+        expect(sum).toBe(29000); // no pesos lost or invented to rounding
     });
 });
 
