@@ -46,6 +46,16 @@ Se investigó la [guía de glassmorphism de NN/g](https://www.nngroup.com/articl
 - **Reducir transparencia**: macOS → Ajustes del Sistema → Accesibilidad → Pantalla → "Reducir transparencia". Con eso activo, el header del POS debe verse sólido, sin blur.
 - **Contraste**: cualquier inspector de accesibilidad del navegador (Chrome DevTools → Lighthouse / el ícono de contraste en el selector de color) sobre los tres badges del header, en claro y oscuro.
 
+## Color de marca y numerales tabulares (2026-09-11, misma rama)
+
+Segunda vuelta de este trabajo, basada en tendencias 2026 reales de dashboards/SaaS (no solo intuición): el color ahora es **funcional, no decorativo** — la mayoría de la interfaz en neutros, con **un solo acento usado con moderación pero alto contraste** para acciones primarias. Es lo opuesto a "repintar todo de un color de marca".
+
+**Diagnóstico previo:** `--primary` en `app/globals.css` era literalmente escala de grises (`oklch(0.205 0 0)`, sin matiz) — el tema por defecto de shadcn sin personalizar. Como `bg-primary`/`text-primary` ya es, en el código, el token semántico para "acción principal" (botón de cobrar, total, pestaña activa, focus), bastó con **recolorear ese único token** para que el acento aparezca exactamente donde ya se usaba como "lo más importante" — sin tocar componente por componente.
+
+- **Color elegido:** índigo (`#4f46e5` claro / `#818cf8` oscuro). Contraste verificado con la fórmula WCAG real: 6.29:1 (blanco sobre índigo claro) y 4.55:1 (texto oscuro sobre índigo en modo oscuro) — ambos superan el mínimo de texto grande en botones.
+- **Deliberadamente no se tocó** `--destructive` (rojo, ya semántico) ni el verde usado en "ventas"/éxito — el acento nuevo no debe competir con esos significados ya establecidos.
+- **Numerales tabulares** (`font-variant-numeric: tabular-nums`) aplicados globalmente en `body`: los dígitos ocupan el mismo ancho, así que precios y totales alinean en columna en vez de "bailar" cuando cambia la cantidad de dígitos. Es el patrón "numerales de contabilidad" que señalan las guías 2026 para paneles con muchos montos — impacto alto, cambio de una sola línea.
+
 ## Ver también
 - [[05-Componentes-POS]]
 - [[06-Componentes-Admin]]
