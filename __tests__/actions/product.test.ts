@@ -5,6 +5,7 @@ const mockRequireManager = vi.fn();
 vi.mock('../../lib/auth', () => ({
     requireSession: () => mockRequireSession(),
     requireManager: () => mockRequireManager(),
+    requirePermission: () => mockRequireManager(),
 }));
 
 const mockFindMany = vi.fn();

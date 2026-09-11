@@ -87,7 +87,7 @@ async function main() {
         data: { name: "ADMIN", permissions: ["ALL"] },
     });
     await prisma.role.create({
-        data: { name: "SUPERVISOR", permissions: ["POS", "REPORTS", "INVENTORY", "VOID_SALE"] },
+        data: { name: "SUPERVISOR", permissions: ["VIEW_DASHBOARD", "MANAGE_CATALOG", "RECEIVE_INVENTORY", "VOID_SALE", "VIEW_REPORTS"] },
     });
     await prisma.role.create({
         data: { name: "CASHIER", permissions: ["POS"] },

@@ -16,10 +16,20 @@ import type { ProductColumn } from "./columns";
  * Radix unmounts the menu content on outside clicks, which would tear down a
  * modal that lived inside the menu before the user could submit it.
  */
-export function RowActions({ product }: { product: ProductColumn }) {
+interface RowActionsProps {
+  product: ProductColumn;
+  /** Both default true: ADMIN/SUPERVISOR always have full access — see the
+   * static `columns` export. A permission-limited CASHIER gets explicit
+   * false via `buildColumns()`. */
+  canManageCatalog?: boolean;
+  canReceiveInventory?: boolean;
+}
+
+export function RowActions({ product, canManageCatalog = true, canReceiveInventory = true }: RowActionsProps) {
   const [movementOpen, setMovementOpen] = useState(false);
   const [lotOpen, setLotOpen] = useState(false);
   const isLotTracked = product.trackingMode === "LOT";
+  if (!canManageCatalog && !canReceiveInventory) return null;
   return (
     <>
       <DropdownMenu>
@@ -31,18 +41,26 @@ export function RowActions({ product }: { product: ProductColumn }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-          <ProductForm
-            product={product}
-            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar producto</DropdownMenuItem>}
-          />
-          {isLotTracked && (
+          {canManageCatalog && (
+            <ProductForm
+              product={product}
+              trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar producto</DropdownMenuItem>}
+            />
+          )}
+          {canReceiveInventory && isLotTracked && (
             <DropdownMenuItem onSelect={() => setLotOpen(true)}>Recibir lote</DropdownMenuItem>
           )}
-          <DropdownMenuItem onSelect={() => setMovementOpen(true)}>
-            {isLotTracked ? "Merma / ajuste (sin lote)" : "Entrada / merma / ajuste"}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DeleteProductItem productId={product.id} productName={product.name} />
+          {canReceiveInventory && (
+            <DropdownMenuItem onSelect={() => setMovementOpen(true)}>
+              {isLotTracked ? "Merma / ajuste (sin lote)" : "Entrada / merma / ajuste"}
+            </DropdownMenuItem>
+          )}
+          {canManageCatalog && (
+            <>
+              <DropdownMenuSeparator />
+              <DeleteProductItem productId={product.id} productName={product.name} />
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       {movementOpen && (

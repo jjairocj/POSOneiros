@@ -1,7 +1,7 @@
 "use server";
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireSession, requireManager } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { toUserMessage } from "@/lib/result";
 
 export async function getCategories() {
@@ -29,7 +29,7 @@ export async function getCategories() {
 
 export async function createCategory(formData: FormData) {
     try {
-        await requireManager();
+        await requirePermission("MANAGE_CATALOG");
         const name = String(formData.get("name") ?? "").trim();
         if (!name) return { success: false, error: "El nombre es obligatorio." };
         const sortOrder = Number(formData.get("sortOrder") || 0);
@@ -49,7 +49,7 @@ export async function createCategory(formData: FormData) {
 
 export async function updateCategory(id: string, formData: FormData) {
     try {
-        await requireManager();
+        await requirePermission("MANAGE_CATALOG");
         const name = String(formData.get("name") ?? "").trim();
         if (!name) return { success: false, error: "El nombre es obligatorio." };
         const sortOrder = Number(formData.get("sortOrder") || 0);
@@ -70,7 +70,7 @@ export async function updateCategory(id: string, formData: FormData) {
 
 export async function deleteCategory(id: string) {
     try {
-        await requireManager();
+        await requirePermission("MANAGE_CATALOG");
         await prisma.category.delete({
             where: { id }
         });
@@ -87,7 +87,7 @@ export async function deleteCategory(id: string) {
 
 export async function updateCategoryOrders(updates: { id: string, sortOrder: number }[]) {
     try {
-        await requireManager();
+        await requirePermission("MANAGE_CATALOG");
         // Use a transaction to update all sorting orders atomically
         await prisma.$transaction(
             updates.map((update) =>

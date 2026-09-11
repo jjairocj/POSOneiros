@@ -9,15 +9,23 @@ import { useState } from "react";
 import { useMounted } from "@/app/lib/useMounted";
 
 const NAV_ITEMS = [
-    { name: "Resumen", href: "/admin", icon: LineChart, adminOnly: false },
-    { name: "Inventario", href: "/admin/inventory", icon: Package, adminOnly: false },
-    { name: "Ventas", href: "/admin/sales", icon: Receipt, adminOnly: false },
-    { name: "Usuarios y Cajas", href: "/admin/users", icon: Users, adminOnly: true },
-    { name: "Ajustes", href: "/admin/settings", icon: Settings, adminOnly: true },
+    { name: "Resumen", href: "/admin", icon: LineChart },
+    { name: "Inventario", href: "/admin/inventory", icon: Package },
+    { name: "Ventas", href: "/admin/sales", icon: Receipt },
+    { name: "Usuarios y Cajas", href: "/admin/users", icon: Users },
+    { name: "Ajustes", href: "/admin/settings", icon: Settings },
 ];
 
-export default function AdminSidebar({ role }: { role: "ADMIN" | "SUPERVISOR" }) {
-    const items = NAV_ITEMS.filter((item) => !item.adminOnly || role === "ADMIN");
+interface AdminSidebarProps {
+    role: "ADMIN" | "SUPERVISOR" | "CASHIER";
+    /** Hrefs this session is allowed to see — computed in admin/layout.tsx
+     * from Role.permissions for a CASHIER, or "everything non-admin-only"
+     * for ADMIN/SUPERVISOR. Replaces the old adminOnly-flag filtering. */
+    visiblePaths: string[];
+}
+
+export default function AdminSidebar({ role, visiblePaths }: AdminSidebarProps) {
+    const items = NAV_ITEMS.filter((item) => visiblePaths.includes(item.href));
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const mounted = useMounted();

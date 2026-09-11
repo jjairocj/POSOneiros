@@ -2,7 +2,7 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { requireSession, requireManager, roleAtLeast } from "@/lib/auth";
+import { requireSession, requirePermission, roleAtLeast } from "@/lib/auth";
 import { fail, ok, toUserMessage, UserError, type ActionResult } from "@/lib/result";
 import { breakdownLines } from "@/app/lib/tax";
 import type { OrderDiscount } from "@/app/types/cart";
@@ -258,11 +258,13 @@ export async function processSale(
 
 /**
  * Cancels (anula) a completed sale: restores stock and marks it CANCELLED.
- * Only admins can cancel. The sale stays in the history for traceability.
+ * Requires the VOID_SALE permission (ADMIN always has it; SUPERVISOR by
+ * default, configurable in Ajustes → Roles y Permisos). The sale stays in
+ * the history for traceability.
  */
 export async function cancelSale(saleId: string, reason: string): Promise<ActionResult> {
     try {
-        const user = await requireManager();
+        const user = await requirePermission("VOID_SALE");
         const trimmed = (reason ?? "").trim();
         if (trimmed.length < 3) return fail("Escribe el motivo de la anulación.");
 

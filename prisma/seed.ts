@@ -16,7 +16,9 @@ async function main() {
     await prisma.role.upsert({
         where: { name: "SUPERVISOR" },
         update: {},
-        create: { name: "SUPERVISOR", permissions: ["POS", "REPORTS", "INVENTORY", "VOID_SALE"] },
+        // Matches the pre-configurable-permissions default: everything a SUPERVISOR
+        // could already do. See lib/auth.ts PERMISSION_KEYS.
+        create: { name: "SUPERVISOR", permissions: ["VIEW_DASHBOARD", "MANAGE_CATALOG", "RECEIVE_INVENTORY", "VOID_SALE", "VIEW_REPORTS"] },
     });
 
     await prisma.role.upsert({

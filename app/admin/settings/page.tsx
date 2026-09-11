@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getSettings } from "@/app/actions/settings";
+import { getRolePermissions } from "@/app/actions/roles";
 import { SettingsForm } from "./components/SettingsForm";
+import { RolePermissionsForm } from "./components/RolePermissionsForm";
 import { SlidersHorizontal } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -23,6 +25,7 @@ export default async function SettingsPage() {
   if (session?.user?.role !== "ADMIN") redirect("/admin");
 
   const settings = await getSettings();
+  const rolePermissions = await getRolePermissions();
 
   return (
     <div className="space-y-6">
@@ -41,6 +44,7 @@ export default async function SettingsPage() {
       </header>
 
       <SettingsForm initialData={settings} />
+      <RolePermissionsForm initial={rolePermissions} />
     </div>
   );
 }

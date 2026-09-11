@@ -21,6 +21,7 @@ vi.mock('../../lib/prisma', () => ({
 vi.mock('../../lib/auth', () => ({
     requireSession: vi.fn(),
     requireManager: () => mockRequireManager(),
+    requirePermission: () => mockRequireManager(),
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 

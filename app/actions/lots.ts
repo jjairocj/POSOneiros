@@ -1,7 +1,7 @@
 "use server";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireManager } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { fail, ok, toUserMessage, UserError, type ActionResult } from "@/lib/result";
 
 const isPositiveNumber = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n > 0;
@@ -22,7 +22,7 @@ export interface ReceiveProductLotInput {
  */
 export async function receiveProductLot(input: ReceiveProductLotInput): Promise<ActionResult> {
     try {
-        const manager = await requireManager();
+        const manager = await requirePermission("RECEIVE_INVENTORY");
         if (!isPositiveNumber(input.quantity)) return fail("La cantidad debe ser mayor a cero.");
 
         await prisma.$transaction(async (tx) => {
@@ -78,7 +78,7 @@ export interface ProductLotRow {
 /** Lots for one product, most recently received first. */
 export async function getProductLots(productId: string): Promise<ProductLotRow[]> {
     try {
-        await requireManager();
+        await requirePermission("RECEIVE_INVENTORY");
         const lots = await prisma.productLot.findMany({
             where: { productId },
             include: { product: { select: { name: true } } },
@@ -112,7 +112,7 @@ export interface RawMaterialRow {
 /** Every raw material with its currently active lot, if any. */
 export async function getRawMaterials(): Promise<RawMaterialRow[]> {
     try {
-        await requireManager();
+        await requirePermission("RECEIVE_INVENTORY");
         const materials = await prisma.rawMaterial.findMany({
             include: { lots: { where: { status: "ACTIVE" }, orderBy: { receivedDate: "desc" }, take: 1 } },
             orderBy: { name: "asc" },
@@ -136,7 +136,7 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
 /** Creates a new raw material (e.g. "Café en grano") with no lot yet. */
 export async function createRawMaterial(name: string): Promise<ActionResult> {
     try {
-        await requireManager();
+        await requirePermission("RECEIVE_INVENTORY");
         const trimmed = name.trim();
         if (!trimmed) return fail("El nombre es obligatorio.");
         await prisma.rawMaterial.create({ data: { name: trimmed } });
@@ -163,7 +163,7 @@ export interface ReceiveRawMaterialLotInput {
  */
 export async function receiveRawMaterialLot(input: ReceiveRawMaterialLotInput): Promise<ActionResult> {
     try {
-        const manager = await requireManager();
+        const manager = await requirePermission("RECEIVE_INVENTORY");
         await prisma.$transaction(async (tx) => {
             await tx.rawMaterialLot.updateMany({
                 where: { rawMaterialId: input.rawMaterialId, status: "ACTIVE" },
@@ -190,7 +190,7 @@ export async function receiveRawMaterialLot(input: ReceiveRawMaterialLotInput): 
 /** Manual override: mark a raw material lot depleted without registering a replacement yet. */
 export async function markRawMaterialLotDepleted(lotId: string): Promise<ActionResult> {
     try {
-        await requireManager();
+        await requirePermission("RECEIVE_INVENTORY");
         await prisma.rawMaterialLot.update({ where: { id: lotId }, data: { status: "DEPLETED" } });
         revalidatePath("/admin/inventory");
         return ok();
@@ -214,7 +214,7 @@ export interface ExpiringItem {
 /** Product lots and active raw-material lots expiring within `daysAhead`. */
 export async function getExpiringItems(daysAhead = 7): Promise<ExpiringItem[]> {
     try {
-        await requireManager();
+        await requirePermission("VIEW_DASHBOARD");
         const horizon = new Date();
         horizon.setDate(horizon.getDate() + daysAhead);
 

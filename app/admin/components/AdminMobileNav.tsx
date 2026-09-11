@@ -4,16 +4,21 @@ import { usePathname } from "next/navigation";
 import { Package, Receipt, Users, Settings, LineChart } from "lucide-react";
 
 const NAV_ITEMS = [
-    { name: "Resumen", href: "/admin", icon: LineChart, adminOnly: false },
-    { name: "Inventario", href: "/admin/inventory", icon: Package, adminOnly: false },
-    { name: "Ventas", href: "/admin/sales", icon: Receipt, adminOnly: false },
-    { name: "Personal", href: "/admin/users", icon: Users, adminOnly: true },
-    { name: "Ajustes", href: "/admin/settings", icon: Settings, adminOnly: true },
+    { name: "Resumen", href: "/admin", icon: LineChart },
+    { name: "Inventario", href: "/admin/inventory", icon: Package },
+    { name: "Ventas", href: "/admin/sales", icon: Receipt },
+    { name: "Personal", href: "/admin/users", icon: Users },
+    { name: "Ajustes", href: "/admin/settings", icon: Settings },
 ];
 
-export default function AdminMobileNav({ role }: { role: "ADMIN" | "SUPERVISOR" }) {
+interface AdminMobileNavProps {
+    role: "ADMIN" | "SUPERVISOR" | "CASHIER";
+    visiblePaths: string[];
+}
+
+export default function AdminMobileNav({ visiblePaths }: AdminMobileNavProps) {
     const pathname = usePathname();
-    const items = NAV_ITEMS.filter((item) => !item.adminOnly || role === "ADMIN");
+    const items = NAV_ITEMS.filter((item) => visiblePaths.includes(item.href));
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg pb-safe flex justify-around items-center h-16 px-2">

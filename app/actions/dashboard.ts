@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "../../lib/prisma";
-import { requireManager } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { startOfBusinessDay, endOfBusinessDay, businessHour, BUSINESS_TZ } from "@/app/lib/time";
 
 export interface HourlySale {
@@ -46,7 +46,7 @@ export interface DashboardData {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-    await requireManager();
+    await requirePermission("VIEW_DASHBOARD");
     const now = new Date();
     const startOfDay = startOfBusinessDay(now);
     const endOfDay = endOfBusinessDay(now);

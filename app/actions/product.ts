@@ -1,7 +1,7 @@
 "use server";
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireSession, requireManager } from "@/lib/auth";
+import { requireSession, requirePermission } from "@/lib/auth";
 import { toUserMessage, UserError } from "@/lib/result";
 
 export async function getProducts(categoryId?: string, search?: string, opts: { includeInactive?: boolean } = {}) {
@@ -76,7 +76,7 @@ function parseProductForm(formData: FormData) {
 
 export async function createProduct(formData: FormData) {
     try {
-        await requireManager();
+        await requirePermission("MANAGE_CATALOG");
         const parsed = parseProductForm(formData);
         if ("error" in parsed) return { success: false, error: parsed.error };
         await prisma.product.create({ data: parsed.data });
@@ -92,7 +92,7 @@ export async function createProduct(formData: FormData) {
 
 export async function updateProduct(id: string, formData: FormData) {
     try {
-        const manager = await requireManager();
+        const manager = await requirePermission("MANAGE_CATALOG");
         const parsed = parseProductForm(formData);
         if ("error" in parsed) return { success: false, error: parsed.error };
         await prisma.$transaction(async (tx) => {
@@ -117,7 +117,7 @@ export async function updateProduct(id: string, formData: FormData) {
 
 export async function deleteProduct(id: string) {
     try {
-        await requireManager();
+        await requirePermission("MANAGE_CATALOG");
         const salesCount = await prisma.saleDetail.count({ where: { productId: id } });
         if (salesCount > 0) {
             // Keep history intact: deactivate instead of deleting.
@@ -160,7 +160,7 @@ export type MovementType = "PURCHASE" | "ADJUSTMENT" | "WASTE";
  */
 export async function adjustStock(input: { productId: string; type: MovementType; quantity: number; reason?: string; unitCost?: number }) {
     try {
-        const manager = await requireManager();
+        const manager = await requirePermission("RECEIVE_INVENTORY");
         const qty = Number(input.quantity);
         if (!Number.isFinite(qty) || qty === 0) return { success: false, error: "La cantidad debe ser distinta de cero." };
         if (input.type === "PURCHASE" && qty < 0) return { success: false, error: "Una entrada no puede ser negativa." };
@@ -219,7 +219,7 @@ export interface MovementRow {
 /** Latest stock movements, optionally for one product. */
 export async function getStockMovements(opts: { productId?: string; take?: number } = {}): Promise<MovementRow[]> {
     try {
-        await requireManager();
+        await requirePermission("RECEIVE_INVENTORY");
         const rows = await prisma.stockMovement.findMany({
             where: opts.productId ? { productId: opts.productId } : {},
             orderBy: { createdAt: "desc" },

@@ -23,7 +23,17 @@ export type ProductColumn = {
   trackingMode?: string;
 };
 
-export const columns: ColumnDef<ProductColumn>[] = [
+/** `columns` is the ADMIN/SUPERVISOR shape (both always have full catalog
+ * access). Pages that can be reached by a permission-limited CASHIER build
+ * their own with `buildColumns(perms)` instead — see admin/inventory/page.tsx. */
+export function buildColumns(perms: { canManageCatalog: boolean; canReceiveInventory: boolean }): ColumnDef<ProductColumn>[] {
+  return [...BASE_COLUMNS, {
+    id: "actions",
+    cell: ({ row }) => <RowActions product={row.original} {...perms} />,
+  }];
+}
+
+const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
   {
     accessorKey: "code",
     header: "Código",
@@ -111,8 +121,7 @@ export const columns: ColumnDef<ProductColumn>[] = [
       return <div className="text-right text-muted-foreground">{isNaN(amount) ? 0 : amount}%</div>
     },
   },
-  {
-    id: "actions",
-    cell: ({ row }) => <RowActions product={row.original} />,
-  },
-]
+];
+
+/** Static export for ADMIN/SUPERVISOR pages (always full access). */
+export const columns: ColumnDef<ProductColumn>[] = buildColumns({ canManageCatalog: true, canReceiveInventory: true });

@@ -29,11 +29,16 @@ export default withAuth(
             return NextResponse.redirect(new URL("/login", req.url));
         }
 
-        // RBAC: /admin is for ADMIN and SUPERVISOR; CASHIER stays in /pos.
-        // Same staleness caveat as above; the authoritative check is
-        // admin/layout.tsx's fresh session read (and each ADMIN-only
-        // sub-page, e.g. users/settings/import, does its own further check).
-        if (req.nextUrl.pathname.startsWith("/admin") && token?.role === "CASHIER") {
+        // RBAC: /admin is for ADMIN and SUPERVISOR; CASHIER stays in /pos —
+        // EXCEPT /admin/inventory, which a CASHIER can be granted access to
+        // via the configurable RECEIVE_INVENTORY/MANAGE_CATALOG permissions
+        // (Ajustes → Roles y Permisos). This proxy has no cheap way to check
+        // Role.permissions (it only ever decodes the JWT, no DB access — see
+        // the file-level comment), so it just lets CASHIER through to that
+        // one path; admin/layout.tsx's fresh, DB-backed check is what
+        // actually decides whether they belong there.
+        const isInventory = req.nextUrl.pathname.startsWith("/admin/inventory");
+        if (req.nextUrl.pathname.startsWith("/admin") && token?.role === "CASHIER" && !isInventory) {
             return NextResponse.redirect(new URL("/pos", req.url));
         }
 

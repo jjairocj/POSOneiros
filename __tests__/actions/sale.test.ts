@@ -16,6 +16,7 @@ const ROLE_RANK: Record<string, number> = { CASHIER: 0, SUPERVISOR: 1, ADMIN: 2 
 vi.mock('../../lib/auth', () => ({
     requireSession: (...a: any[]) => mockRequireSession(...a),
     requireManager: () => mockRequireSession('SUPERVISOR'),
+    requirePermission: () => mockRequireSession('SUPERVISOR'),
     roleAtLeast: (role: string, min: string) => ROLE_RANK[role] >= ROLE_RANK[min],
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));

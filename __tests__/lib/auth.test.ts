@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGetServerSession = vi.fn();
+const mockRoleFindUnique = vi.fn();
 vi.mock('next-auth/next', () => ({ getServerSession: (...a: unknown[]) => mockGetServerSession(...a) }));
 vi.mock('@/app/api/auth/[...nextauth]/route', () => ({ authOptions: {} }));
+vi.mock('@/lib/prisma', () => ({ default: { role: { findUnique: (...a: unknown[]) => mockRoleFindUnique(...a) } } }));
 
-import { requireSession, requireAdmin, requireManager, roleAtLeast, AuthError } from '../../lib/auth';
+import { requireSession, requireAdmin, requireManager, requirePermission, roleAtLeast, AuthError } from '../../lib/auth';
 
 const session = (role: string) => ({ user: { id: 'u1', name: 'Ana', email: 'a@x.com', role } });
 
@@ -70,5 +72,31 @@ describe('requireAdmin / requireManager', () => {
 
         mockGetServerSession.mockResolvedValue(session('CASHIER'));
         await expect(requireManager()).rejects.toThrow(/permisos/);
+    });
+});
+
+describe('requirePermission', () => {
+    it('ADMIN always passes, without consulting Role.permissions', async () => {
+        mockGetServerSession.mockResolvedValue(session('ADMIN'));
+        await expect(requirePermission('MANAGE_CATALOG')).resolves.toMatchObject({ role: 'ADMIN' });
+        expect(mockRoleFindUnique).not.toHaveBeenCalled();
+    });
+
+    it('passes when the role has the permission in Role.permissions', async () => {
+        mockGetServerSession.mockResolvedValue(session('CASHIER'));
+        mockRoleFindUnique.mockResolvedValue({ permissions: ['RECEIVE_INVENTORY'] });
+        await expect(requirePermission('RECEIVE_INVENTORY')).resolves.toMatchObject({ role: 'CASHIER' });
+    });
+
+    it('blocks when the role lacks the permission', async () => {
+        mockGetServerSession.mockResolvedValue(session('CASHIER'));
+        mockRoleFindUnique.mockResolvedValue({ permissions: [] });
+        await expect(requirePermission('VOID_SALE')).rejects.toThrow(/permisos/);
+    });
+
+    it('blocks when the role has no permissions row at all', async () => {
+        mockGetServerSession.mockResolvedValue(session('SUPERVISOR'));
+        mockRoleFindUnique.mockResolvedValue(null);
+        await expect(requirePermission('VIEW_REPORTS')).rejects.toThrow(/permisos/);
     });
 });

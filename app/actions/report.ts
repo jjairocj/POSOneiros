@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { differenceInDays } from "date-fns";
 import { startOfBusinessDay as startOfDay, endOfBusinessDay as endOfDay, businessDayKey, businessDayLabel } from "@/app/lib/time";
-import { requireManager } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { toUserMessage } from "@/lib/result";
 
 interface AnalyticsFilters {
@@ -14,7 +14,7 @@ interface AnalyticsFilters {
 }
 
 export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
-    await requireManager();
+    await requirePermission("VIEW_REPORTS");
     const { startDate, endDate, shiftId } = filters;
 
     // Date range for query
@@ -159,7 +159,7 @@ export async function getSalesAnalytics(filters: AnalyticsFilters = {}) {
 
 // History List for the DataTable
 export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
-    await requireManager();
+    await requirePermission("VIEW_REPORTS");
     const { startDate, endDate, shiftId } = filters;
 
     const where: Prisma.SaleWhereInput = {};
@@ -207,7 +207,7 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
 
 export async function getSaleForPrint(saleId: string) {
     try {
-        await requireManager();
+        await requirePermission("VIEW_REPORTS");
         const sale = await prisma.sale.findUnique({
             where: { id: saleId },
             include: {

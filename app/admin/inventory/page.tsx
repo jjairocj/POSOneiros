@@ -2,10 +2,11 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getEffectivePermissions, hasPermission } from '@/lib/auth';
 import { getProducts, getStockMovements } from '@/app/actions/product';
 import { getCategories } from '@/app/actions/category';
 import { getRawMaterials } from '@/app/actions/lots';
-import { columns } from './components/columns';
+import { buildColumns } from './components/columns';
 import { categoryColumns } from './components/category-columns';
 import { DataTable } from './components/data-table';
 import { PackageOpen, FolderTree, FileSpreadsheet, History, FlaskConical } from 'lucide-react';
@@ -23,10 +24,15 @@ export const metadata: Metadata = {
 export default async function InventoryPage() {
     const session = await getServerSession(authOptions);
     const isAdmin = session?.user?.role === "ADMIN";
+    const permissions = await getEffectivePermissions();
+    const canManageCatalog = hasPermission(permissions, "MANAGE_CATALOG");
+    const canReceiveInventory = hasPermission(permissions, "RECEIVE_INVENTORY");
+
     const products = await getProducts(undefined, undefined, { includeInactive: true });
-    const categories = await getCategories();
-    const movements = await getStockMovements({ take: 300 });
-    const rawMaterials = await getRawMaterials();
+    const categories = canManageCatalog ? await getCategories() : [];
+    const movements = canReceiveInventory ? await getStockMovements({ take: 300 }) : [];
+    const rawMaterials = canReceiveInventory ? await getRawMaterials() : [];
+    const defaultTab = canManageCatalog ? "products" : canReceiveInventory ? "movements" : "products";
 
     return (
         <div className="space-y-6">
@@ -51,45 +57,61 @@ export default async function InventoryPage() {
                 )}
             </header>
 
-            <Tabs defaultValue="products" className="space-y-6">
+            <Tabs defaultValue={defaultTab} className="space-y-6">
                 <TabsList className="bg-muted/50 p-1 rounded-2xl">
                     <TabsTrigger value="products" className="rounded-xl px-6 font-bold flex items-center gap-2">
                         <PackageOpen className="w-4 h-4" /> Productos
                     </TabsTrigger>
-                    <TabsTrigger value="categories" className="rounded-xl px-6 font-bold flex items-center gap-2">
-                        <FolderTree className="w-4 h-4" /> Categorías y Orden
-                    </TabsTrigger>
-                    <TabsTrigger value="movements" className="rounded-xl px-6 font-bold flex items-center gap-2">
-                        <History className="w-4 h-4" /> Movimientos
-                    </TabsTrigger>
-                    <TabsTrigger value="insumos" className="rounded-xl px-6 font-bold flex items-center gap-2">
-                        <FlaskConical className="w-4 h-4" /> Insumos
-                    </TabsTrigger>
+                    {canManageCatalog && (
+                        <TabsTrigger value="categories" className="rounded-xl px-6 font-bold flex items-center gap-2">
+                            <FolderTree className="w-4 h-4" /> Categorías y Orden
+                        </TabsTrigger>
+                    )}
+                    {canReceiveInventory && (
+                        <>
+                            <TabsTrigger value="movements" className="rounded-xl px-6 font-bold flex items-center gap-2">
+                                <History className="w-4 h-4" /> Movimientos
+                            </TabsTrigger>
+                            <TabsTrigger value="insumos" className="rounded-xl px-6 font-bold flex items-center gap-2">
+                                <FlaskConical className="w-4 h-4" /> Insumos
+                            </TabsTrigger>
+                        </>
+                    )}
                 </TabsList>
 
-                <TabsContent value="movements" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
-                    <MovementsTable rows={movements} />
-                </TabsContent>
+                {canReceiveInventory && (
+                    <TabsContent value="movements" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
+                        <MovementsTable rows={movements} />
+                    </TabsContent>
+                )}
 
                 <TabsContent value="products" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none space-y-4">
-                    <div className="flex justify-end">
-                        <ProductForm />
-                    </div>
-                    <DataTable columns={columns} data={products} />
+                    {/* Cashier with only RECEIVE_INVENTORY sees the catalog read-only —
+                        no "new product" button, and RowActions hides edit/delete itself. */}
+                    {canManageCatalog && (
+                        <div className="flex justify-end">
+                            <ProductForm />
+                        </div>
+                    )}
+                    <DataTable columns={buildColumns({ canManageCatalog, canReceiveInventory })} data={products} />
                 </TabsContent>
 
-                <TabsContent value="categories" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none space-y-4">
-                    <div className="flex justify-end">
-                        <CategoryForm />
-                    </div>
-                    <div className="bg-transparent border-none p-0 shadow-none">
-                        <CategoryDragList initialCategories={categories} />
-                    </div>
-                </TabsContent>
+                {canManageCatalog && (
+                    <TabsContent value="categories" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none space-y-4">
+                        <div className="flex justify-end">
+                            <CategoryForm />
+                        </div>
+                        <div className="bg-transparent border-none p-0 shadow-none">
+                            <CategoryDragList initialCategories={categories} />
+                        </div>
+                    </TabsContent>
+                )}
 
-                <TabsContent value="insumos" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
-                    <RawMaterialsTable materials={rawMaterials} />
-                </TabsContent>
+                {canReceiveInventory && (
+                    <TabsContent value="insumos" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
+                        <RawMaterialsTable materials={rawMaterials} />
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     );
