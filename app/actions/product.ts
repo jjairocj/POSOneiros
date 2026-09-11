@@ -2,7 +2,7 @@
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireSession, requireManager } from "@/lib/auth";
-import { toUserMessage } from "@/lib/result";
+import { toUserMessage, UserError } from "@/lib/result";
 
 export async function getProducts(categoryId?: string, search?: string, opts: { includeInactive?: boolean } = {}) {
     try {
@@ -69,7 +69,9 @@ function parseProductForm(formData: FormData) {
     const isActive = formData.get("isActive") === null ? true : formData.get("isActive") === "true";
     const rawCategory = formData.get("categoryId")?.toString().trim();
     const categoryId = rawCategory && rawCategory !== "none" ? rawCategory : null;
-    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive, categoryId } } as const;
+    const rawTracking = formData.get("trackingMode")?.toString().trim();
+    const trackingMode = ["SIMPLE", "LOT", "NONE"].includes(rawTracking ?? "") ? rawTracking! : "SIMPLE";
+    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive, categoryId, trackingMode } } as const;
 }
 
 export async function createProduct(formData: FormData) {
@@ -169,6 +171,12 @@ export async function adjustStock(input: { productId: string; type: MovementType
         const signed = input.type === "WASTE" ? -Math.abs(qty) : qty;
 
         await prisma.$transaction(async (tx) => {
+            if (input.type === "PURCHASE") {
+                const product = await tx.product.findUnique({ where: { id: input.productId }, select: { trackingMode: true } });
+                if (product?.trackingMode === "LOT") {
+                    throw new UserError('Este producto usa seguimiento por lote: registra la entrada con "Recibir lote".');
+                }
+            }
             const data: { stock: { increment: number }; cost?: number } = { stock: { increment: signed } };
             if (input.type === "PURCHASE" && input.unitCost !== undefined && Number.isFinite(input.unitCost) && input.unitCost >= 0) {
                 data.cost = input.unitCost;
