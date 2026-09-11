@@ -16,6 +16,7 @@ const mockSaleDetailCount = vi.fn();
 const mockTransaction = vi.fn();
 const mockStockMovementFindMany = vi.fn();
 const mockUserFindMany = vi.fn();
+const mockFamilyUpsert = vi.fn();
 
 vi.mock('../../lib/prisma', () => ({
     default: {
@@ -25,6 +26,7 @@ vi.mock('../../lib/prisma', () => ({
             update: (...a: any[]) => mockUpdate(...a),
             delete: (...a: any[]) => mockDelete(...a),
         },
+        productFamily: { upsert: (...a: any[]) => mockFamilyUpsert(...a) },
         saleDetail: { count: (...a: any[]) => mockSaleDetailCount(...a) },
         stockMovement: { findMany: (...a: any[]) => mockStockMovementFindMany(...a) },
         user: { findMany: (...a: any[]) => mockUserFindMany(...a) },
@@ -197,6 +199,23 @@ describe('createProduct', () => {
         const res = await createProduct(productForm({ name: 'Café', code: '001', price: '100' }));
         expect(res.success).toBe(false);
         expect(res.error).toMatch(/Ya existe un producto con ese código/);
+    });
+
+    it('leaves familyId null when no familyName was submitted', async () => {
+        mockCreate.mockResolvedValue(makeProduct());
+        await createProduct(productForm({ name: 'Buldak Carbonara', code: '002', price: '5000' }));
+        expect(mockFamilyUpsert).not.toHaveBeenCalled();
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ familyId: null }) }));
+    });
+
+    it('upserts the family by name and uses its id, reusing an existing family instead of duplicating it', async () => {
+        mockFamilyUpsert.mockResolvedValue({ id: 'fam-buldak', name: 'Buldak' });
+        mockCreate.mockResolvedValue(makeProduct());
+        await createProduct(productForm({ name: 'Buldak Carbonara', code: '002', price: '5000', familyName: 'Buldak' }));
+        expect(mockFamilyUpsert).toHaveBeenCalledWith({
+            where: { name: 'Buldak' }, update: {}, create: { name: 'Buldak' },
+        });
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ familyId: 'fam-buldak' }) }));
     });
 });
 

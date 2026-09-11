@@ -24,7 +24,8 @@ export async function getProducts(categoryId?: string, search?: string, opts: { 
                 ]
             },
             include: {
-                category: true
+                category: true,
+                family: true,
             },
             orderBy: { name: 'asc' }
         });
@@ -38,7 +39,12 @@ export async function getProducts(categoryId?: string, search?: string, opts: { 
                 ...p.category,
                 createdAt: p.category.createdAt.toISOString(),
                 updatedAt: p.category.updatedAt.toISOString(),
-            } : null
+            } : null,
+            family: p.family ? {
+                ...p.family,
+                createdAt: p.family.createdAt.toISOString(),
+                updatedAt: p.family.updatedAt.toISOString(),
+            } : null,
         }));
     } catch (error) {
         console.error("Error fetching products:", error);
@@ -71,7 +77,21 @@ function parseProductForm(formData: FormData) {
     const categoryId = rawCategory && rawCategory !== "none" ? rawCategory : null;
     const rawTracking = formData.get("trackingMode")?.toString().trim();
     const trackingMode = ["SIMPLE", "LOT", "NONE"].includes(rawTracking ?? "") ? rawTracking! : "SIMPLE";
-    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive, categoryId, trackingMode } } as const;
+    const familyName = formData.get("familyName")?.toString().trim() || null;
+    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive, categoryId, trackingMode }, familyName } as const;
+}
+
+/** Resolves a free-typed family name to an id, creating the family if it's
+ * new — lets the product form offer a "type or pick" field with no separate
+ * family-management screen to maintain. */
+async function resolveFamilyId(familyName: string | null): Promise<string | null> {
+    if (!familyName) return null;
+    const family = await prisma.productFamily.upsert({
+        where: { name: familyName },
+        update: {},
+        create: { name: familyName },
+    });
+    return family.id;
 }
 
 export async function createProduct(formData: FormData) {
@@ -79,7 +99,8 @@ export async function createProduct(formData: FormData) {
         await requirePermission("MANAGE_CATALOG");
         const parsed = parseProductForm(formData);
         if ("error" in parsed) return { success: false, error: parsed.error };
-        await prisma.product.create({ data: parsed.data });
+        const familyId = await resolveFamilyId(parsed.familyName);
+        await prisma.product.create({ data: { ...parsed.data, familyId } });
 
         revalidatePath("/admin/inventory");
         revalidatePath("/pos");
@@ -95,9 +116,11 @@ export async function updateProduct(id: string, formData: FormData) {
         const manager = await requirePermission("MANAGE_CATALOG");
         const parsed = parseProductForm(formData);
         if ("error" in parsed) return { success: false, error: parsed.error };
+        const familyId = await resolveFamilyId(parsed.familyName);
+        const data = { ...parsed.data, familyId };
         await prisma.$transaction(async (tx) => {
             const before = await tx.product.findUnique({ where: { id }, select: { stock: true } });
-            const updated = await tx.product.update({ where: { id }, data: parsed.data });
+            const updated = await tx.product.update({ where: { id }, data });
             const delta = updated.stock - (before?.stock ?? 0);
             if (delta !== 0) {
                 await tx.stockMovement.create({
@@ -236,6 +259,17 @@ export async function getStockMovements(opts: { productId?: string; take?: numbe
         }));
     } catch (error) {
         console.error("Error fetching movements:", error);
+        return [];
+    }
+}
+
+/** Every product family, for the "type or pick" field on the product form
+ * and for promotion condition/effect pickers ("any Buldak flavor"). */
+export async function getProductFamilies(): Promise<{ id: string; name: string }[]> {
+    try {
+        return await prisma.productFamily.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+    } catch (error) {
+        console.error("Error fetching product families:", error);
         return [];
     }
 }

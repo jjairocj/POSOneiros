@@ -78,6 +78,16 @@ model Category {
   updatedAt DateTime  @updatedAt
 }
 
+/// A promotion-matching group across variants/flavors of the same line (e.g.
+/// "Buldak" covers every flavor as separate Products) — see Product.familyId.
+model ProductFamily {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
 model Product {
   id          String      @id @default(uuid())
   name        String
@@ -91,6 +101,12 @@ model Product {
   taxImpoConsumo Float    @default(0) // Percentage (e.g., 0, 8)
   categoryId  String?
   category    Category?   @relation(fields: [categoryId], references: [id])
+  // Lightweight grouping used ONLY by promotions ("any Buldak flavor"), kept
+  // separate from Category because Category drives how the POS browses the
+  // catalog (e.g. "Snacks") and mixing the two would force an awkward
+  // category per brand/line. Optional: most products aren't in any promo.
+  familyId    String?
+  family      ProductFamily? @relation(fields: [familyId], references: [id])
   imageUrl    String?     // Already existed
   isFavorite  Boolean     @default(false)
   isActive    Boolean     @default(true)

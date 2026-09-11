@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/product";
 import { getCategories } from "@/app/actions/category";
+import { getProductFamilies } from "@/app/actions/product";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,12 +32,15 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const [imageFailed, setImageFailed] = useState(false);
     const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
     const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "none");
+    const [families, setFamilies] = useState<{ id: string; name: string }[]>([]);
+    const [familyName, setFamilyName] = useState<string>(product?.family?.name ?? "");
     const [isActive, setIsActive] = useState<boolean>(product?.isActive ?? true);
     const [trackingMode, setTrackingMode] = useState<string>(product?.trackingMode ?? "SIMPLE");
 
     useEffect(() => {
         if (!open) return;
         getCategories().then((c) => setCategories(c.map(({ id, name }) => ({ id, name })))).catch(() => setCategories([]));
+        getProductFamilies().then(setFamilies).catch(() => setFamilies([]));
     }, [open]);
 
     // Costing Calculator State
@@ -139,6 +143,27 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     <input type="hidden" name="isActive" value={isActive ? "true" : "false"} />
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label htmlFor="familyName" className="text-sm font-semibold ml-1">
+                                Familia <span className="font-normal text-muted-foreground">(opcional, para promociones)</span>
+                            </label>
+                            <Input
+                                id="familyName"
+                                name="familyName"
+                                list="family-options"
+                                value={familyName}
+                                onChange={(e) => setFamilyName(e.target.value)}
+                                className="rounded-xl h-11 bg-muted/50"
+                                placeholder="Ej: Buldak — agrupa sus sabores para las promos"
+                            />
+                            <datalist id="family-options">
+                                {families.map((f) => <option key={f.id} value={f.name} />)}
+                            </datalist>
+                            <p className="text-xs text-muted-foreground ml-1">
+                                Escribe un nombre nuevo o elige uno existente de la lista. Deja vacío si este producto no participa en ninguna promoción.
+                            </p>
                         </div>
 
                         <div className="space-y-1.5">

@@ -14,6 +14,7 @@ export type ProductColumn = {
   stock: number;
   category?: { name: string } | null;
   categoryId?: string | null;
+  family?: { name: string } | null;
   isActive?: boolean;
   taxIva?: number | null;
   taxIca?: number | null;
