@@ -30,16 +30,18 @@ export default function ShiftHeader({ activeShift, userName, userRole }: ShiftHe
                 </h1>
 
                 {!activeShift ? (
-                    <span className="flex items-center px-2.5 py-1 rounded-full bg-destructive/20 border border-destructive/30 text-destructive text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                    <span className="flex items-center px-2.5 py-1 rounded-full bg-destructive/25 border border-destructive/40 text-destructive text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
                         Sin turno activo
                     </span>
                 ) : (
                     <>
-                        <span className="flex items-center px-2.5 py-1 rounded-full bg-primary/15 border border-primary/25 text-primary text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                        {/* Solid-ish backgrounds (not just a border on the glass header) so these
+                            stay readable no matter what scrolls behind the header. */}
+                        <span className="flex items-center px-2.5 py-1 rounded-full bg-primary/20 border border-primary/40 text-primary text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
                             <span className="hidden sm:inline">Turno:&nbsp;</span>
                             {activeShift.register?.name || "Caja Fija"}
                         </span>
-                        <span className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                        <span className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-xs font-bold whitespace-nowrap">
                             <ShoppingBag className="w-3 h-3" />
                             {(activeShift._count?.sales ?? 0)}{" "}
                             {(activeShift._count?.sales ?? 0) === 1 ? "venta" : "ventas"}
