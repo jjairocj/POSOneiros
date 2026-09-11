@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset-blank": "tsx prisma/reset-blank.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
