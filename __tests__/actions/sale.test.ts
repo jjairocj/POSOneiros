@@ -49,6 +49,7 @@ function makeTx(overrides: Partial<Record<string, any>> = {}) {
             findMany: vi.fn().mockResolvedValue([]),
         },
         productLot: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn().mockResolvedValue({}) },
+        promotion: { findMany: vi.fn().mockResolvedValue([]) },
         ...overrides,
     };
     mockTransaction.mockImplementation(async (fn: any) => fn(tx));
@@ -188,6 +189,59 @@ describe('processSale — totals and payments', () => {
         const tx = makeTx();
         await processSale('s1', ITEMS, PAYMENTS, { subAccountLabel: 'Persona 1' });
         expect(tx.subAccount.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ label: 'Persona 1', total: 6000 })] });
+    });
+});
+
+describe('processSale — promotions (server recompute, never trusted from the client)', () => {
+    const AGUA = { id: 'p2', name: 'Agua', code: 'C2', price: 2000, stock: 10, isActive: true, taxIva: 0, taxIca: 0, taxImpoConsumo: 0 };
+    const FREE_AGUA_PROMO = {
+        id: 'promo1', name: 'Agua gratis', isActive: true, priority: 0, startDate: null, endDate: null,
+        conditions: [{ productId: 'p1', familyId: null, minQuantity: 2 }],
+        effect: { type: 'FREE_ITEM', targetType: 'PRODUCT', targetProductId: 'p2', targetFamilyId: null, value: null, targetQuantity: 1 },
+    };
+
+    it('applies a matching promotion and snapshots its id/name on the sale', async () => {
+        const tx = makeTx({
+            product: { findMany: vi.fn().mockResolvedValue([DB_PRODUCT, AGUA]), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+            promotion: { findMany: vi.fn().mockResolvedValue([FREE_AGUA_PROMO]) },
+        });
+        const items = [{ id: 'p1', quantity: 2 }, { id: 'p2', quantity: 1 }];
+        const res = await processSale('s1', items, [{ method: 'CASH', amount: 6000 }]); // 2*3000 + 0 (free agua)
+        expect(res.ok).toBe(true);
+        const data = tx.sale.create.mock.calls[0][0].data;
+        expect(data.total).toBe(6000);
+        expect(data.promotionId).toBe('promo1');
+        expect(data.promotionName).toBe('Agua gratis');
+        const aguaDetail = data.details.create.find((d: any) => d.productCode === 'C2');
+        expect(aguaDetail).toMatchObject({ discount: 2000, subtotal: 0 });
+    });
+
+    it('does not apply when the condition quantity is not met', async () => {
+        const tx = makeTx({
+            product: { findMany: vi.fn().mockResolvedValue([DB_PRODUCT, AGUA]), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+            promotion: { findMany: vi.fn().mockResolvedValue([FREE_AGUA_PROMO]) },
+        });
+        const items = [{ id: 'p1', quantity: 1 }, { id: 'p2', quantity: 1 }]; // needs 2 of p1, only 1 here
+        const res = await processSale('s1', items, [{ method: 'CASH', amount: 5000 }]); // full price, no discount
+        expect(res.ok).toBe(true);
+        const data = tx.sale.create.mock.calls[0][0].data;
+        expect(data.promotionId).toBeNull();
+        expect(data.total).toBe(5000);
+    });
+
+    it('overrides a manual order-level discount when a promotion also applies — the two are mutually exclusive', async () => {
+        const tx = makeTx({
+            product: { findMany: vi.fn().mockResolvedValue([DB_PRODUCT, AGUA]), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+            promotion: { findMany: vi.fn().mockResolvedValue([FREE_AGUA_PROMO]) },
+        });
+        const items = [{ id: 'p1', quantity: 2 }, { id: 'p2', quantity: 1 }];
+        // Client also sends a manual $500 discount — the server must ignore it
+        // once the promotion applies, not add it on top.
+        const res = await processSale('s1', items, [{ method: 'CASH', amount: 6000 }], { discount: { type: 'amount', value: 500 } });
+        expect(res.ok).toBe(true);
+        const data = tx.sale.create.mock.calls[0][0].data;
+        expect(data.total).toBe(6000); // not 5500
+        expect(data.discount).toBe(2000); // only the promo's discount, not +500
     });
 });
 

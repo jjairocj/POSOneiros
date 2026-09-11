@@ -26,6 +26,7 @@ export interface ReceiptSale {
     createdAt: string | Date;
     total: number;
     discount?: number;
+    promotionName?: string | null;
     status?: string;
     shiftId: string;
     shift?: { register?: { name: string; prefix?: string | null } | null; user?: { name: string } | null } | null;
@@ -129,6 +130,9 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
             </div>
 
             <div className="border-t border-black pt-1 mb-2 flex flex-col items-stretch">
+                {sale.promotionName && (
+                    <p className="mb-1 font-bold">★ Promo aplicada: {sale.promotionName}</p>
+                )}
                 {(sale.discount ?? 0) > 0 && (
                     <div className="flex justify-between mb-1">
                         <span>Descuento:</span><span>-{money(sale.discount ?? 0)}</span>

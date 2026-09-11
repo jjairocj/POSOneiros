@@ -15,6 +15,7 @@ import { saveSettings, type SettingsData } from "@/app/actions/settings";
 import { Building2, Settings2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./SettingsForm.module.css";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SettingsFormProps {
   initialData: SettingsData;
@@ -42,6 +43,20 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
+      <Tabs defaultValue="business" className="space-y-6">
+        <TabsList className="bg-muted/50 p-1 rounded-2xl">
+          <TabsTrigger value="business" className="rounded-xl px-6 font-bold flex items-center gap-2">
+            <Building2 className="w-4 h-4" /> Negocio
+          </TabsTrigger>
+          <TabsTrigger value="operational" className="rounded-xl px-6 font-bold flex items-center gap-2">
+            <Settings2 className="w-4 h-4" /> Operación
+          </TabsTrigger>
+          <TabsTrigger value="receipt" className="rounded-xl px-6 font-bold flex items-center gap-2">
+            <Receipt className="w-4 h-4" /> Recibo / Ticket
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="business" className="m-0 border-none p-0 outline-none">
       {/* Sección 1 — Información del negocio */}
       <section className={styles.card}>
         <div className={styles.cardHeader}>
@@ -98,7 +113,9 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
           </div>
         </div>
       </section>
+        </TabsContent>
 
+        <TabsContent value="operational" className="m-0 border-none p-0 outline-none">
       {/* Sección 2 — Configuración operacional */}
       <section className={styles.card}>
         <div className={styles.cardHeader}>
@@ -160,7 +177,9 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
           />
         </div>
       </section>
+        </TabsContent>
 
+        <TabsContent value="receipt" className="m-0 border-none p-0 outline-none">
       {/* Sección 3 — Recibo / Ticket */}
       <section className={styles.card}>
         <div className={styles.cardHeader}>
@@ -251,6 +270,8 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
           </p>
         </div>
       </section>
+        </TabsContent>
+      </Tabs>
 
       {/* Submit */}
       <div className={styles.submitBar}>

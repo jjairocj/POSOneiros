@@ -6,6 +6,7 @@ import { requireSession, requirePermission, roleAtLeast } from "@/lib/auth";
 import { fail, ok, toUserMessage, UserError, type ActionResult } from "@/lib/result";
 import { breakdownLines } from "@/app/lib/tax";
 import type { OrderDiscount } from "@/app/types/cart";
+import { evaluatePromotions, type PromotionRule, type PromotionEffectType, type PromotionTargetType } from "@/app/lib/promotions";
 
 export interface SaleLineInput {
     id: string;
@@ -77,7 +78,7 @@ export async function processSale(
             }
             if (line.discount !== undefined && (!isMoney(line.discount))) return fail("Descuento de línea inválido.");
         }
-        const orderDiscount = options.discount ?? null;
+        let orderDiscount = options.discount ?? null;
         if (orderDiscount) {
             if (!["percent", "amount"].includes(orderDiscount.type) || !isMoney(orderDiscount.value)) return fail("Descuento inválido.");
             if (orderDiscount.type === "percent" && orderDiscount.value > 100) return fail("El descuento no puede superar el 100%.");
@@ -106,6 +107,47 @@ export async function processSale(
             const productIds = Array.from(qtyByProduct.keys());
             const dbProducts = await tx.product.findMany({ where: { id: { in: productIds } } });
             if (dbProducts.length !== productIds.length) throw new UserError("Algunos productos ya no existen. Recarga el catálogo.");
+
+            // Promotions are the server's own recompute, never trusted from the
+            // client — same reasoning as prices/taxes below. At most one applies
+            // (they don't stack, see app/lib/promotions.ts), and when one does it
+            // overrides any manual order-level discount the client sent: the two
+            // are mutually exclusive by design, not just a UI-level restriction.
+            const activePromotions = await tx.promotion.findMany({
+                where: { isActive: true },
+                include: { conditions: true, effect: true },
+                orderBy: [{ priority: "asc" }],
+            });
+            const promoRules: PromotionRule[] = activePromotions
+                .filter((r) => r.effect)
+                .map((r) => ({
+                    id: r.id, name: r.name, isActive: r.isActive, priority: r.priority,
+                    startDate: r.startDate, endDate: r.endDate,
+                    conditions: r.conditions.map((c) => ({ productId: c.productId, familyId: c.familyId, minQuantity: c.minQuantity })),
+                    effect: {
+                        type: r.effect!.type as PromotionEffectType,
+                        targetType: r.effect!.targetType as PromotionTargetType,
+                        targetProductId: r.effect!.targetProductId, targetFamilyId: r.effect!.targetFamilyId,
+                        value: r.effect!.value, targetQuantity: r.effect!.targetQuantity,
+                    },
+                }));
+            const familyByProductId = Object.fromEntries(dbProducts.map((p) => [p.id, p.familyId]));
+            const promoEvaluation = evaluatePromotions(
+                dbProducts.map((p) => ({ id: p.id, quantity: qtyByProduct.get(p.id)!, price: p.price })),
+                familyByProductId,
+                promoRules
+            );
+            if (promoEvaluation.appliedPromotion) orderDiscount = null;
+            // Overwrite, not add: the client may have already baked this same
+            // promo discount into these lines (so its own live preview and
+            // split-bill math line up with what's about to be charged) — the
+            // server recomputing and adding on top would double-discount.
+            // Whatever a manual per-line discount said for these specific
+            // products is superseded by the promo, which is the point of it
+            // being mutually exclusive with manual discounts in the first place.
+            for (const [productId, extra] of Object.entries(promoEvaluation.discountByProduct)) {
+                discByProduct.set(productId, extra);
+            }
 
             let finalTotal = 0;
             let totalDiscount = 0;
@@ -205,6 +247,8 @@ export async function processSale(
                     number,
                     total: finalTotal,
                     discount: totalDiscount,
+                    promotionId: promoEvaluation.appliedPromotion?.id ?? null,
+                    promotionName: promoEvaluation.appliedPromotion?.name ?? null,
                     details: { create: saleDetails },
                     payments: { create: payments.map((p) => ({ method: p.method, amount: round(p.amount), subAccountLabel: p.subAccountLabel ?? null })) },
                 },

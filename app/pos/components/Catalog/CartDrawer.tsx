@@ -1,14 +1,35 @@
 "use client";
-import { useState } from "react";
-import { Minus, Plus, ShoppingCart, ArrowLeft, Trash2, Users, Tag, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Minus, Plus, ShoppingCart, ArrowLeft, Trash2, Users, Tag, X, Sparkles } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCartStore, type CartItem } from "@/app/store/useCartStore";
 import { formatMoney } from "@/app/lib/money";
+import { calculateOrderTotals } from "@/app/lib/tax";
+import { evaluatePromotions, type PromotionRule } from "@/app/lib/promotions";
+import { getActivePromotionRules, getProductFamilyMap } from "@/app/actions/promotions";
 import ShiftOpeningModal from "../Shift/ShiftOpeningModal";
 import CheckoutModal from "../Checkout/CheckoutModal";
 import SplitBillModal from "../Checkout/SplitBillModal";
 import { useSubAccountStore } from "@/app/store/useSubAccountStore";
+
+/** Fetched once per POS session (promotions rarely change mid-shift) and
+ * re-evaluated live against the cart on every change — automatic, no button
+ * for the cashier to press. See app/lib/promotions.ts. */
+function usePromotionPreview(items: CartItem[]) {
+    const [rules, setRules] = useState<PromotionRule[]>([]);
+    const [familyByProductId, setFamilyByProductId] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        getActivePromotionRules().then(setRules).catch(() => setRules([]));
+        getProductFamilyMap().then(setFamilyByProductId).catch(() => setFamilyByProductId({}));
+    }, []);
+
+    return useMemo(
+        () => evaluatePromotions(items.map((i) => ({ id: i.id, quantity: i.quantity, price: i.price })), familyByProductId, rules),
+        [items, familyByProductId, rules]
+    );
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -126,10 +147,33 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
     const [isSplitOpen, setIsSplitOpen] = useState(false);
 
     const activeOrder = orders[activeOrderId];
+    const promoPreview = usePromotionPreview(activeOrder?.items ?? []);
+    const promoActive = !!promoPreview.appliedPromotion;
+
+    // A promotion that applies overrides the manual order-level discount —
+    // the two are mutually exclusive by design (see app/lib/promotions.ts and
+    // the same rule enforced server-side in processSale). Clear any stale
+    // manual discount the instant a promo starts applying, so what's on
+    // screen never drifts from what processSale will actually charge.
+    useEffect(() => {
+        if (promoActive && activeOrder?.orderDiscount) setOrderDiscount(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [promoActive]);
+
     if (!activeOrder) return null;
 
-    const { items, subtotal, discount, taxIva, taxIca, taxImpoConsumo, total, orderDiscount } = activeOrder;
+    const { items, orderDiscount } = activeOrder;
     const hasItems = items.length > 0;
+
+    // The promo's per-product discount is folded into each line the same way
+    // a manual per-line discount would be, then run through the exact same
+    // calculateOrderTotals() the server uses — so the number the cashier
+    // collects always matches what processSale will persist.
+    const displayItems = promoActive
+        ? items.map((i) => ({ ...i, discount: (i.discount ?? 0) + (promoPreview.discountByProduct[i.id] ?? 0) }))
+        : items;
+    const effectiveOrderDiscount = promoActive ? null : orderDiscount;
+    const { subtotal, discount, taxIva, taxIca, taxImpoConsumo, total } = calculateOrderTotals(displayItems, effectiveOrderDiscount);
 
     const applyOrderDiscount = () => {
         const v = Number(discountDraft);
@@ -191,11 +235,19 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                         <span>Subtotal</span>
                         <span className="text-foreground font-semibold">{formatMoney(subtotal)}</span>
                     </div>
-                    {/* Order discount */}
+                    {/* Promo banner — automatic, the cashier never activates it */}
+                    {promoActive && (
+                        <div className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-bold px-3 py-2 rounded-xl">
+                            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                            Promo aplicada: {promoPreview.appliedPromotion!.name}
+                        </div>
+                    )}
+                    {/* Order discount — disabled while a promo is active: the two
+                        are mutually exclusive, see usePromotionPreview above. */}
                     <div className="flex justify-between items-center">
                         <span className="flex items-center gap-2">
                             Descuento
-                            {hasItems && !discountOpen && (
+                            {hasItems && !discountOpen && !promoActive && (
                                 <button
                                     type="button"
                                     onClick={() => setDiscountOpen(true)}
@@ -204,7 +256,12 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                                     {orderDiscount ? (orderDiscount.type === "percent" ? `${orderDiscount.value}%` : "editar") : "aplicar"}
                                 </button>
                             )}
-                            {orderDiscount && !discountOpen && (
+                            {promoActive && (
+                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg border border-border text-muted-foreground" title="Ya hay una promoción aplicada a esta venta">
+                                    bloqueado por promo
+                                </span>
+                            )}
+                            {orderDiscount && !discountOpen && !promoActive && (
                                 <button type="button" aria-label="Quitar descuento" onClick={() => setOrderDiscount(null)} className="text-muted-foreground hover:text-destructive">
                                     <X className="w-3.5 h-3.5" />
                                 </button>
@@ -214,7 +271,7 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                             {discount > 0 ? `−${formatMoney(discount)}` : formatMoney(0)}
                         </span>
                     </div>
-                    {discountOpen && (
+                    {discountOpen && !promoActive && (
                         <div className="flex items-center gap-2 bg-muted/40 rounded-xl p-2 border border-border/50">
                             <div className="flex rounded-lg overflow-hidden border border-border text-xs font-bold">
                                 <button type="button" onClick={() => setDiscountType("percent")} className={`px-2.5 py-1 ${discountType === "percent" ? "bg-primary text-primary-foreground" : "bg-background"}`}>%</button>
@@ -256,7 +313,7 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                         type="button"
                         onClick={() => {
                         if (!activeShiftId) { setIsOpeningShift(true); return; }
-                        initSplit(items, orderDiscount);
+                        initSplit(displayItems, effectiveOrderDiscount);
                         setIsSplitOpen(true);
                     }}
                         className="w-full py-2.5 text-sm font-semibold rounded-2xl border border-border text-muted-foreground hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2 mb-3"
@@ -284,8 +341,8 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
             {isSplitOpen && activeShiftId && (
                 <SplitBillModal
                     activeShiftId={activeShiftId}
-                    items={items}
-                    orderDiscount={orderDiscount}
+                    items={displayItems}
+                    orderDiscount={effectiveOrderDiscount}
                     onClose={() => setIsSplitOpen(false)}
                     onSuccess={() => {
                         setIsSplitOpen(false);
@@ -298,8 +355,8 @@ export default function CartDrawer({ activeShiftId, onCheckoutSuccess }: CartDra
                 <CheckoutModal
                     activeShiftId={activeShiftId}
                     orderTotal={total}
-                    items={items}
-                    orderDiscount={orderDiscount}
+                    items={displayItems}
+                    orderDiscount={effectiveOrderDiscount}
                     onSuccess={() => {
                         setIsCheckoutOpen(false);
                         clearActiveOrder();
