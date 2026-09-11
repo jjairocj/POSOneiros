@@ -1,6 +1,12 @@
 "use client";
 import React from "react";
 import { useBusinessInfo } from "@/app/components/BusinessInfoProvider";
+import { moneyInWords } from "@/app/lib/numberToWords";
+
+/** Used as the customer's document number when a sale has none on file —
+ * the standard placeholder Colombian accounting practice uses for a final
+ * consumer who didn't provide identification. */
+const GENERIC_CONSUMER_ID = "222222222";
 
 interface ReceiptDetail {
     productName?: string;
@@ -23,6 +29,7 @@ export interface ReceiptSale {
     status?: string;
     shiftId: string;
     shift?: { register?: { name: string; prefix?: string | null } | null; user?: { name: string } | null } | null;
+    customer?: { fullName: string; documentId?: string | null; phone?: string | null; email?: string | null } | null;
     details: ReceiptDetail[];
     payments: { method: string; amount: number }[];
 }
@@ -73,12 +80,24 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
             </div>
 
             <div className="border-t border-b border-black border-dashed py-1 mb-2">
-                <p>#{receiptNumber(sale)}</p>
+                <p>Consec. #{receiptNumber(sale)}</p>
                 {sale.status === "CANCELLED" && <p className="font-bold">*** ANULADO ***</p>}
                 {subAccountLabel && <p>Cuenta: {subAccountLabel}</p>}
-                <p>{new Date(sale.createdAt).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p>
+                <p>Fecha de pago: {new Date(sale.createdAt).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p>
                 <p>Caja: {sale.shift?.register?.name ?? sale.shiftId.slice(0, 8)}</p>
                 {sale.shift?.user?.name && <p>Atendió: {sale.shift.user.name}</p>}
+            </div>
+
+            {/* Recibí de — identificación de quien entrega el dinero (recibo de
+                caja, no factura). Sin cliente asociado se usa el documento
+                genérico de consumidor final, no se deja en blanco. */}
+            <div className="border-b border-black border-dashed pb-1 mb-2">
+                <p className="font-bold">Recibí de:</p>
+                <p>{sale.customer?.fullName || "Consumidor final"}</p>
+                <p>C.C./NIT: {sale.customer?.documentId || GENERIC_CONSUMER_ID}</p>
+                {(sale.customer?.phone || sale.customer?.email) && (
+                    <p>Contacto: {[sale.customer?.phone, sale.customer?.email].filter(Boolean).join(" · ")}</p>
+                )}
             </div>
 
             <div className="mb-2">
@@ -113,6 +132,8 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
                         <div className="flex justify-between"><span>Cambio:</span><span>{money(paid - sale.total)}</span></div>
                     )}
                 </div>
+                <p className="mt-1">Concepto: Pago de la Venta No. {receiptNumber(sale)}</p>
+                <p className="italic">Son: {moneyInWords(sale.total)}</p>
             </div>
 
             {showTaxes && (
@@ -128,6 +149,12 @@ export default function Receipt({ sale, subAccountLabel }: { sale: ReceiptSale |
             <div className="text-center mt-2">
                 <p>{business?.receiptFooter || "¡Gracias por su compra!"}</p>
             </div>
+
+            {/* Required disclaimer: this is a recibo de caja (cash receipt), not a
+                DIAN sales invoice or documento equivalente — see docs/16. */}
+            <p className="text-center font-bold mt-2 pt-1 border-t border-black">
+                Este documento no es una factura de venta ni documento equivalente.
+            </p>
         </div>
     );
 }

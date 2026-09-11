@@ -216,6 +216,7 @@ export async function getSaleForPrint(saleId: string) {
                 },
                 payments: true,
                 shift: { include: { register: true } },
+                customer: true,
             }
         });
 

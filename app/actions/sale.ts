@@ -38,7 +38,7 @@ export interface ProcessSaleOptions {
 }
 
 export type SaleWithDetails = Prisma.SaleGetPayload<{
-    include: { details: { include: { product: true } }; payments: true; shift: { include: { register: true } } };
+    include: { details: { include: { product: true } }; payments: true; shift: { include: { register: true } }; customer: true };
 }>;
 
 const PAYMENT_METHODS = new Set(["CASH", "CARD", "TRANSFER"]);
@@ -185,6 +185,7 @@ export async function processSale(
                     details: { include: { product: true } },
                     payments: true,
                     shift: { include: { register: true } },
+                    customer: true,
                 },
             });
 
