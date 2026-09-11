@@ -28,6 +28,25 @@ Cambios concretos que sí valdría la pena evaluar, sin rehacer el sistema:
 
 No cambiaría la dirección general (glassmorphism + mobile-first sigue siendo coherente con el resto de la app) — solo ajustaría **dónde** se aplica el blur para que nunca compita con la legibilidad de un total de venta.
 
+## Implementado (2026-09-11, rama `design/liquid-glass-contrast`)
+
+Se investigó la [guía de glassmorphism de NN/g](https://www.nngroup.com/articles/glassmorphism/) y el backlash real que sufrió Apple con Liquid Glass en iOS 26 (contraste medido tan bajo como 1.5:1 en algunas superficies, muy por debajo del mínimo WCAG de 4.5:1, forzando a Apple a sacar un control "Tinted" para atenuarlo). Dos hallazgos de NN/g aplicados directamente:
+
+1. **El texto sobre un fondo translúcido puede caer sobre distintos colores** — no hay forma de garantizar contraste si lo que está detrás cambia. Su recomendación: reservar el vidrio para superficies simples, medir contraste con una herramienta (no a ojo), y respetar la preferencia del sistema de reducir transparencia.
+2. Verificado con la fórmula de contraste WCAG (relative luminance, no "a ojo"): los badges de estado del `ShiftHeader` ("Sin turno activo", "Turno: X", "N ventas") con los tonos y opacidades usados en la primera pasada de este trabajo **no llegaban a 4.5:1** en varios casos (ej. `text-emerald-600` sobre `bg-emerald-500/20` daba ~3.1:1). Es exactamente el patrón de mayor riesgo que señala NN/g: texto de marca sobre una tinta translúcida del mismo color.
+
+### Cambios aplicados
+
+- **`.glass-chrome`** (`app/globals.css`): clase reutilizable para toda superficie de vidrio de navegación (hoy solo el header del POS). Usa `color-mix()` sobre `--background` (así respeta el tema activo automáticamente) + `backdrop-filter: blur(20px) saturate(1.5)`. Bajo `@media (prefers-reduced-transparency: reduce)` — la media query CSS real, equivalente a "Reducir transparencia" de Apple/iOS — cae a un fondo 100% opaco sin blur. Esto es justo lo que le faltó a Apple por defecto y tuvo que agregar tras las quejas.
+- **Badges del `ShiftHeader`**: recalculados con la fórmula de contraste real (no shades "a ojo"). Los tres badges ahora usan una opacidad de fondo del 12% con texto en el tono 700 (claro) / 300 (oscuro) de su color — combinación que da entre 4.76:1 y 8.6:1 según el caso, con margen sobre el mínimo de 4.5:1. Los colores están hardcodeados a propósito (no los tokens semánticos `destructive`/`primary`) porque esos tokens están calibrados para uso sólido (botones), no para texto-sobre-tinta-translúcida — mezclarlos sin recalcular el contraste rompe la garantía.
+- El total del carrito y el botón de pago **no se tocaron** — ya viven en `bg-card` sólido (verificado en la primera pasada de este trabajo), que es justamente la recomendación de NN/g de "usar fondos simples cuando sea posible" para lo que más importa leer bien.
+
+### Cómo verificar manualmente
+
+- **Reducir transparencia**: macOS → Ajustes del Sistema → Accesibilidad → Pantalla → "Reducir transparencia". Con eso activo, el header del POS debe verse sólido, sin blur.
+- **Contraste**: cualquier inspector de accesibilidad del navegador (Chrome DevTools → Lighthouse / el ícono de contraste en el selector de color) sobre los tres badges del header, en claro y oscuro.
+
 ## Ver también
 - [[05-Componentes-POS]]
 - [[06-Componentes-Admin]]
+- [[13-Seguridad]]

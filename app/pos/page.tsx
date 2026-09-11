@@ -22,8 +22,9 @@ export default async function POSPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Sticky header — glass chrome: legible over whatever scrolls behind it (product photos),
-          never used over a critical number (those live on solid surfaces, see CartDrawer footer). */}
-      <header className="sticky top-0 z-20 flex items-center px-4 sm:px-6 py-3 bg-background/75 backdrop-blur-xl backdrop-saturate-150 border-b border-border/30 shadow-[0_1px_0_0_rgba(0,0,0,0.03)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
+          never used over a critical number (those live on solid surfaces, see CartDrawer footer).
+          .glass-chrome (app/globals.css) drops the blur when the OS asks to reduce transparency. */}
+      <header className="glass-chrome sticky top-0 z-20 flex items-center px-4 sm:px-6 py-3 border-b border-border/30 shadow-[0_1px_0_0_rgba(0,0,0,0.03)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
         <ShiftHeader
           activeShift={activeShift}
           userName={userName}
