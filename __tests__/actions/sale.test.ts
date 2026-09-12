@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockShiftFindUnique = vi.fn();
 const mockConfigFindUnique = vi.fn();
+const mockSaleFindUnique = vi.fn();
 const mockTransaction = vi.fn();
 const mockRequireSession = vi.fn();
 
@@ -9,6 +10,7 @@ vi.mock('../../lib/prisma', () => ({
     default: {
         shift: { findUnique: (...a: any[]) => mockShiftFindUnique(...a) },
         systemConfig: { findUnique: (...a: any[]) => mockConfigFindUnique(...a) },
+        sale: { findUnique: (...a: any[]) => mockSaleFindUnique(...a) },
         $transaction: (...a: any[]) => mockTransaction(...a),
     },
 }));
@@ -61,6 +63,37 @@ beforeEach(() => {
     mockRequireSession.mockResolvedValue({ id: 'u1', role: 'CASHIER' });
     mockConfigFindUnique.mockResolvedValue({ value: 'false' });
     mockShiftFindUnique.mockResolvedValue(OPEN_SHIFT);
+    mockSaleFindUnique.mockResolvedValue(null);
+});
+
+describe('processSale — offline-retry idempotency (clientRef)', () => {
+    it('returns the already-created sale instead of registering a duplicate when clientRef matches an existing sale', async () => {
+        const existing = { id: 'sale-existing', total: 6000 };
+        mockSaleFindUnique.mockResolvedValue(existing);
+        const result = await processSale('s1', ITEMS, PAYMENTS, { clientRef: 'retry-key-1' });
+        expect(result.ok).toBe(true);
+        if (result.ok) expect(result.data).toBe(existing);
+        expect(mockSaleFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { clientRef: 'retry-key-1' } }));
+        expect(mockTransaction).not.toHaveBeenCalled();
+    });
+
+    it('proceeds normally and stores clientRef on the sale when no prior sale matches it', async () => {
+        const tx = makeTx();
+        const result = await processSale('s1', ITEMS, PAYMENTS, { clientRef: 'retry-key-2' });
+        expect(result.ok).toBe(true);
+        expect(tx.sale.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ clientRef: 'retry-key-2' }),
+        }));
+    });
+
+    it('does not look up or store a clientRef when none is given', async () => {
+        const tx = makeTx();
+        await processSale('s1', ITEMS, PAYMENTS, {});
+        expect(mockSaleFindUnique).not.toHaveBeenCalled();
+        expect(tx.sale.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ clientRef: null }),
+        }));
+    });
 });
 
 describe('processSale — validation', () => {

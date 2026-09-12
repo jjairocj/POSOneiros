@@ -36,6 +36,8 @@ export interface ProcessSaleOptions {
     subAccountLabel?: string;
     /** Equal / custom split: one sale, several payers. */
     subAccounts?: SubAccountInput[];
+    /** Idempotency key set by the offline-retry queue (app/lib/offlineSalesQueue.ts) — see processSale's clientRef handling. */
+    clientRef?: string;
 }
 
 export type SaleWithDetails = Prisma.SaleGetPayload<{
@@ -66,6 +68,18 @@ export async function processSale(
 ): Promise<ActionResult<SaleWithDetails>> {
     try {
         const user = await requireSession();
+
+        // The offline-retry queue replays this exact call once the network
+        // comes back. If the first attempt actually reached the server and
+        // committed (the client only saw the connection drop on the way
+        // *back*), this returns that sale instead of registering a duplicate.
+        if (options.clientRef) {
+            const already = await prisma.sale.findUnique({
+                where: { clientRef: options.clientRef },
+                include: { details: { include: { product: true } }, payments: true, shift: { include: { register: true } }, customer: true },
+            });
+            if (already) return ok(already);
+        }
 
         // ── Input validation ────────────────────────────────────────────
         if (!Array.isArray(items) || items.length === 0) return fail("El carrito está vacío.");
@@ -249,6 +263,7 @@ export async function processSale(
                     discount: totalDiscount,
                     promotionId: promoEvaluation.appliedPromotion?.id ?? null,
                     promotionName: promoEvaluation.appliedPromotion?.name ?? null,
+                    clientRef: options.clientRef ?? null,
                     details: { create: saleDetails },
                     payments: { create: payments.map((p) => ({ method: p.method, amount: round(p.amount), subAccountLabel: p.subAccountLabel ?? null })) },
                 },

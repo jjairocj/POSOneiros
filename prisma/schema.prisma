@@ -307,6 +307,12 @@ model Sale {
   promotionName String?
   status        String       @default("COMPLETED") // COMPLETED, SUSPENDED, CANCELLED
   source        String       @default("POS") // POS | SIIGO (imported)
+  /// Client-generated idempotency key (crypto.randomUUID()), set only by the
+  /// offline-retry queue (see app/lib/offlineSalesQueue.ts): the POS can
+  /// lose the network mid-checkout and retry the same submission once
+  /// reconnected — this lets the server recognize a retry of a sale it
+  /// already created instead of registering it twice.
+  clientRef     String?      @unique
   externalRef   String? // e.g. Siigo invoice number
   cancelledAt   DateTime?
   cancelledById String?

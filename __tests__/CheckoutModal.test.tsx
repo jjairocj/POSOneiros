@@ -130,13 +130,14 @@ describe('CheckoutModal — payment stage', () => {
         await waitFor(() => expect(screen.getByText('Stock insuficiente')).toBeInTheDocument());
     });
 
-    it('shows a connection error when processSale throws', async () => {
+    it('queues the sale for offline retry instead of showing a dead-end error when processSale throws', async () => {
         mockProcessSale.mockRejectedValue(new Error('network'));
         renderModal();
         const cashInput = screen.getAllByPlaceholderText('0')[0];
         fireEvent.change(cashInput, { target: { value: '15000' } });
         fireEvent.click(screen.getByRole('button', { name: /finalizar venta/i }));
-        await waitFor(() => expect(screen.getByText(/No se pudo conectar/)).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText(/sin conexión/i)).toBeInTheDocument());
+        expect(screen.getByRole('button', { name: /continuar/i })).toBeInTheDocument();
     });
 
     it('in "collect" mode records the payments without calling processSale', async () => {

@@ -14,6 +14,8 @@ import type { ReceiptSale } from "./Receipt";
 import type { CartItem, OrderDiscount } from "@/app/types/cart";
 import { playSaleSound } from "@/app/lib/sound";
 import { formatMoney } from "@/app/lib/money";
+import { useOfflineSalesQueue } from "@/app/lib/offlineSalesQueue";
+import { CloudOff } from "lucide-react";
 
 const QUICK_BILLS = [5000, 10000, 20000, 50000, 100000];
 
@@ -204,6 +206,11 @@ export default function CheckoutModal({
     const [completedSale, setCompletedSale] = useState<ReceiptSale | null>(null);
     const [collected, setCollected] = useState(false);
     const [customerId, setCustomerId] = useState<string | null>(null);
+    const [queuedOffline, setQueuedOffline] = useState(false);
+    const enqueueOfflineSale = useOfflineSalesQueue((s) => s.enqueue);
+    // Stable per checkout attempt: reused across the queue's automatic
+    // retries so the server can recognize a retry instead of double-selling.
+    const [clientRef] = useState(() => crypto.randomUUID());
 
     const toAmount = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : 0; };
     const cashAmount = toAmount(cash);
@@ -248,18 +255,22 @@ export default function CheckoutModal({
         }
 
         setLoading(true);
+        const saleItems = items.map((i) => ({ id: i.id, quantity: i.quantity, discount: i.discount ?? 0 }));
+        const options = { customerId: customerId ?? undefined, subAccountLabel, discount: orderDiscount, clientRef };
         try {
-            const res = await processSale(
-                activeShiftId,
-                items.map((i) => ({ id: i.id, quantity: i.quantity, discount: i.discount ?? 0 })),
-                payments,
-                { customerId: customerId ?? undefined, subAccountLabel, discount: orderDiscount }
-            );
+            const res = await processSale(activeShiftId, saleItems, payments, options);
             if (!res.ok) { setError(res.error); return; }
             playSaleSound();
             setCompletedSale(res.data as unknown as ReceiptSale);
         } catch {
-            setError("No se pudo conectar con el servidor. Revisa la conexión e intenta de nuevo.");
+            // A thrown error here (as opposed to `res.ok === false`) means the
+            // request never got a real answer from the server — most likely
+            // the connection dropped mid-checkout. Queue it for automatic
+            // retry instead of making the cashier remember to resubmit; from
+            // their perspective the sale is done, so treat it like a success.
+            enqueueOfflineSale({ clientRef, activeShiftId, items: saleItems, payments, options, enqueuedAt: Date.now() });
+            playSaleSound();
+            setQueuedOffline(true);
         } finally {
             setLoading(false);
         }
@@ -269,7 +280,21 @@ export default function CheckoutModal({
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-card w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-border flex flex-col max-h-[90vh]">
 
-                {completedSale || collected ? (
+                {queuedOffline ? (
+                    <div className="p-8 flex flex-col items-center text-center gap-4">
+                        <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center">
+                            <CloudOff className="w-7 h-7 text-amber-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black tracking-tight">Venta guardada, sin conexión</h2>
+                            <p className="text-muted-foreground text-sm mt-1">
+                                No hay conexión con el servidor en este momento. La venta por {formatMoney(orderTotal)} quedó guardada
+                                y se enviará sola apenas vuelva la conexión — no necesitas repetirla.
+                            </p>
+                        </div>
+                        <Button onClick={onSuccess} className="w-full rounded-2xl h-12 font-bold">Continuar</Button>
+                    </div>
+                ) : completedSale || collected ? (
                     <SaleSuccess
                         sale={completedSale}
                         change={change}
