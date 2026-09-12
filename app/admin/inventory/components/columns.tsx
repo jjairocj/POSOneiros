@@ -42,6 +42,7 @@ const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
   },
   {
     accessorKey: "name",
+    meta: { label: "Nombre del Producto" },
     header: ({ column }) => {
       return (
         <Button
@@ -74,6 +75,7 @@ const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
   },
   {
     accessorKey: "stock",
+    meta: { label: "Stock" },
     header: () => <div className="text-right">Stock</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("stock"))
@@ -88,6 +90,7 @@ const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
   },
   {
     accessorKey: "cost",
+    meta: { label: "Costo unitario" },
     header: () => <div className="text-right">Costo unitario</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("cost"))
@@ -102,6 +105,7 @@ const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
   },
   {
     accessorKey: "price",
+    meta: { label: "Precio Venta" },
     header: () => <div className="text-right">Precio Venta (Base)</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("price"))
@@ -116,6 +120,7 @@ const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
   },
   {
     accessorKey: "taxIva",
+    meta: { label: "IVA" },
     header: () => <div className="text-right">IVA %</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("taxIva") || "0")

@@ -77,13 +77,30 @@ export function DataTable<TData, TValue>({
         {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <div key={row.id} className="bg-card/80 backdrop-blur-sm border border-border rounded-3xl p-5 shadow-sm space-y-3 flex flex-col">
-                {row.getVisibleCells().map((cell) => {
+                {[...row.getVisibleCells()].sort((a, b) => {
+                  // Title cell first, actions last, everything else keeps
+                  // its table-column order in between.
+                  const rank = (id: string) => (id === "name" ? 0 : id === "actions" ? 2 : 1);
+                  return rank(a.column.id) - rank(b.column.id);
+                }).map((cell) => {
                   const isAction = cell.column.id === "actions";
-                  // Get header as string if possible
-                  const headerName = typeof cell.column.columnDef.header === 'string' 
-                    ? cell.column.columnDef.header 
-                    : cell.column.id.charAt(0).toUpperCase() + cell.column.id.slice(1);
-                  
+                  // "name" is the row's identity — give it a title treatment
+                  // instead of stacking it as just another labeled field.
+                  const isTitle = cell.column.id === "name";
+                  const headerName =
+                    cell.column.columnDef.meta?.label ??
+                    (typeof cell.column.columnDef.header === "string"
+                      ? cell.column.columnDef.header
+                      : cell.column.id.charAt(0).toUpperCase() + cell.column.id.slice(1));
+
+                  if (isTitle) {
+                    return (
+                      <div key={cell.id} className="text-base font-bold">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={cell.id} className={`flex ${isAction ? 'justify-end mt-2 pt-3 border-t border-border/50' : 'justify-between items-center gap-4'}`}>
                       {!isAction && (

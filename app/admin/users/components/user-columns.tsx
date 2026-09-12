@@ -84,6 +84,7 @@ export function createUserColumns(
     return [
         {
             accessorKey: "name",
+            meta: { label: "Nombre" },
             header: ({ column }) => (
                 <Button
                     variant="ghost"
