@@ -44,11 +44,12 @@ beforeEach(() => {
 
 describe('getRegisters', () => {
     it('requires ADMIN and serializes dates to ISO strings', async () => {
-        mockFindMany.mockResolvedValue([makeRegister()]);
+        const register = makeRegister();
+        mockFindMany.mockResolvedValue([register]);
         const result = await getRegisters();
         expect(mockRequireAdmin).toHaveBeenCalled();
-        expect(result[0].createdAt).toBe(makeRegister().createdAt.toISOString());
-        expect(result[0].branch.createdAt).toBe(makeBranch().createdAt.toISOString());
+        expect(result[0].createdAt).toBe(register.createdAt.toISOString());
+        expect(result[0].branch.createdAt).toBe(register.branch.createdAt.toISOString());
     });
 
     it('returns an empty array on error instead of throwing', async () => {
