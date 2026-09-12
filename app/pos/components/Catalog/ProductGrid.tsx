@@ -5,7 +5,7 @@ import CategorySelector from "./CategorySelector";
 import { getProducts } from "@/app/actions/product";
 import { getCategories } from "@/app/actions/category";
 import OrderSwitcher from "./OrderSwitcher";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, Search, X, CloudOff } from "lucide-react";
 import type { CatalogProduct, CatalogCategory } from "@/app/types/cart";
 
 export default function ProductGrid() {
@@ -15,22 +15,31 @@ export default function ProductGrid() {
     const [isPending, startTransition] = useTransition();
     const [initialized, setInitialized] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    // True when the last attempt to reach the server for the catalog threw
+    // (a dropped connection, not a normal "no results"). While true, we keep
+    // showing whatever was already on screen instead of blanking it — the
+    // cashier can still sell from what's visible, just can't switch
+    // category/search until the connection is back.
+    const [offline, setOffline] = useState(false);
     const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         async function init() {
             try {
                 const [p, c] = await Promise.all([
-                    getProducts('favorites').catch(() => []),
+                    getProducts('favorites').catch(() => null),
                     getCategories().catch(() => [])
                 ]);
                 setCategories(c || []);
+                setOffline(p === null);
                 if (p && p.length > 0) {
                     setProducts(p);
-                } else {
-                    // No favorites yet: don't open on an empty screen.
+                } else if (p !== null) {
+                    // Reached the server, genuinely no favorites yet: don't open on an empty screen.
                     setActiveCategoryId('all');
-                    setProducts((await getProducts('all').catch(() => [])) || []);
+                    const all = await getProducts('all').catch(() => null);
+                    setOffline(all === null);
+                    if (all !== null) setProducts(all);
                 }
             } catch (error) {
                 console.error("Error initializing catalog:", error);
@@ -41,24 +50,36 @@ export default function ProductGrid() {
         init();
     }, []);
 
+    // Silently re-fetch the current view when the browser regains
+    // connectivity, so the "sin conexión" banner clears and category/search
+    // start working again without the cashier having to do anything.
+    useEffect(() => {
+        const retry = () => {
+            if (!offline) return;
+            startTransition(async () => {
+                const results = searchQuery.trim()
+                    ? await getProducts(undefined, searchQuery.trim()).catch(() => null)
+                    : await getProducts(activeCategoryId).catch(() => null);
+                setOffline(results === null);
+                if (results !== null) setProducts(results);
+            });
+        };
+        window.addEventListener("online", retry);
+        return () => window.removeEventListener("online", retry);
+    }, [offline, activeCategoryId, searchQuery]);
+
     const handleSearchChange = (value: string) => {
         setSearchQuery(value);
         if (searchDebounce.current) clearTimeout(searchDebounce.current);
         searchDebounce.current = setTimeout(() => {
             startTransition(async () => {
-                try {
-                    if (value.trim()) {
-                        // Search across ALL products ignoring active category
-                        const results = await getProducts(undefined, value.trim());
-                        setProducts(results || []);
-                    } else {
-                        // Restore current category view
-                        const results = await getProducts(activeCategoryId);
-                        setProducts(results || []);
-                    }
-                } catch (error) {
-                    console.error("Error searching products:", error);
-                }
+                // Search across ALL products ignoring active category, or
+                // restore the current category view when the box is cleared.
+                const results = value.trim()
+                    ? await getProducts(undefined, value.trim()).catch(() => null)
+                    : await getProducts(activeCategoryId).catch(() => null);
+                setOffline(results === null);
+                if (results !== null) setProducts(results);
             });
         }, 300);
     };
@@ -67,20 +88,18 @@ export default function ProductGrid() {
         setActiveCategoryId(id);
         setSearchQuery("");
         startTransition(async () => {
-            try {
-                const filtered = await getProducts(id);
-                setProducts(filtered || []);
-            } catch (error) {
-                console.error("Error filtering category:", error);
-            }
+            const filtered = await getProducts(id).catch(() => null);
+            setOffline(filtered === null);
+            if (filtered !== null) setProducts(filtered);
         });
     };
 
     const handleClear = () => {
         setSearchQuery("");
         startTransition(async () => {
-            const results = await getProducts(activeCategoryId).catch(() => []);
-            setProducts(results || []);
+            const results = await getProducts(activeCategoryId).catch(() => null);
+            setOffline(results === null);
+            if (results !== null) setProducts(results);
         });
     };
 
@@ -123,6 +142,13 @@ export default function ProductGrid() {
                 activeCategoryId={activeCategoryId}
                 onSelect={handleCategorySelect}
             />
+
+            {offline && (
+                <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-semibold">
+                    <CloudOff className="w-4 h-4 shrink-0" />
+                    Sin conexión — mostrando el catálogo que ya tenías cargado. Buscar o cambiar de categoría no funcionará hasta que vuelva la conexión.
+                </div>
+            )}
             </div>{/* end sticky header */}
 
             <div className="flex-1 min-h-0 overflow-y-auto">
