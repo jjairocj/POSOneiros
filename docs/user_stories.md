@@ -93,19 +93,31 @@ El cerebro detrás de las operaciones, enfocado en manejo multi-sucursal y contr
 
 ### US4.1: Topología de Negocio (Sucursales y Cajas)
 Como administrador, quiero crear múltiples puntos de venta físicos y lógicos.
-- [ ] **Tarea 4.1.1: Modelado de Topología.**
+- [x] **Tarea 4.1.1: Modelado de Topología.**
   - [x] Subtarea 4.1.1.1: Modelos `Branch` (Sucursal) y `Register` (Caja) vinculados a la sucursal. Asignación de series de facturación por caja.
-- [ ] **Tarea 4.1.2: CRUD Topología.**
-  - [ ] Subtarea 4.1.2.1: Formularios en `/admin` para dar de alta/baja sucursales y cajas.
+- [ ] **Tarea 4.1.2: CRUD Topología.** *(parcial — revisado 2026-09-12)*
+  - [ ] Subtarea 4.1.2.1: Formularios en `/admin` para dar de alta/baja sucursales y cajas. **Cajas: hecho** (`app/actions/registers.ts` + `RegisterFormModal`/`RegistersTable` en `/admin/users`, CRUD completo). **Sucursales: pendiente** — solo existe `getBranches()` de lectura (usado como dropdown), no hay `createBranch`/`updateBranch` ni formulario para altas/bajas de sucursales.
 
 ### US4.2: Gestión de Inventarios y Reglas de Negocio
 Como administrador, quiero controlar el stock y decidir si permito ventas en negativo (Preventas/Errores de bodega).
-- [ ] **Tarea 4.2.1: CRUD de Productos Avanzado.**
-  - [ ] Subtarea 4.2.1.1: Formulario con soporte para variantes (ej. Tallas/Colores) [Escalabilidad a futuro] y control de Costo vs Precio de Venta.
-- [ ] **Tarea 4.2.2: Flujo Kardex (Movimientos de Inventario).**
-  - [x] Subtarea 4.2.2.1: Todo descuento/aumento de stock debe generar un registro auditable (`InventoryMovement` model).
-- [ ] **Tarea 4.2.3: Configuraciones Globales (App Settings).**
-  - [x] Subtarea 4.2.3.1: Tabla `SystemConfig` (Key-Value) para *feature flags* (Ej: `ALLOW_NEGATIVE_STOCK = true`).
+- [ ] **Tarea 4.2.1: CRUD de Productos Avanzado.** *(parcial — revisado 2026-09-12)*
+  - [ ] Subtarea 4.2.1.1: Formulario con soporte para variantes (ej. Tallas/Colores) [Escalabilidad a futuro] y control de Costo vs Precio de Venta. **Costo vs Precio: hecho** (calculadora de margen en `product-form.tsx`). **Variantes reales (stock por talla/color): pendiente** — lo más cercano hoy es `ProductFamily` (2026-09-11), pero es solo una agrupación para que las promociones matcheen "cualquier sabor/variedad", no maneja stock independiente por variante.
+- [x] **Tarea 4.2.2: Flujo Kardex (Movimientos de Inventario).**
+  - [x] Subtarea 4.2.2.1: Todo descuento/aumento de stock debe generar un registro auditable (`StockMovement` model).
+- [x] **Tarea 4.2.3: Configuraciones Globales (App Settings).**
+  - [x] Subtarea 4.2.3.1: Tabla `SystemConfig` (Key-Value) para *feature flags* (Ej: `ALLOW_NEGATIVE_STOCK`, hoy `false` por defecto — implementado y respetado en `processSale`).
+
+### US4.3: Proveedores y trazabilidad de lotes (añadida 2026-09-11)
+Como administrador, quiero registrar de qué proveedor viene cada lote recibido para trazabilidad de compras.
+- [x] **Tarea 4.3.1:** Modelo `Supplier` + CRUD (`app/actions/suppliers.ts`, pestaña "Proveedores" en `/admin/inventory`).
+- [x] **Tarea 4.3.2:** Campo proveedor en recepción de lotes de producto e insumos (`ReceiveLotModal`, `RawMaterialsTable`).
+
+### US4.4: Promociones y combos ligados a inventario (añadida 2026-09-11)
+Como administrador, quiero configurar promociones (ej. "lleva X y Y, Z gratis") que se apliquen automáticamente y de forma transparente para el cajero.
+- [x] **Tarea 4.4.1:** Modelo `Promotion`/`PromotionCondition`/`PromotionEffect`, motor de evaluación puro compartido cliente/servidor (`app/lib/promotions.ts`).
+- [x] **Tarea 4.4.2:** UI de administración de promociones (pestaña "Promociones" en Ajustes) — vigencia manual (activar/desactivar), sin acumulación (una por prioridad), sin descuento manual adicional cuando hay promo activa.
+- [x] **Tarea 4.4.3:** Integración POS: banner de promo aplicada, bloqueo de descuento manual, recibo muestra la promo aplicada.
+- [x] **Tarea 4.4.4:** Verificado en vivo que promociones + dividir cuenta prorratean y suman correctamente (2026-09-11/12).
 
 ---
 
