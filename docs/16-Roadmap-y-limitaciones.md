@@ -17,7 +17,7 @@ Cosas identificadas en revisiones previas del proyecto, no priorizadas aún — 
 - ✅ **Resuelto (2026-09-11, commit `48314b3`):** el export CSV de cierre de turno cramaba todos los pagos de una venta dividida en una sola celda de texto ilegible — ahora son columnas numéricas por método (Efectivo/Tarjeta/Transferencia) + flag "Cuenta dividida".
 
 ## Testing
-- Ver [[10-Testing]]: faltan tests para `dashboard.ts`, `registers.ts`, `report.ts`, `users.ts`, `import-products.ts` (sigue igual, revisado 2026-09-12 — `category.ts`, `product.ts`, `settings.ts` sí llegaron a 100% en batch 7).
+- ✅ **Resuelto (2026-09-12):** `dashboard.ts`, `registers.ts`, `report.ts`, `users.ts`, `import-products.ts` y `lots.ts` (encontrado sin cobertura al revisar, no estaba en la lista original) ya tienen tests — 98 tests nuevos en 7 archivos, suite total 302 → 400. `roles.ts` también se cubrió de paso. `shift.ts` resultó ya tener cobertura previa (`__tests__/shift-actions.test.ts`, 17 tests) que esta lista no había registrado.
 - No hay tests de integración contra una base Postgres real — toda la suite mockea Prisma. Cubriría mejor los `page.tsx` (excluidos hoy de cobertura) y comportamiento real de transacciones/concurrencia (por ejemplo, la venta de la última unidad de stock desde dos cajas a la vez).
 
 ## Infraestructura
