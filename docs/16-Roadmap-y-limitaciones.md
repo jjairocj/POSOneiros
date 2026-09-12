@@ -8,6 +8,7 @@ Cosas identificadas en revisiones previas del proyecto, no priorizadas aún — 
 
 ## Observabilidad
 - **Sin monitoreo de errores en producción.** Recomendado: Sentry (tiene plan gratuito y SDK oficial para Next.js) — ver [[13-Seguridad]].
+- **2026-09-12: instalación iniciada, pendiente.** Se eligió instalar vía Vercel Marketplace (`vercel integration add sentry`) en vez de crear la cuenta directo en sentry.io. Quedó detenida en dos pasos: (1) aceptar términos del marketplace en el navegador (link generado por el CLI), (2) el CLI luego pide un `--plan <PLAN_ID>` de facturación que no se resolvió en el momento. Retomar con `vercel integration add sentry` una vez el usuario decida el plan (el gratuito de Sentry debería alcanzar para este volumen).
 
 ## Datos
 - **Montos en `Float`**, no enteros. Funciona porque todo se redondea a pesos enteros en cada cálculo (`Math.round` en `app/lib/tax.ts` y `app/actions/sale.ts`), pero un tipo entero (centavos o pesos como `Int`) eliminaría por completo el riesgo de error de coma flotante a nivel de esquema, no solo por convención de código.
