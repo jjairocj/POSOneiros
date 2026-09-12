@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Receipt, Users, Settings, LineChart } from "lucide-react";
+import { Package, Receipt, Users, Settings, LineChart, ShoppingCart } from "lucide-react";
 
 const NAV_ITEMS = [
     { name: "Resumen", href: "/admin", icon: LineChart },
@@ -11,6 +11,11 @@ const NAV_ITEMS = [
     { name: "Ajustes", href: "/admin/settings", icon: Settings },
 ];
 
+// Always visible regardless of role/permissions, same as AdminSidebar's
+// "Ir al Punto de Venta (TPV)" link — every admin/cashier needs a way back
+// into the POS, and this was the only nav missing it.
+const POS_ITEM = { name: "TPV", href: "/pos", icon: ShoppingCart };
+
 interface AdminMobileNavProps {
     role: "ADMIN" | "SUPERVISOR" | "CASHIER";
     visiblePaths: string[];
@@ -18,7 +23,7 @@ interface AdminMobileNavProps {
 
 export default function AdminMobileNav({ visiblePaths }: AdminMobileNavProps) {
     const pathname = usePathname();
-    const items = NAV_ITEMS.filter((item) => visiblePaths.includes(item.href));
+    const items = [...NAV_ITEMS.filter((item) => visiblePaths.includes(item.href)), POS_ITEM];
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg pb-safe flex justify-around items-center h-16 px-2">

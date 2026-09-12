@@ -27,21 +27,21 @@ Cosas identificadas en revisiones previas del proyecto, no priorizadas aún — 
 - Explorar ajustar dónde se aplica el glassmorphism (blur) para no competir con la legibilidad de números críticos (total a cobrar) — ver [[15-Sistema-de-diseño]].
 - ✅ **Resuelto (batch 6):** reorganización de Ajustes por tabs/secciones (General/Promociones/Roles y Permisos, y Negocio/Operación/Recibo-Ticket dentro de General).
 
-## ⚠️ Cumplimiento fiscal del recibo (DIAN) — alta prioridad, requiere decisión del negocio
-- Desde nov. 2024, el tiquete POS en Colombia debe ser el **Documento Equivalente Electrónico (DEE) POS**: se genera, transmite y valida ante la DIAN en tiempo real, con CUDE y QR — no un ticket estático impreso. `Receipt.tsx` hoy es solo un HTML impreso por el navegador, sin ninguna de esas piezas.
-- Casi cualquier negocio activo está obligado (Régimen Simple sin importar ingresos, o cualquier otro régimen si supera ~3.500 UVT/año ≈ $183M COP). Sin confirmar en qué régimen está el negocio ni si ya facturan por fuera del POS (común en negocios pequeños), no se puede saber si esto es una brecha real o ya está cubierto por otro sistema.
-- **Antes de tocar código**: confirmar con el negocio/contador su situación tributaria real.
-- Mitigación de bajo riesgo mientras se resuelve: agregar al recibo un texto explícito ("comprobante interno, no es factura ni documento equivalente electrónico") para no inducir a error — no implementado todavía, pendiente de que el usuario confirme si procede.
-- Si resulta que sí se necesita, es un proyecto de integración con un proveedor tecnológico autorizado por la DIAN (CUFE/CUDE, XML UBL, transmisión en tiempo real) — no un ajuste de UI.
+## Cumplimiento fiscal del recibo (DIAN) — descartado por ahora
+- Desde nov. 2024, el tiquete POS en Colombia debe ser el **Documento Equivalente Electrónico (DEE) POS** (CUDE, QR, transmisión en tiempo real a la DIAN). `Receipt.tsx` sigue siendo solo un HTML impreso por el navegador.
+- **2026-09-12: el usuario confirmó que no aplica de momento** (situación tributaria del negocio actual) — no es una prioridad activa. Si la situación del negocio cambia (crece, cambia de régimen, deja de facturar por fuera del POS), revisar este punto de nuevo — es un proyecto de integración con un proveedor autorizado por la DIAN, no un ajuste de UI.
 
 ## Permisos granulares por rol/vista
 - ✅ **Resuelto (2026-09-11, commit `e16efd9`):** permisos configurables por rol implementados (`feat(auth): configurable permissions — let a cashier receive inventory`) — ya no es solo la jerarquía fija CASHIER < SUPERVISOR < ADMIN.
 
 ## Backlog activo (no resuelto aún)
 
-### Móvil (reportado 2026-09-12)
-- **Varias vistas de `/admin` no funcionan correctamente en móvil.** Falta que el usuario detalle cuáles, o hacer una pasada de QA visual en viewport móvil antes de tocar código. Nota de tooling: `resize_window` (Claude in Chrome) no cambia el viewport real del screenshot en este entorno — puede requerir devtools u otro método para verificar visualmente.
-- **No hay botón/acceso al módulo POS (`/pos`) desde la navegación móvil** — hoy solo se llega por URL directa.
+### Móvil (reportado 2026-09-12) — ✅ resuelto el mismo día
+- **Causa raíz encontrada:** `app/components/Nav/Navbar.tsx` era un componente de navegación global **obsoleto** (con rutas muertas `/admin/products` y `/admin/config`, que nunca existieron como tal — las reales son `/admin/inventory` y `/admin/settings`), que `AppShell` seguía renderizando en *todas* las rutas `/admin/*` porque solo excluía `/login` y `/pos`. Quedaba literalmente superpuesto, en el mismo `position:fixed` y mismo `z-index:50`, encima del nav real y correcto que ya construye `app/admin/layout.tsx` (`AdminSidebar` en desktop, `AdminMobileNav` en móvil) — dos navs completos ocupando el mismo espacio en pantalla.
+- **Fix:** `AppShell.tsx` ahora también excluye `/admin` (ya tiene su propio nav completo); se eliminó por completo `Navbar.tsx` + `navbar.module.css` (único importador era `AppShell`); se limpió el CSS de `app/pos/layout.tsx` que existía solo para tapar ese navbar viejo (ya redundante).
+- **"No hay botón al POS en móvil":** confirmado en código — `AdminSidebar` (desktop) sí tenía el link "Ir al Punto de Venta (TPV)" → `/pos`, pero `AdminMobileNav` nunca lo tuvo. Se agregó como 6º ítem ("TPV", ícono carrito) siempre visible.
+- Verificado en vivo (viewport ~500px) en Resumen/Inventario/Ventas/Personal/Ajustes: un solo nav, sin overlap, navegación y tab activa correctas; botón TPV navega a `/pos`. Verificado también en desktop (1400px) que el sidebar sigue igual, sin duplicado.
+- Nota de tooling (ya no bloquea, pero queda documentada): `resize_window` (Claude in Chrome) sí cambia el viewport real en este entorno — la limitación anotada en `[[project-beta-hardening]]` sobre esto ya no aplica tal cual.
 
 ### Topología de negocio (US4.1, revisado 2026-09-12)
 - **CRUD de Sucursales (`Branch`) no existe** — solo `getBranches()` de lectura (usado como dropdown en Usuarios/Cajas). Cajas (`Register`) sí tienen CRUD completo. Falta: `createBranch`/`updateBranch`/`deleteBranch` + formulario en `/admin`.
