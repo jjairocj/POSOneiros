@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import { createProduct, updateProduct } from "@/app/actions/product";
 import { getCategories } from "@/app/actions/category";
 import { getProductFamilies } from "@/app/actions/product";
+import { getRawMaterials } from "@/app/actions/lots";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogDescription
 } from "@/components/ui/dialog";
 import { PackagePlus, Save, Loader2, Star, Image as ImageIcon } from "lucide-react";
 import { ProductColumn } from "./columns";
@@ -36,11 +37,14 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const [familyName, setFamilyName] = useState<string>(product?.family?.name ?? "");
     const [isActive, setIsActive] = useState<boolean>(product?.isActive ?? true);
     const [trackingMode, setTrackingMode] = useState<string>(product?.trackingMode ?? "SIMPLE");
+    const [rawMaterials, setRawMaterials] = useState<{ id: string; name: string }[]>([]);
+    const [rawMaterialId, setRawMaterialId] = useState<string>(product?.rawMaterial?.id ?? "none");
 
     useEffect(() => {
         if (!open) return;
         getCategories().then((c) => setCategories(c.map(({ id, name }) => ({ id, name })))).catch(() => setCategories([]));
         getProductFamilies().then(setFamilies).catch(() => setFamilies([]));
+        getRawMaterials().then((rows) => setRawMaterials(rows.map(({ id, name }) => ({ id, name })))).catch(() => setRawMaterials([]));
     }, [open]);
 
     // Costing Calculator State
@@ -83,7 +87,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                     </Button>
                 )}
             </DialogTrigger>
-            
+
             <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[92vh] overflow-y-auto rounded-[2rem] p-5 sm:p-8 bg-card border-border shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-black">
@@ -100,21 +104,21 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1">Código / SKU</label>
-                                <Input 
-                                    name="code" 
-                                    required 
-                                    defaultValue={product?.code} 
-                                    className="rounded-xl h-12 bg-muted/50" 
+                                <Input
+                                    name="code"
+                                    required
+                                    defaultValue={product?.code}
+                                    className="rounded-xl h-12 bg-muted/50"
                                     placeholder="Ej: CHC-001"
                                 />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1">Nombre</label>
-                                <Input 
-                                    name="name" 
-                                    required 
-                                    defaultValue={product?.name} 
-                                    className="rounded-xl h-12 bg-muted/50" 
+                                <Input
+                                    name="name"
+                                    required
+                                    defaultValue={product?.name}
+                                    className="rounded-xl h-12 bg-muted/50"
                                     placeholder="Ej: Chocoramo"
                                 />
                             </div>
@@ -188,6 +192,25 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                             </p>
                         </div>
 
+                        <div className="space-y-1.5">
+                            <label htmlFor="rawMaterialId" className="text-sm font-semibold ml-1">
+                                Insumo consumido <span className="font-normal text-muted-foreground">(opcional)</span>
+                            </label>
+                            <select
+                                id="rawMaterialId"
+                                name="rawMaterialId"
+                                value={rawMaterialId}
+                                onChange={(e) => setRawMaterialId(e.target.value)}
+                                className="w-full h-12 rounded-xl bg-muted/50 border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            >
+                                <option value="none">Ninguno</option>
+                                {rawMaterials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                            <p className="text-xs text-muted-foreground ml-1">
+                                Ej: “Café Americano” hecho con el insumo “Café en grano” — permite reportar qué se vendió mientras duró cada lote. Los insumos se crean en la pestaña “Insumos”.
+                            </p>
+                        </div>
+
                         {/* Image URL and Favorite */}
                         <div className="space-y-3">
                             <div className="space-y-1.5">
@@ -257,7 +280,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Margen objetivo (%)</label>
+                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Margen (%)</label>
                                     <Input
                                         type="number"
                                         step="0.1"
@@ -279,7 +302,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     />
                                 </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-3 pt-1 text-sm">
                                 <div className="bg-background p-3 rounded-xl border border-border flex justify-between items-center">
                                     <span className="text-muted-foreground">Precio Sugerido:</span>
@@ -347,17 +370,17 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                     </div>
 
                     <div className="pt-4 flex gap-3">
-                        <Button 
-                            type="button" 
-                            variant="outline" 
+                        <Button
+                            type="button"
+                            variant="outline"
                             onClick={() => setOpen(false)}
                             className="flex-1 rounded-xl h-12 font-bold"
                             disabled={loading}
                         >
                             Cancelar
                         </Button>
-                        <Button 
-                            type="submit" 
+                        <Button
+                            type="submit"
                             className="flex-1 rounded-xl h-12 font-bold shadow-lg"
                             disabled={loading}
                         >

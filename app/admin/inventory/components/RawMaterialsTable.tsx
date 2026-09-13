@@ -1,12 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FlaskConical, PackagePlus, CheckCircle2, X } from "lucide-react";
+import { FlaskConical, PackagePlus, CheckCircle2, X, BarChart3, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createRawMaterial, receiveRawMaterialLot, markRawMaterialLotDepleted, type RawMaterialRow } from "@/app/actions/lots";
+import {
+    createRawMaterial, receiveRawMaterialLot, markRawMaterialLotDepleted,
+    getRawMaterialConsumptionReport, type RawMaterialRow, type RawMaterialConsumptionLot,
+} from "@/app/actions/lots";
 import type { SupplierRow } from "@/app/actions/suppliers";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { formatMoney } from "@/app/lib/money";
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { timeZone: "America/Bogota" });
 
@@ -80,9 +85,78 @@ function OpenLotForm({ materialId, suppliers, onDone }: { materialId: string; su
     );
 }
 
+function ConsumptionReportModal({ materialId, materialName, onClose }: { materialId: string; materialName: string; onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [lots, setLots] = useState<RawMaterialConsumptionLot[]>([]);
+
+    useEffect(() => {
+        getRawMaterialConsumptionReport(materialId).then((res) => {
+            if (!res.ok) { setError(res.error); return; }
+            setLots(res.data);
+        }).finally(() => setLoading(false));
+    }, [materialId]);
+
+    return (
+        <Dialog open onOpenChange={(v) => !v && onClose()}>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Consumo de &quot;{materialName}&quot;</DialogTitle>
+                    <DialogDescription>Qué se vendió mientras duró cada lote de este insumo.</DialogDescription>
+                </DialogHeader>
+                {loading ? (
+                    <div className="flex items-center justify-center py-10 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Calculando...</div>
+                ) : error ? (
+                    <p className="text-destructive text-sm py-4">{error}</p>
+                ) : lots.length === 0 ? (
+                    <p className="text-muted-foreground text-sm py-4">
+                        Ningún producto está marcado como hecho con este insumo todavía — configúralo en el formulario de producto, campo &quot;Insumo consumido&quot;.
+                    </p>
+                ) : (
+                    <div className="space-y-4">
+                        {lots.map((lot) => (
+                            <div key={lot.lotId} className="border border-border rounded-2xl p-4">
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                    <span className="font-semibold text-sm">
+                                        {lot.lotNumber ? `Lote ${lot.lotNumber}` : "Sin número de lote"}
+                                    </span>
+                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${lot.status === "ACTIVE" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                                        {lot.status === "ACTIVE" ? "En uso" : "Agotado"}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                    {fmtDate(lot.startDate)} — {lot.endDate ? fmtDate(lot.endDate) : "hoy"}
+                                </p>
+                                {lot.byProduct.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">Nada vendido en esta ventana.</p>
+                                ) : (
+                                    <>
+                                        <ul className="space-y-1 mb-2">
+                                            {lot.byProduct.map((p) => (
+                                                <li key={p.productId} className="flex justify-between text-sm">
+                                                    <span>{p.productName}</span>
+                                                    <span className="font-mono text-muted-foreground">{p.quantitySold} · {formatMoney(p.revenue)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <p className="text-xs font-semibold text-right border-t border-border/50 pt-2">
+                                            Total: {lot.totalQuantitySold} unidades · {formatMoney(lot.totalRevenue)} · {lot.saleCount} venta{lot.saleCount === 1 ? "" : "s"}
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export function RawMaterialsTable({ materials, suppliers }: { materials: RawMaterialRow[]; suppliers: SupplierRow[] }) {
     const router = useRouter();
     const [openingFor, setOpeningFor] = useState<string | null>(null);
+    const [reportFor, setReportFor] = useState<{ id: string; name: string } | null>(null);
 
     const deplete = async (lotId: string) => {
         const res = await markRawMaterialLotDepleted(lotId);
@@ -128,6 +202,9 @@ export function RawMaterialsTable({ materials, suppliers }: { materials: RawMate
                                     <Button size="sm" variant="outline" onClick={() => setOpeningFor(m.id)} className="h-8 text-xs">
                                         <PackagePlus className="w-3.5 h-3.5 mr-1" /> {m.activeLot ? "Abrir lote nuevo" : "Registrar lote"}
                                     </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setReportFor({ id: m.id, name: m.name })} className="h-8 text-xs">
+                                        <BarChart3 className="w-3.5 h-3.5 mr-1" /> Ver consumo
+                                    </Button>
                                 </div>
                             </div>
                             {m.activeLot && (
@@ -142,6 +219,9 @@ export function RawMaterialsTable({ materials, suppliers }: { materials: RawMate
                         </li>
                     ))}
                 </ul>
+            )}
+            {reportFor && (
+                <ConsumptionReportModal materialId={reportFor.id} materialName={reportFor.name} onClose={() => setReportFor(null)} />
             )}
         </div>
     );

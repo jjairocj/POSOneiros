@@ -26,6 +26,7 @@ export async function getProducts(categoryId?: string, search?: string, opts: { 
             include: {
                 category: true,
                 family: true,
+                rawMaterial: { select: { id: true, name: true } },
             },
             orderBy: { name: 'asc' }
         });
@@ -78,7 +79,9 @@ function parseProductForm(formData: FormData) {
     const rawTracking = formData.get("trackingMode")?.toString().trim();
     const trackingMode = ["SIMPLE", "LOT", "NONE"].includes(rawTracking ?? "") ? rawTracking! : "SIMPLE";
     const familyName = formData.get("familyName")?.toString().trim() || null;
-    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive, categoryId, trackingMode }, familyName } as const;
+    const rawRawMaterial = formData.get("rawMaterialId")?.toString().trim();
+    const rawMaterialId = rawRawMaterial && rawRawMaterial !== "none" ? rawRawMaterial : null;
+    return { data: { name, code, price, cost, stock, taxIva, taxIca, taxImpoConsumo, imageUrl, isFavorite, isActive, categoryId, trackingMode, rawMaterialId }, familyName } as const;
 }
 
 /** Resolves a free-typed family name to an id, creating the family if it's

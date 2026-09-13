@@ -5,6 +5,9 @@ const mockProductLotFindMany = vi.fn();
 const mockRawMaterialFindMany = vi.fn();
 const mockRawMaterialCreate = vi.fn();
 const mockRawMaterialLotUpdate = vi.fn();
+const mockRawMaterialLotFindMany = vi.fn();
+const mockProductFindMany = vi.fn();
+const mockSaleDetailFindMany = vi.fn();
 const mockRequirePermission = vi.fn();
 
 const tx = {
@@ -19,13 +22,15 @@ vi.mock('@/lib/prisma', () => ({
         $transaction: (...a: any[]) => mockTransaction(...a),
         productLot: { findMany: (...a: any[]) => mockProductLotFindMany(...a) },
         rawMaterial: { findMany: (...a: any[]) => mockRawMaterialFindMany(...a), create: (...a: any[]) => mockRawMaterialCreate(...a) },
-        rawMaterialLot: { update: (...a: any[]) => mockRawMaterialLotUpdate(...a) },
+        rawMaterialLot: { update: (...a: any[]) => mockRawMaterialLotUpdate(...a), findMany: (...a: any[]) => mockRawMaterialLotFindMany(...a) },
+        product: { findMany: (...a: any[]) => mockProductFindMany(...a) },
+        saleDetail: { findMany: (...a: any[]) => mockSaleDetailFindMany(...a) },
     },
 }));
 vi.mock('@/lib/auth', () => ({ requirePermission: (...a: any[]) => mockRequirePermission(...a) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-import { receiveProductLot, getProductLots, getRawMaterials, createRawMaterial, receiveRawMaterialLot, markRawMaterialLotDepleted, getExpiringItems } from '../../app/actions/lots';
+import { receiveProductLot, getProductLots, getRawMaterials, createRawMaterial, receiveRawMaterialLot, markRawMaterialLotDepleted, getExpiringItems, getRawMaterialConsumptionReport } from '../../app/actions/lots';
 import prisma from '@/lib/prisma';
 
 beforeEach(() => {
@@ -166,5 +171,68 @@ describe('getExpiringItems', () => {
         (prisma as any).productLot = { findMany: vi.fn().mockRejectedValue(new Error('db down')) };
         (prisma as any).rawMaterialLot.findMany = vi.fn().mockResolvedValue([]);
         expect(await getExpiringItems()).toEqual([]);
+    });
+});
+
+describe('getRawMaterialConsumptionReport', () => {
+    it('requires VIEW_REPORTS and returns [] when no product references this insumo', async () => {
+        (prisma as any).product.findMany = vi.fn().mockResolvedValue([]);
+        (prisma as any).rawMaterialLot.findMany = vi.fn().mockResolvedValue([{ id: 'lot1' }]);
+        const result: any = await getRawMaterialConsumptionReport('rm1');
+        expect(mockRequirePermission).toHaveBeenCalledWith('VIEW_REPORTS');
+        expect(result.ok).toBe(true);
+        expect(result.data).toEqual([]);
+    });
+
+    it('returns [] when the insumo has no lots yet', async () => {
+        (prisma as any).product.findMany = vi.fn().mockResolvedValue([{ id: 'p1', name: 'Café Americano' }]);
+        (prisma as any).rawMaterialLot.findMany = vi.fn().mockResolvedValue([]);
+        const result: any = await getRawMaterialConsumptionReport('rm1');
+        expect(result.data).toEqual([]);
+    });
+
+    it('bounds each lot\'s sales window by the next lot\'s receivedDate, and aggregates by product', async () => {
+        const lot1Start = new Date('2026-09-01T00:00:00Z');
+        const lot2Start = new Date('2026-09-10T00:00:00Z');
+        (prisma as any).product.findMany = vi.fn().mockResolvedValue([{ id: 'p1', name: 'Café Americano' }]);
+        (prisma as any).rawMaterialLot.findMany = vi.fn().mockResolvedValue([
+            { id: 'lot1', lotNumber: 'A', status: 'DEPLETED', receivedDate: lot1Start, updatedAt: lot2Start },
+            { id: 'lot2', lotNumber: 'B', status: 'ACTIVE', receivedDate: lot2Start, updatedAt: lot2Start },
+        ]);
+        (prisma as any).saleDetail.findMany = vi.fn()
+            .mockResolvedValueOnce([
+                { productId: 'p1', quantity: 3, subtotal: 9000, saleId: 's1' },
+                { productId: 'p1', quantity: 2, subtotal: 6000, saleId: 's2' },
+            ])
+            .mockResolvedValueOnce([
+                { productId: 'p1', quantity: 1, subtotal: 3000, saleId: 's3' },
+            ]);
+
+        const result: any = await getRawMaterialConsumptionReport('rm1');
+        expect(result.ok).toBe(true);
+        // Most recent lot first.
+        expect(result.data[0].lotId).toBe('lot2');
+        expect(result.data[0].status).toBe('ACTIVE');
+        expect(result.data[0].endDate).toBeNull();
+        expect(result.data[0].totalQuantitySold).toBe(1);
+        expect(result.data[0].saleCount).toBe(1);
+
+        expect(result.data[1].lotId).toBe('lot1');
+        expect(result.data[1].endDate).toBe(lot2Start.toISOString());
+        expect(result.data[1].totalQuantitySold).toBe(5);
+        expect(result.data[1].totalRevenue).toBe(15000);
+        expect(result.data[1].saleCount).toBe(2);
+        expect(result.data[1].byProduct).toEqual([{ productId: 'p1', productName: 'Café Americano', quantitySold: 5, revenue: 15000 }]);
+
+        // Lot1's window query used [lot1Start, lot2Start).
+        expect((prisma as any).saleDetail.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            where: expect.objectContaining({ sale: expect.objectContaining({ createdAt: { gte: lot1Start, lt: lot2Start } }) }),
+        }));
+    });
+
+    it('returns a failure result instead of throwing on a DB error', async () => {
+        (prisma as any).product.findMany = vi.fn().mockRejectedValue(new Error('db down'));
+        const result: any = await getRawMaterialConsumptionReport('rm1');
+        expect(result.ok).toBe(false);
     });
 });

@@ -212,6 +212,88 @@ export async function markRawMaterialLotDepleted(lotId: string): Promise<ActionR
     }
 }
 
+// ─── "What sold while this insumo lasted" report ────────────────────────────
+
+export interface RawMaterialConsumptionLot {
+    lotId: string;
+    lotNumber: string | null;
+    status: "ACTIVE" | "DEPLETED";
+    startDate: string;
+    /** null while the lot is still the active one — the window is open-ended. */
+    endDate: string | null;
+    saleCount: number;
+    totalQuantitySold: number;
+    totalRevenue: number;
+    byProduct: { productId: string; productName: string; quantitySold: number; revenue: number }[];
+}
+
+/**
+ * For a given insumo (e.g. "Café en grano"), breaks down what sold — by
+ * product, per lot — while each lot was the one in use. A lot's window runs
+ * from its `receivedDate` to the next lot's `receivedDate` (lots replace each
+ * other one at a time, see receiveRawMaterialLot), or to `updatedAt` if it
+ * was manually marked DEPLETED with no replacement yet, or stays open-ended
+ * if it's still ACTIVE.
+ */
+export async function getRawMaterialConsumptionReport(rawMaterialId: string): Promise<ActionResult<RawMaterialConsumptionLot[]>> {
+    try {
+        await requirePermission("VIEW_REPORTS");
+
+        const [lots, products] = await Promise.all([
+            prisma.rawMaterialLot.findMany({ where: { rawMaterialId }, orderBy: { receivedDate: "asc" } }),
+            prisma.product.findMany({ where: { rawMaterialId }, select: { id: true, name: true } }),
+        ]);
+        if (products.length === 0 || lots.length === 0) return ok([]);
+
+        const productIds = products.map((p) => p.id);
+        const nameById = new Map(products.map((p) => [p.id, p.name]));
+
+        const results: RawMaterialConsumptionLot[] = [];
+        for (let i = 0; i < lots.length; i++) {
+            const lot = lots[i];
+            const next = lots[i + 1];
+            const start = lot.receivedDate;
+            const end = next ? next.receivedDate : lot.status === "DEPLETED" ? lot.updatedAt : null;
+
+            const details = await prisma.saleDetail.findMany({
+                where: {
+                    productId: { in: productIds },
+                    sale: { status: "COMPLETED", createdAt: end ? { gte: start, lt: end } : { gte: start } },
+                },
+                select: { productId: true, quantity: true, subtotal: true, saleId: true },
+            });
+
+            const byProduct = new Map<string, { quantitySold: number; revenue: number }>();
+            const saleIds = new Set<string>();
+            for (const d of details) {
+                saleIds.add(d.saleId);
+                const entry = byProduct.get(d.productId) ?? { quantitySold: 0, revenue: 0 };
+                entry.quantitySold += d.quantity;
+                entry.revenue += d.subtotal;
+                byProduct.set(d.productId, entry);
+            }
+
+            results.push({
+                lotId: lot.id,
+                lotNumber: lot.lotNumber,
+                status: lot.status as "ACTIVE" | "DEPLETED",
+                startDate: start.toISOString(),
+                endDate: end ? end.toISOString() : null,
+                saleCount: saleIds.size,
+                totalQuantitySold: Array.from(byProduct.values()).reduce((a, v) => a + v.quantitySold, 0),
+                totalRevenue: Array.from(byProduct.values()).reduce((a, v) => a + v.revenue, 0),
+                byProduct: Array.from(byProduct.entries())
+                    .map(([productId, v]) => ({ productId, productName: nameById.get(productId) ?? "?", ...v }))
+                    .sort((a, b) => b.quantitySold - a.quantitySold),
+            });
+        }
+        return ok(results.reverse()); // most recent lot first
+    } catch (error) {
+        console.error("[getRawMaterialConsumptionReport]", error);
+        return fail(toUserMessage(error, "No se pudo generar el reporte de consumo."));
+    }
+}
+
 // ─── Expiration dashboard widget ────────────────────────────────────────────
 
 export interface ExpiringItem {

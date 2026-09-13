@@ -170,6 +170,12 @@ model Product {
   // category per brand/line. Optional: most products aren't in any promo.
   familyId           String?
   family             ProductFamily?       @relation(fields: [familyId], references: [id])
+  /// Which bulk insumo (see RawMaterial) this product is made from, e.g.
+  /// "Café Americano" -> "Café en grano". One insumo per product — good
+  /// enough to answer "what did we sell while this batch of coffee lasted"
+  /// without building a full multi-ingredient recipe/BOM.
+  rawMaterialId      String?
+  rawMaterial        RawMaterial?         @relation(fields: [rawMaterialId], references: [id])
   imageUrl           String? // Already existed
   isFavorite         Boolean              @default(false)
   isActive           Boolean              @default(true)
@@ -235,6 +241,7 @@ model RawMaterial {
   id        String           @id @default(uuid())
   name      String           @unique // e.g. "Café en grano", "Mezcla de helado"
   lots      RawMaterialLot[]
+  products  Product[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 }
