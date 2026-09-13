@@ -239,3 +239,112 @@ export async function getSaleForPrint(saleId: string) {
         return { success: false, error: toUserMessage(err, "No se pudo cargar el comprobante.") };
     }
 }
+
+// ─── Product ranking & profitability ────────────────────────────────────────
+
+export interface ProductRankingRow {
+    productId: string;
+    productName: string;
+    productCode: string;
+    quantitySold: number;
+    revenue: number;
+    /** quantitySold * Product.cost (today's cost, not a historical snapshot
+     * — SaleDetail doesn't store cost-at-sale-time, only unitPrice). Good
+     * enough for "which products are worth pushing", not exact accounting. */
+    estimatedCost: number;
+    margin: number;
+    marginPercent: number;
+}
+
+/** Full product ranking (no top-5 cap) with an estimated margin per
+ * product, for an arbitrary date range or a specific shift. */
+export async function getProductRankingReport(filters: AnalyticsFilters = {}) {
+    await requirePermission("VIEW_REPORTS");
+    const { startDate, endDate, shiftId } = filters;
+
+    const where: Prisma.SaleDetailWhereInput = {
+        sale: {
+            status: "COMPLETED",
+            ...(shiftId ? { shiftId } : startDate && endDate ? { createdAt: { gte: startOfDay(startDate), lte: endOfDay(endDate) } } : {}),
+        },
+    };
+
+    try {
+        const details = await prisma.saleDetail.findMany({
+            where,
+            select: { productId: true, quantity: true, subtotal: true, product: { select: { name: true, code: true, cost: true } } },
+        });
+
+        const map = new Map<string, ProductRankingRow>();
+        for (const d of details) {
+            const entry = map.get(d.productId) ?? {
+                productId: d.productId,
+                productName: d.product?.name ?? "Producto eliminado",
+                productCode: d.product?.code ?? "",
+                quantitySold: 0, revenue: 0, estimatedCost: 0, margin: 0, marginPercent: 0,
+            };
+            entry.quantitySold += d.quantity;
+            entry.revenue += d.subtotal;
+            entry.estimatedCost += (d.product?.cost ?? 0) * d.quantity;
+            map.set(d.productId, entry);
+        }
+
+        const rows = Array.from(map.values())
+            .map((r) => {
+                const margin = r.revenue - r.estimatedCost;
+                return { ...r, margin, marginPercent: r.revenue > 0 ? (margin / r.revenue) * 100 : 0 };
+            })
+            .sort((a, b) => b.quantitySold - a.quantitySold);
+
+        return { success: true, rows };
+    } catch (error: unknown) {
+        console.error("Error building product ranking report:", error);
+        return { success: false, error: toUserMessage(error, "No se pudo generar el reporte.") };
+    }
+}
+
+// ─── Promotion usage ─────────────────────────────────────────────────────────
+
+export interface PromotionUsageRow {
+    promotionId: string;
+    promotionName: string;
+    timesUsed: number;
+    totalDiscount: number;
+    totalRevenue: number;
+}
+
+/** How much each promotion has actually been used and discounted, for an
+ * arbitrary date range or a specific shift — is it earning its keep? */
+export async function getPromotionUsageReport(filters: AnalyticsFilters = {}) {
+    await requirePermission("VIEW_REPORTS");
+    const { startDate, endDate, shiftId } = filters;
+
+    const where: Prisma.SaleWhereInput = {
+        status: "COMPLETED",
+        promotionId: { not: null },
+        ...(shiftId ? { shiftId } : startDate && endDate ? { createdAt: { gte: startOfDay(startDate), lte: endOfDay(endDate) } } : {}),
+    };
+
+    try {
+        const sales = await prisma.sale.findMany({ where, select: { promotionId: true, promotionName: true, discount: true, total: true } });
+
+        const map = new Map<string, PromotionUsageRow>();
+        for (const s of sales) {
+            if (!s.promotionId) continue;
+            const entry = map.get(s.promotionId) ?? {
+                promotionId: s.promotionId, promotionName: s.promotionName ?? "Promoción eliminada",
+                timesUsed: 0, totalDiscount: 0, totalRevenue: 0,
+            };
+            entry.timesUsed += 1;
+            entry.totalDiscount += s.discount;
+            entry.totalRevenue += s.total;
+            map.set(s.promotionId, entry);
+        }
+
+        const rows = Array.from(map.values()).sort((a, b) => b.timesUsed - a.timesUsed);
+        return { success: true, rows };
+    } catch (error: unknown) {
+        console.error("Error building promotion usage report:", error);
+        return { success: false, error: toUserMessage(error, "No se pudo generar el reporte.") };
+    }
+}

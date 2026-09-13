@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAdmin, requireSession } from "@/lib/auth";
+import { requireAdmin, requireSession, requirePermission } from "@/lib/auth";
 import { toCsv, csvResponse } from "@/app/lib/csv";
+import { buildXlsx, xlsxResponse } from "@/app/lib/xlsx";
+import { getProductRankingReport, getPromotionUsageReport } from "@/app/actions/report";
 import { startOfBusinessDay, endOfBusinessDay, BUSINESS_TZ, businessDayKey } from "@/app/lib/time";
 
 const STATUS: Record<string, string> = { COMPLETED: "Completada", CANCELLED: "Anulada", SUSPENDED: "Suspendida" };
@@ -68,6 +70,37 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
                 rows
             );
             return csvResponse(`turno_${businessDayKey(shift.startTime)}_${shift.register.name.replace(/\s+/g, "_")}.csv`, csv);
+        }
+
+        // These two are real .xlsx (colors, currency formatting) instead of
+        // CSV — the reports they back are meant to be read/skimmed, not just
+        // dumped for a spreadsheet formula. Gated by VIEW_REPORTS (same as
+        // the report actions themselves), not requireAdmin — a CASHIER
+        // delegated report access can pull these too.
+        if (kind === "product-ranking") {
+            await requirePermission("VIEW_REPORTS");
+            const { start, end, tag } = parseRange(req);
+            const result = await getProductRankingReport({ startDate: start, endDate: end });
+            if (!result.success || !result.rows) return new Response(result.error ?? "No se pudo generar el reporte.", { status: 500 });
+            const buffer = await buildXlsx(
+                "Ranking de productos",
+                ["Código", "Producto", "Cantidad vendida", "Ingresos$", "Costo estimado$", "Margen$", "Margen %"],
+                result.rows.map((r) => [r.productCode, r.productName, r.quantitySold, r.revenue, r.estimatedCost, r.margin, Number(r.marginPercent.toFixed(1))])
+            );
+            return xlsxResponse(`ranking_productos_${tag}.xlsx`, buffer);
+        }
+
+        if (kind === "promotion-usage") {
+            await requirePermission("VIEW_REPORTS");
+            const { start, end, tag } = parseRange(req);
+            const result = await getPromotionUsageReport({ startDate: start, endDate: end });
+            if (!result.success || !result.rows) return new Response(result.error ?? "No se pudo generar el reporte.", { status: 500 });
+            const buffer = await buildXlsx(
+                "Uso de promociones",
+                ["Promoción", "Veces usada", "Descuento total$", "Ingresos de esas ventas$"],
+                result.rows.map((r) => [r.promotionName, r.timesUsed, r.totalDiscount, r.totalRevenue])
+            );
+            return xlsxResponse(`uso_promociones_${tag}.xlsx`, buffer);
         }
 
         await requireAdmin();

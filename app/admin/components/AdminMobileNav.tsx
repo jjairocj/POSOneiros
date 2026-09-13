@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Receipt, Users, Settings, LineChart, ShoppingCart } from "lucide-react";
+import { Package, Receipt, Users, Settings, LineChart, ShoppingCart, BarChart3 } from "lucide-react";
 
 const NAV_ITEMS = [
     { name: "Resumen", href: "/admin", icon: LineChart },
     { name: "Inventario", href: "/admin/inventory", icon: Package },
     { name: "Ventas", href: "/admin/sales", icon: Receipt },
+    { name: "Reportes", href: "/admin/reports", icon: BarChart3 },
     { name: "Personal", href: "/admin/users", icon: Users },
     { name: "Ajustes", href: "/admin/settings", icon: Settings },
 ];
@@ -26,15 +27,15 @@ export default function AdminMobileNav({ visiblePaths }: AdminMobileNavProps) {
     const items = [...NAV_ITEMS.filter((item) => visiblePaths.includes(item.href)), POS_ITEM];
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg pb-safe flex justify-around items-center h-16 px-2">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg pb-safe flex justify-around items-center h-16 px-2 overflow-x-auto">
             {items.map((item) => {
                 const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
-                
+
                 return (
-                    <Link 
-                        key={item.href} 
+                    <Link
+                        key={item.href}
                         href={item.href}
-                        className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${
+                        className={`flex flex-col items-center justify-center h-full gap-1 px-3 shrink-0 transition-colors ${
                             isActive 
                                 ? "text-primary font-bold" 
                                 : "text-muted-foreground hover:text-foreground"

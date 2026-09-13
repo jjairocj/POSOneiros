@@ -34,6 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         canSee(["VIEW_DASHBOARD"]) ? "/admin" : null,
         canSee(["RECEIVE_INVENTORY", "MANAGE_CATALOG"]) ? "/admin/inventory" : null,
         canSee(["VIEW_REPORTS"]) ? "/admin/sales" : null,
+        canSee(["VIEW_REPORTS"]) ? "/admin/reports" : null,
         role === "ADMIN" ? "/admin/users" : null,
         role === "ADMIN" ? "/admin/settings" : null,
     ].filter((p): p is string => p !== null);
