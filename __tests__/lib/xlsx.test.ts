@@ -37,6 +37,24 @@ describe('buildXlsx', () => {
         expect(header.fill).toBeDefined();
     });
 
+    it('escapes a string cell that looks like a formula, so Excel treats it as text instead of evaluating it', async () => {
+        const buffer = await buildXlsx('Sheet', ['Producto'], [
+            ['=cmd|\'/c calc\'!A1'],
+            ['+1+1'],
+            ['-SUM(A1:A2)'],
+            ['@SUM(A1)'],
+            ['Buldak Ramen'], // ordinary value must pass through unchanged
+        ]);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer as any);
+        const sheet = workbook.getWorksheet('Sheet')!;
+        expect(sheet.getRow(2).getCell(1).value).toBe("'=cmd|'/c calc'!A1");
+        expect(sheet.getRow(3).getCell(1).value).toBe("'+1+1");
+        expect(sheet.getRow(4).getCell(1).value).toBe("'-SUM(A1:A2)");
+        expect(sheet.getRow(5).getCell(1).value).toBe("'@SUM(A1)");
+        expect(sheet.getRow(6).getCell(1).value).toBe('Buldak Ramen');
+    });
+
     it('handles an empty row set without throwing', async () => {
         const buffer = await buildXlsx('Empty', ['A', 'B'], []);
         const workbook = new ExcelJS.Workbook();

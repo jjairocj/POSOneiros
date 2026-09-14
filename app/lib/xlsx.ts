@@ -1,6 +1,19 @@
 import ExcelJS from "exceljs";
 
 /**
+ * A string cell starting with =, +, -, @, or a tab/CR is interpreted by
+ * Excel as a formula when the file opens — a classic CSV/XLSX "formula
+ * injection" (CWE-1236). Our rows can carry user-entered text (a product or
+ * promotion name), so every string value is escaped by prefixing a literal
+ * `'` before it reaches the sheet: Excel then displays it as plain text
+ * (the leading quote itself isn't shown) instead of evaluating it.
+ */
+function escapeFormula(value: string | number | null | undefined): string | number | null | undefined {
+    if (typeof value !== "string") return value;
+    return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+/**
  * Builds a single-sheet, styled .xlsx workbook: bold header row with a fill
  * color, auto-sized columns, and a currency number format on any column
  * whose header ends in "$" (stripped from the displayed header). Used by the
@@ -25,7 +38,8 @@ export async function buildXlsx(sheetName: string, headers: string[], rows: (str
     headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
     headerRow.alignment = { vertical: "middle" };
 
-    for (const row of rows) {
+    for (const rawRow of rows) {
+        const row = rawRow.map(escapeFormula);
         const added = sheet.addRow(row);
         row.forEach((value, i) => {
             if (isMoneyCol[i] && typeof value === "number") {

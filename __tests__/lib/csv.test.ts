@@ -11,6 +11,18 @@ describe('toCsv', () => {
     it('renders null/undefined as empty cells', () => {
         expect(toCsv(['A'], [[null], [undefined]]).slice(1)).toBe('A\r\n\r\n');
     });
+
+    it('escapes a cell that looks like a formula so Excel treats it as text instead of evaluating it on open', () => {
+        const csv = toCsv(['Producto'], [
+            ['=SUM(A1:A2)'], ['+1+1'], ['-1+1'], ['@SUM(A1)'], ['Buldak Ramen'],
+        ]);
+        const lines = csv.slice(1).split('\r\n');
+        expect(lines[1]).toBe("'=SUM(A1:A2)");
+        expect(lines[2]).toBe("'+1+1");
+        expect(lines[3]).toBe("'-1+1");
+        expect(lines[4]).toBe("'@SUM(A1)");
+        expect(lines[5]).toBe('Buldak Ramen'); // ordinary value passes through unchanged
+    });
 });
 
 describe('business time (America/Bogota)', () => {
