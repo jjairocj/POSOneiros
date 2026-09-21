@@ -1,0 +1,109 @@
+# Oneiros POS para CasaOS (instalación personalizada: "+" → "Install a customized app" → pegar/importar este YAML).
+# También funciona con `docker compose -f docker-compose.casaos.yml up -d`.
+# Guía completa: docs/17-Despliegue-Docker-CasaOS.md
+#
+# Antes de instalar, la imagen debe existir en el servidor (ver la guía):
+#   docker load < oneiros-pos.tar     ->  oneiros-pos:latest
+name: oneiros-pos
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: oneiros-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oneiros
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-cambia-esta-clave-de-la-base}
+      POSTGRES_DB: oneirospos
+      TZ: America/Bogota
+    volumes:
+      - /DATA/AppData/oneiros-pos/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oneiros -d oneirospos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [oneiros]
+    x-casaos:
+      volumes:
+        - container: /var/lib/postgresql/data
+          description:
+            en_us: PostgreSQL data (your business data lives here — back it up)
+            es_es: Datos de PostgreSQL (aquí viven los datos del negocio — haz copias de seguridad)
+
+  app:
+    image: oneiros-pos:latest
+    pull_policy: never          # la imagen se carga localmente, no se descarga de internet
+    container_name: oneiros-pos
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - target: 3000
+        published: "3000"
+        protocol: tcp
+    environment:
+      # Misma clave que DB_PASSWORD de arriba.
+      DATABASE_URL: postgresql://oneiros:${DB_PASSWORD:-cambia-esta-clave-de-la-base}@db:5432/oneirospos
+      # Secreto para firmar sesiones. Genera uno: openssl rand -base64 32
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-cambia-esto-por-un-secreto-largo-y-aleatorio}
+      # Dirección con la que ABRES la app desde tus dispositivos (IP del servidor o su nombre, sin barra final).
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://192.168.1.50:3000}
+      # Sólo se usan la PRIMERA vez (base vacía) para crear el administrador.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@tunegocio.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-cambia-esta-clave}
+      BUSINESS_NAME: ${BUSINESS_NAME:-Sucursal Principal}
+      TZ: America/Bogota
+    networks: [oneiros]
+    x-casaos:
+      envs:
+        - container: DATABASE_URL
+          description:
+            es_es: Conexión a la base de datos (la clave debe coincidir con la del servicio db)
+            en_us: Database connection (password must match the db service)
+        - container: NEXTAUTH_SECRET
+          description:
+            es_es: Secreto de sesiones — cámbialo por uno propio (openssl rand -base64 32)
+            en_us: Session secret — replace with your own
+        - container: NEXTAUTH_URL
+          description:
+            es_es: URL con la que abres la app, ej. http://192.168.1.50:3000
+            en_us: URL you use to open the app
+        - container: ADMIN_EMAIL
+          description:
+            es_es: Correo del primer administrador (solo se usa con la base vacía)
+            en_us: First admin email (only used on an empty database)
+        - container: ADMIN_PASSWORD
+          description:
+            es_es: Clave del primer administrador, mínimo 8 caracteres (solo se usa con la base vacía)
+            en_us: First admin password, min 8 chars (only used on an empty database)
+      ports:
+        - container: "3000"
+          description:
+            es_es: Puerto web de Oneiros POS
+            en_us: Oneiros POS web port
+
+networks:
+  oneiros:
+    driver: bridge
+
+x-casaos:
+  architectures: [amd64, arm64]
+  main: app
+  index: /login
+  port_map: "3000"
+  category: Business
+  title:
+    en_us: Oneiros POS
+    es_es: Oneiros POS
+  tagline:
+    en_us: Point of sale, inventory and reports for a small business
+    es_es: Punto de venta, inventario y reportes para un negocio pequeño
+  description:
+    en_us: Private point-of-sale app with its own PostgreSQL database. Runs only on your local network.
+    es_es: App privada de punto de venta con su propia base PostgreSQL. Funciona solo en tu red local.
+  author: Oneiros
+  developer: Oneiros
+  icon: ""
+  thumbnail: ""
