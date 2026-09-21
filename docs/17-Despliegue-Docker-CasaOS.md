@@ -64,6 +64,20 @@ postgresql://USUARIO:CLAVE@IP:5432/BASE      # símbolos en la clave codificados
 
 Si esa base ya viene copiada/migrada (con sus usuarios), `ADMIN_EMAIL`/`ADMIN_PASSWORD` no se usan. Las migraciones pendientes se aplican solas al arrancar. Verificado contra una copia real de la base de producción en otro equipo de la red: arranque sano, 18 migraciones ya aplicadas (sin cambios), login y todas las páginas del admin cargando datos reales.
 
+## CI/CD: publicar y actualizar sin tocar el servidor
+
+```
+git push origin main  ->  GitHub Actions: typecheck + tests  ->  imagen linux/amd64  ->  GHCR (privada)
+                                                                  ->  Watchtower en el PC la detecta y reinicia la app
+```
+
+- **Workflow:** `.github/workflows/docker-image.yml`. Solo publica si los tests pasan. Etiquetas: `latest` y el hash corto del commit (`ghcr.io/jjairocj/oneiros-pos:<sha>`, sirve para volver atrás). También se lanza a mano en GitHub → Actions → *Imagen Docker* → *Run workflow*. Los `.md`/`docs` no disparan el build.
+- **Sin secretos extra:** el workflow publica con el `GITHUB_TOKEN` propio de GitHub. La imagen queda **privada** (paquete vinculado al repo).
+- **Configuración única en el PC:** `docker login ghcr.io -u jjairocj` con un token clásico de GitHub con solo el permiso `read:packages` (GitHub → Settings → Developer settings → Tokens). El mismo token va en `REPO_PASS` del servicio `watchtower` del compose.
+- **Actualización automática:** Watchtower revisa cada 5 min y solo toca los contenedores con la etiqueta `com.centurylinklabs.watchtower.enable=true` (la app, nunca la base). Para actualizar a mano: `docker compose pull && docker compose up -d`.
+- **Migraciones:** cada versión nueva aplica sus migraciones al arrancar, contra la base real. Antes de cambios grandes de esquema haz una copia (`pg_dump`, ver abajo). Volver a una imagen anterior no deshace migraciones ya aplicadas.
+- **Vercel** sigue siendo independiente (despliegue por CLI); este flujo solo cubre la imagen del servidor local.
+
 ## Datos y copias de seguridad
 
 Los datos viven en `/DATA/AppData/oneiros-pos/postgres` (volumen del contenedor `db`). **Haz copias**: por ejemplo un cron en el servidor:
