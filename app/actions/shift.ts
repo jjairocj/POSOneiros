@@ -15,10 +15,39 @@ import { businessHour } from "@/app/lib/time";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 
-export interface ShiftSummary {
+/** Expected (from recorded sales) vs what the cashier counted, per payment method. */
+export interface MethodReconciliation {
     expected: number;
     declared: number;
     difference: number;
+}
+
+/** What the cashier counted at close. Card = datáfono total, transfer = Nequi/Daviplata etc. */
+export interface DeclaredAmounts {
+    cash: number;
+    card: number;
+    transfer: number;
+}
+
+/** Shown on the review step of the close flow, BEFORE closing. */
+export interface ShiftClosePreview {
+    baseAmount: number;
+    cashSales: number;
+    cardSales: number;
+    transferSales: number;
+    /** Cash the drawer should hold: base + cash sales. */
+    expectedCash: number;
+}
+
+export interface ShiftSummary {
+    // Cash reconciliation (kept flat — the drawer count is the headline number).
+    expected: number;
+    declared: number;
+    difference: number;
+    baseAmount: number;
+    card: MethodReconciliation;
+    transfer: MethodReconciliation;
+    note: string | null;
     totalSales: number;
     cashSales: number;
     cardSales: number;
@@ -99,44 +128,98 @@ export async function getActiveShift() {
     });
 }
 
+/** Sums a shift's completed sales by payment method (payments are stored net of change). */
+function salesByMethod(sales: { status: string; total: number; payments: { method: string; amount: number }[] }[]) {
+    let cash = 0, card = 0, transfer = 0;
+    for (const sale of sales) {
+        if (sale.status !== "COMPLETED") continue;
+        for (const p of sale.payments) {
+            if (p.method === "CASH") cash += p.amount;
+            else if (p.method === "CARD") card += p.amount;
+            else if (p.method === "TRANSFER") transfer += p.amount;
+        }
+    }
+    return { cash, card, transfer };
+}
+
+async function loadShiftForClose(shiftId: string, user: Awaited<ReturnType<typeof requireSession>>) {
+    const shift = await prisma.shift.findUnique({
+        where: { id: shiftId },
+        include: {
+            sales: { include: { details: true, payments: true } },
+            user: { select: { name: true } },
+        },
+    });
+    if (!shift || shift.status !== "OPEN") return { error: "El turno no está abierto." } as const;
+    if (shift.userId !== user.id && !roleAtLeast(user.role, "SUPERVISOR")) return { error: "Este turno pertenece a otro usuario." } as const;
+    return { shift } as const;
+}
+
+/**
+ * Numbers the cashier is compared against on the review step of the close
+ * flow. Fetched only after they've typed their counts, so the count itself
+ * stays blind (they can't just copy the expected figures).
+ */
+export async function getShiftClosePreview(shiftId: string): Promise<ActionResult<ShiftClosePreview>> {
+    try {
+        const user = await requireSession();
+        const loaded = await loadShiftForClose(shiftId, user);
+        if (!loaded.shift) return fail(loaded.error ?? "El turno no está abierto.");
+        const { shift } = loaded;
+        const by = salesByMethod(shift.sales);
+        return ok({
+            baseAmount: shift.baseAmount,
+            cashSales: by.cash,
+            cardSales: by.card,
+            transferSales: by.transfer,
+            expectedCash: shift.baseAmount + by.cash,
+        });
+    } catch (err) {
+        console.error("[getShiftClosePreview]", err);
+        return fail(toUserMessage(err, "No se pudo calcular el cuadre."));
+    }
+}
+
 /**
  * Closes the shift and returns the Z-report summary.
  * Expected cash = base + CASH payments of completed sales (cash payments are
- * stored net of change, so no change adjustment is needed).
+ * stored net of change, so no change adjustment is needed); card and
+ * transfer are compared against their own totals. If ANY declared amount
+ * differs from expected a reason (`note`) is required — checked here, not
+ * only in the UI.
  */
-export async function closeShift(shiftId: string, closeAmount: number): Promise<ActionResult<{ summary: ShiftSummary }>> {
+export async function closeShift(shiftId: string, declaredInput: DeclaredAmounts, note?: string): Promise<ActionResult<{ summary: ShiftSummary }>> {
     try {
         const user = await requireSession();
 
-        if (typeof closeAmount !== "number" || !Number.isFinite(closeAmount) || closeAmount < 0) {
-            return fail("El monto contado debe ser un número mayor o igual a cero.");
+        const values = [declaredInput?.cash, declaredInput?.card, declaredInput?.transfer];
+        if (values.some((v) => typeof v !== "number" || !Number.isFinite(v) || v < 0)) {
+            return fail("Los montos contados deben ser números mayores o iguales a cero.");
         }
+        const declared: DeclaredAmounts = {
+            cash: Math.round(declaredInput.cash),
+            card: Math.round(declaredInput.card),
+            transfer: Math.round(declaredInput.transfer),
+        };
 
-        const shift = await prisma.shift.findUnique({
-            where: { id: shiftId },
-            include: {
-                sales: { include: { details: true, payments: true } },
-                user: { select: { name: true } },
-            },
-        });
-
-        if (!shift || shift.status !== "OPEN") return fail("El turno no está abierto.");
-        if (shift.userId !== user.id && !roleAtLeast(user.role, "SUPERVISOR")) return fail("Este turno pertenece a otro usuario.");
+        const loaded = await loadShiftForClose(shiftId, user);
+        if (!loaded.shift) return fail(loaded.error ?? "El turno no está abierto.");
+        const { shift } = loaded;
 
         const completed = shift.sales.filter((s) => s.status === "COMPLETED");
         const cancelledCount = shift.sales.length - completed.length;
 
-        let cashSales = 0, cardSales = 0, transferSales = 0;
-        for (const sale of completed) {
-            for (const p of sale.payments) {
-                if (p.method === "CASH") cashSales += p.amount;
-                else if (p.method === "CARD") cardSales += p.amount;
-                else if (p.method === "TRANSFER") transferSales += p.amount;
-            }
-        }
+        const by = salesByMethod(shift.sales);
         const totalSales = completed.reduce((acc, s) => acc + s.total, 0);
-        const expectedAmount = shift.baseAmount + cashSales;
-        const difference = closeAmount - expectedAmount;
+        const expectedAmount = shift.baseAmount + by.cash;
+        const difference = declared.cash - expectedAmount;
+        const cardDifference = declared.card - by.card;
+        const transferDifference = declared.transfer - by.transfer;
+
+        const cleanNote = note?.trim() || null;
+        if ((difference !== 0 || cardDifference !== 0 || transferDifference !== 0) && !cleanNote) {
+            return fail("Hay un descuadre: escribe el motivo para poder cerrar el turno.");
+        }
 
         const productQty: Record<string, number> = {};
         for (const sale of completed) {
@@ -154,19 +237,30 @@ export async function closeShift(shiftId: string, closeAmount: number): Promise<
 
         await prisma.shift.update({
             where: { id: shiftId },
-            data: { status: "CLOSED", closeAmount: Math.round(closeAmount), endTime: new Date() },
+            data: {
+                status: "CLOSED",
+                closeAmount: declared.cash,
+                closeCard: declared.card,
+                closeTransfer: declared.transfer,
+                closeNote: cleanNote,
+                endTime: new Date(),
+            },
         });
 
         revalidatePath("/pos");
         return ok({
             summary: {
                 expected: expectedAmount,
-                declared: closeAmount,
+                declared: declared.cash,
                 difference,
+                baseAmount: shift.baseAmount,
+                card: { expected: by.card, declared: declared.card, difference: cardDifference },
+                transfer: { expected: by.transfer, declared: declared.transfer, difference: transferDifference },
+                note: cleanNote,
                 totalSales,
-                cashSales,
-                cardSales,
-                transferSales,
+                cashSales: by.cash,
+                cardSales: by.card,
+                transferSales: by.transfer,
                 cancelledCount,
                 transactionCount: completed.length,
                 topProduct,

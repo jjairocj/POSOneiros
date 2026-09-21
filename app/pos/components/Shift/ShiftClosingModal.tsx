@@ -1,43 +1,45 @@
 /**
  * @file ShiftClosingModal.tsx
- * @description Two-stage modal for closing a cashier's shift.
+ * @description Three-stage modal for closing a cashier's shift.
  *
- * STAGE 1 — Cash reconciliation form
- *   The cashier enters the physical cash total in the drawer. On submit the
- *   `closeShift` server action is called. The button is disabled while the
- *   field is empty to prevent accidental empty submissions.
+ * STAGE 1 — Count form
+ *   Shows the opening base (read-only) and asks for what the cashier counted:
+ *   cash in the drawer (base included), transfers, and card/datáfono totals.
+ *   Nothing about expected amounts is shown yet, so the count stays blind.
  *
- * STAGE 2 — Narrative Z-report summary
- *   After a successful close the modal transitions to a storytelling view that
- *   shows the cashier how their shift went, following the "desenlace" arc from
- *   the design spec:
+ * STAGE 2 — Reconciliation review (after clicking "Cerrar Turno")
+ *   Fetches the expected figures and shows expected vs typed per method with
+ *   the differences. If anything doesn't match, a reason is required before
+ *   the shift can be closed (also enforced server-side).
  *
- *   - Personalised closing message ("¡Buen turno, [first name]!")
- *   - Transaction count and total revenue (the main numbers)
- *   - Product estrella (top product by quantity — shown only when > 0 sales)
- *   - Hora pico in 12h format (shown only when > 0 sales)
- *   - Cash reconciliation: expected vs declared vs difference
- *     - difference < 0 → red (shortage)
- *     - difference > 0 → amber (surplus, unusual)
- *     - difference = 0 → green (perfect match)
- *
- * "Confirmar y Salir" calls router.refresh() then window.location.reload() to
- * force ShiftGuard to re-evaluate (the shift is now CLOSED server-side).
+ * STAGE 3 — Z-report summary
+ *   Compact stats, reconciliation per method, the recorded reason and the
+ *   .xlsx download. "Confirmar y Salir" reloads so ShiftGuard sees the shift
+ *   is CLOSED.
  *
  * @param activeShiftId - ID of the shift to close.
- * @param onCancel      - Called when the user dismisses stage 1 without closing.
+ * @param baseAmount    - Opening base, shown read-only in stage 1.
+ * @param onCancel      - Called when the user dismisses without closing.
  */
 
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { createPortal } from "react-dom";
-import { closeShift, type ShiftSummary } from "@/app/actions/shift";
+import { closeShift, getShiftClosePreview, type ShiftSummary, type ShiftClosePreview } from "@/app/actions/shift";
+import { Hint } from "@/app/components/TutorialMode";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogOut, CheckCircle2, Trophy, Clock, ShoppingBag, TrendingUp, Banknote, CreditCard, ArrowRightLeft, AlertCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+
+const money = (n: number) => `$${n.toLocaleString("es-CO")}`;
+const signed = (n: number) => (n < 0 ? `-${money(Math.abs(n))}` : `+${money(n)}`);
+const diffColor = (n: number) => (n < 0 ? "text-destructive" : n > 0 ? "text-amber-500" : "text-emerald-500");
+
+/** Empty field = 0 (only the cash count is mandatory). */
+const toAmount = (v: string) => (v.trim() === "" ? 0 : parseFloat(v));
 
 /** Converts a 0–23 hour integer to a human-readable 12h string. */
 function formatHour(h: number) {
@@ -46,26 +48,42 @@ function formatHour(h: number) {
     return `${display}:00 ${period}`;
 }
 
-export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeShiftId: string; onCancel: () => void }) {
-    const [amount, setAmount] = useState("");
+export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCancel }: { activeShiftId: string; baseAmount?: number; onCancel: () => void }) {
+    const [cash, setCash] = useState("");
+    const [transfer, setTransfer] = useState("");
+    const [card, setCard] = useState("");
+    const [note, setNote] = useState("");
+    const [preview, setPreview] = useState<ShiftClosePreview | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [summary, setSummary] = useState<ShiftSummary | null>(null);
     const router = useRouter();
 
-    const handleCloseShift = async (e: React.FormEvent) => {
+    const declared = { cash: toAmount(cash), card: toAmount(card), transfer: toAmount(transfer) };
+
+    /** Stage 1 → 2: fetch what was expected and show the comparison. */
+    const handleReview = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-
-        const closeAmount = parseFloat(amount);
-        if (isNaN(closeAmount) || closeAmount < 0) {
-            setError("Monto inválido");
-            return;
-        }
-
+        if (Object.values(declared).some((v) => isNaN(v) || v < 0)) { setError("Monto inválido"); return; }
         setLoading(true);
         try {
-            const res = await closeShift(activeShiftId, closeAmount);
+            const res = await getShiftClosePreview(activeShiftId);
+            if (!res.ok) { setError(res.error); return; }
+            setPreview(res.data);
+        } catch {
+            setError("No se pudo conectar con el servidor. Intenta de nuevo.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /** Stage 2 → 3: actually close the shift. */
+    const handleConfirmClose = async () => {
+        setError("");
+        setLoading(true);
+        try {
+            const res = await closeShift(activeShiftId, declared, note);
             if (!res.ok) { setError(res.error); return; }
             setSummary(res.data.summary);
         } catch {
@@ -81,115 +99,98 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
     };
 
     if (summary) {
-        const differenceColor =
-            summary.difference < 0
-                ? "text-destructive"
-                : summary.difference > 0
-                ? "text-amber-500"
-                : "text-emerald-500";
-
         const closingMessage = summary.userName
             ? `¡Buen turno, ${summary.userName.split(" ")[0]}!`
             : "¡Buen turno!";
 
+        const rows = [
+            { label: "Efectivo", icon: Banknote, ...{ expected: summary.expected, declared: summary.declared, difference: summary.difference } },
+            { label: "Tarjeta", icon: CreditCard, ...summary.card },
+            { label: "Transferencias", icon: ArrowRightLeft, ...summary.transfer },
+        ];
+
         return createPortal(
             <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto p-4">
-                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border my-auto">
+                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 duration-300 border border-border my-auto">
                     {/* Header */}
-                    <div className="flex flex-col items-center text-center space-y-2 mb-6">
-                        <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-2">
-                            <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                    <div className="flex flex-col items-center text-center space-y-1 mb-4">
+                        <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center mb-1">
+                            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
                         </div>
-                        <h2 className="text-2xl font-bold tracking-tight">{closingMessage}</h2>
-                        <p className="text-muted-foreground text-sm">Aquí está el resumen de tu turno.</p>
+                        <h2 className="text-xl font-bold tracking-tight">{closingMessage}</h2>
+                        <Hint className="text-muted-foreground text-sm">Aquí está el resumen de tu turno.</Hint>
                     </div>
 
-                    {/* Narrative stats */}
-                    <div className="grid grid-cols-2 gap-3 mb-5">
-                        <div className="bg-muted/50 rounded-2xl p-4 border border-border/50 flex flex-col gap-1">
-                            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                                <ShoppingBag className="w-3.5 h-3.5" />
-                                Transacciones
+                    {/* Narrative stats — deliberately compact */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className="bg-muted/50 rounded-xl px-3 py-2 border border-border/50">
+                            <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
+                                <ShoppingBag className="w-3 h-3" /> Transacciones
                             </div>
-                            <span className="text-2xl font-black text-foreground">{summary.transactionCount}</span>
+                            <span className="text-base font-bold text-foreground">{summary.transactionCount}</span>
                         </div>
-                        <div className="bg-muted/50 rounded-2xl p-4 border border-border/50 flex flex-col gap-1">
-                            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                                <TrendingUp className="w-3.5 h-3.5" />
-                                Total Ventas
+                        <div className="bg-muted/50 rounded-xl px-3 py-2 border border-border/50">
+                            <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
+                                <TrendingUp className="w-3 h-3" /> Total Ventas
                             </div>
-                            <span className="text-2xl font-black text-foreground">${summary.totalSales.toLocaleString()}</span>
+                            <span className="text-base font-bold text-foreground">{money(summary.totalSales)}</span>
                         </div>
                         {summary.topProduct && (
-                            <div className="bg-amber-500/10 rounded-2xl p-4 border border-amber-500/20 flex flex-col gap-1">
-                                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-xs font-semibold uppercase tracking-wider">
-                                    <Trophy className="w-3.5 h-3.5" />
-                                    Producto estrella
+                            <div className="bg-amber-500/10 rounded-xl px-3 py-2 border border-amber-500/20">
+                                <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-[10px] font-semibold uppercase tracking-wider">
+                                    <Trophy className="w-3 h-3" /> Producto estrella
                                 </div>
-                                <span className="text-sm font-bold text-foreground leading-tight">{summary.topProduct}</span>
+                                <span className="text-sm font-semibold text-foreground leading-tight line-clamp-1">{summary.topProduct}</span>
                             </div>
                         )}
                         {summary.peakHour !== null && (
-                            <div className="bg-primary/10 rounded-2xl p-4 border border-primary/20 flex flex-col gap-1">
-                                <div className="flex items-center gap-1.5 text-primary text-xs font-semibold uppercase tracking-wider">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    Hora pico
+                            <div className="bg-primary/10 rounded-xl px-3 py-2 border border-primary/20">
+                                <div className="flex items-center gap-1 text-primary text-[10px] font-semibold uppercase tracking-wider">
+                                    <Clock className="w-3 h-3" /> Hora pico
                                 </div>
-                                <span className="text-sm font-bold text-foreground">{formatHour(summary.peakHour)}</span>
+                                <span className="text-sm font-semibold text-foreground">{formatHour(summary.peakHour)}</span>
                             </div>
                         )}
                     </div>
-
-                    {/* Payment breakdown */}
-                    <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-                        <div className="bg-muted/40 rounded-2xl p-3 border border-border/50">
-                            <div className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"><Banknote className="w-3 h-3" />Efectivo</div>
-                            <div className="text-sm font-black mt-1">${summary.cashSales.toLocaleString()}</div>
-                        </div>
-                        <div className="bg-muted/40 rounded-2xl p-3 border border-border/50">
-                            <div className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"><CreditCard className="w-3 h-3" />Tarjeta</div>
-                            <div className="text-sm font-black mt-1">${summary.cardSales.toLocaleString()}</div>
-                        </div>
-                        <div className="bg-muted/40 rounded-2xl p-3 border border-border/50">
-                            <div className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"><ArrowRightLeft className="w-3 h-3" />Transf.</div>
-                            <div className="text-sm font-black mt-1">${summary.transferSales.toLocaleString()}</div>
-                        </div>
-                    </div>
                     {summary.cancelledCount > 0 && (
-                        <p className="text-xs text-muted-foreground text-center mb-4">{summary.cancelledCount} venta{summary.cancelledCount === 1 ? "" : "s"} anulada{summary.cancelledCount === 1 ? "" : "s"} (no cuentan en los totales).</p>
+                        <p className="text-xs text-muted-foreground text-center mb-3">{summary.cancelledCount} venta{summary.cancelledCount === 1 ? "" : "s"} anulada{summary.cancelledCount === 1 ? "" : "s"} (no cuentan en los totales).</p>
                     )}
 
-                    {/* Cash reconciliation */}
-                    <div className="space-y-3 mb-6 bg-muted/50 p-5 rounded-2xl border border-border/50">
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground font-medium">Esperado en efectivo</span>
-                            <strong>${summary.expected.toLocaleString()}</strong>
+                    {/* Reconciliation per method */}
+                    <div className="mb-4 bg-muted/50 p-4 rounded-2xl border border-border/50">
+                        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 text-sm items-center">
+                            <span />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Esperado</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Contado</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Diferencia</span>
+                            {rows.map((r) => (
+                                <Fragment key={r.label}>
+                                    <span className="flex items-center gap-1.5 font-medium"><r.icon className="w-3.5 h-3.5 text-muted-foreground" />{r.label}</span>
+                                    <span className="text-right">{money(r.expected)}</span>
+                                    <span className="text-right font-semibold">{money(r.declared)}</span>
+                                    <span className={`text-right font-bold ${diffColor(r.difference)}`}>{r.difference === 0 ? money(0) : signed(r.difference)}</span>
+                                </Fragment>
+                            ))}
                         </div>
-                        <p className="text-[11px] text-muted-foreground -mt-2">Base + ventas en efectivo. Tarjeta y transferencia no van en el cajón.</p>
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground font-medium">Monto Declarado</span>
-                            <strong>${summary.declared.toLocaleString()}</strong>
-                        </div>
-                        <Separator />
-                        <div className={`flex justify-between items-center ${differenceColor}`}>
-                            <span className="font-semibold text-sm">Diferencia</span>
-                            <strong className="text-lg">
-                                {summary.difference < 0
-                                    ? `-$${Math.abs(summary.difference).toLocaleString()}`
-                                    : `+$${summary.difference.toLocaleString()}`}
-                            </strong>
-                        </div>
+                        <Hint className="text-[11px] text-muted-foreground mt-2">Efectivo esperado = base ({money(summary.baseAmount)}) + ventas en efectivo.</Hint>
+                        {summary.note && (
+                            <>
+                                <Separator className="my-3" />
+                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Motivo del descuadre</p>
+                                <p className="text-sm mt-0.5">{summary.note}</p>
+                            </>
+                        )}
                     </div>
 
                     <a
                         href={`/api/export/shift?id=${activeShiftId}`}
-                        className="flex items-center justify-center gap-2 w-full h-11 mb-3 rounded-2xl border border-border text-sm font-semibold text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                        className="flex items-center justify-center gap-2 w-full h-10 mb-2 rounded-2xl border border-border text-sm font-semibold text-muted-foreground hover:text-primary hover:border-primary transition-colors"
                     >
-                        Descargar detalle del turno (Excel/CSV)
+                        Descargar ventas del turno (Excel .xlsx)
                     </a>
                     <Button
                         onClick={handleAcknowledge}
-                        className="w-full h-12 rounded-2xl text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"
+                        className="w-full h-11 rounded-2xl text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"
                     >
                         <CheckCircle2 className="w-5 h-5 mr-2" />
                         Confirmar y Salir
@@ -200,37 +201,123 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
         );
     }
 
-    return createPortal(
-        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto p-4">
-            <div className="bg-card w-full max-w-sm rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300 border border-border my-auto">
-                <div className="flex flex-col items-center text-center space-y-2 mb-8">
-                    <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-2">
-                        <LogOut className="w-8 h-8 text-destructive" />
-                    </div>
-                    <h2 className="text-2xl font-bold tracking-tight">Cerrar Turno</h2>
-                    <p className="text-muted-foreground text-sm">
-                        Cuenta solo el efectivo del cajón (incluida la base) para hacer el arqueo.
-                    </p>
-                </div>
+    // ── Stage 2: reconciliation review ─────────────────────────────────────
+    if (preview) {
+        const rows = [
+            { label: "Efectivo", icon: Banknote, expected: preview.expectedCash, declared: declared.cash },
+            { label: "Tarjeta", icon: CreditCard, expected: preview.cardSales, declared: declared.card },
+            { label: "Transferencias", icon: ArrowRightLeft, expected: preview.transferSales, declared: declared.transfer },
+        ].map((r) => ({ ...r, difference: Math.round(r.declared) - r.expected }));
+        const mismatch = rows.some((r) => r.difference !== 0);
 
-                <form onSubmit={handleCloseShift} className="space-y-6">
-                    <div className="space-y-2">
-                        <label htmlFor="closeAmount" className="text-sm font-semibold text-foreground ml-1">Efectivo contado en caja ($)</label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                            <Input
-                                id="closeAmount"
-                                type="number"
-                                min="0"
-                                step="100"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                placeholder="Ej. 150000"
-                                required
-                                className="pl-8 h-12 text-lg rounded-2xl bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background transition-colors"
+        return createPortal(
+            <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto p-4">
+                <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 duration-300 border border-border my-auto">
+                    <h2 className="text-xl font-bold tracking-tight text-center mb-1">Cuadre del turno</h2>
+                    <Hint className="text-muted-foreground text-sm text-center mb-4">Compara lo que digitaste con lo que el sistema esperaba.</Hint>
+
+                    <div className="bg-muted/50 p-4 rounded-2xl border border-border/50 mb-4">
+                        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 text-sm items-center">
+                            <span />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Esperado</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Digitado</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right">Diferencia</span>
+                            {rows.map((r) => (
+                                <Fragment key={r.label}>
+                                    <span className="flex items-center gap-1.5 font-medium"><r.icon className="w-3.5 h-3.5 text-muted-foreground" />{r.label}</span>
+                                    <span className="text-right">{money(r.expected)}</span>
+                                    <span className="text-right font-semibold">{money(r.declared)}</span>
+                                    <span className={`text-right font-bold ${diffColor(r.difference)}`}>{r.difference === 0 ? "OK" : signed(r.difference)}</span>
+                                </Fragment>
+                            ))}
+                        </div>
+                        <Hint className="text-[11px] text-muted-foreground mt-2">Efectivo esperado = base ({money(preview.baseAmount)}) + ventas en efectivo ({money(preview.cashSales)}).</Hint>
+                    </div>
+
+                    {mismatch && (
+                        <div className="space-y-1.5 mb-4">
+                            <label htmlFor="closeNote" className="text-sm font-semibold ml-1 text-destructive">Motivo del descuadre (obligatorio)</label>
+                            <textarea
+                                id="closeNote"
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                rows={3}
+                                placeholder="Ej. Se dio un vuelto de más / falta un voucher del datáfono"
+                                className="w-full rounded-2xl bg-muted/50 border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                             />
                         </div>
+                    )}
+
+                    {error && (
+                        <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20 mb-3">
+                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                            <p>{error}</p>
+                        </div>
+                    )}
+
+                    <div className="flex gap-3">
+                        <Button type="button" variant="outline" onClick={() => { setPreview(null); setNote(""); setError(""); }} disabled={loading} className="flex-1 h-12 rounded-2xl font-semibold">
+                            Volver a editar
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleConfirmClose}
+                            disabled={loading || (mismatch && !note.trim())}
+                            className="flex-1 h-12 rounded-2xl font-semibold shadow-lg shadow-destructive/20 hover:-translate-y-0.5 transition-all"
+                        >
+                            {loading ? "Cerrando..." : "Confirmar cierre"}
+                        </Button>
                     </div>
+                </div>
+            </div>,
+            document.body
+        );
+    }
+
+    // ── Stage 1: count form ───────────────────────────────────────────────
+    const field = (id: string, label: string, value: string, set: (v: string) => void, icon: React.ReactNode, required = false) => (
+        <div className="space-y-1.5">
+            <label htmlFor={id} className="text-sm font-semibold text-foreground ml-1 flex items-center gap-1.5">{icon}{label}</label>
+            <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                <Input
+                    id={id}
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={value}
+                    onChange={(e) => set(e.target.value)}
+                    placeholder="0"
+                    required={required}
+                    className="pl-8 h-11 text-base rounded-2xl bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background transition-colors"
+                />
+            </div>
+        </div>
+    );
+
+    return createPortal(
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto p-4">
+            <div className="bg-card w-full max-w-sm rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 duration-300 border border-border my-auto">
+                <div className="flex flex-col items-center text-center space-y-1 mb-5">
+                    <div className="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mb-1">
+                        <LogOut className="w-6 h-6 text-destructive" />
+                    </div>
+                    <h2 className="text-xl font-bold tracking-tight">Cerrar Turno</h2>
+                    <Hint className="text-muted-foreground text-sm">
+                        Cuenta lo que hay: efectivo del cajón (incluida la base), transferencias recibidas y el total del datáfono.
+                    </Hint>
+                </div>
+
+                <form onSubmit={handleReview} className="space-y-4">
+                    <div className="flex justify-between items-center rounded-2xl bg-muted/40 border border-border/50 px-4 py-3">
+                        <span className="text-sm font-semibold text-muted-foreground">Base de apertura</span>
+                        <strong className="text-base">{money(baseAmount)}</strong>
+                    </div>
+
+                    {field("closeCash", "Efectivo en caja", cash, setCash, <Banknote className="w-3.5 h-3.5 text-muted-foreground" />, true)}
+                    {field("closeTransfer", "Transferencias", transfer, setTransfer, <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" />)}
+                    {field("closeCard", "Tarjeta / Datáfono", card, setCard, <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />)}
 
                     {error && (
                         <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20">
@@ -239,20 +326,14 @@ export default function ShiftClosingModal({ activeShiftId, onCancel }: { activeS
                         </div>
                     )}
 
-                    <div className="flex gap-3">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onCancel}
-                            disabled={loading}
-                            className="flex-1 h-12 rounded-2xl font-semibold"
-                        >
+                    <div className="flex gap-3 pt-1">
+                        <Button type="button" variant="outline" onClick={onCancel} disabled={loading} className="flex-1 h-12 rounded-2xl font-semibold">
                             Cancelar
                         </Button>
                         <Button
                             type="submit"
                             variant="destructive"
-                            disabled={loading || !amount}
+                            disabled={loading || cash.trim() === ""}
                             className="flex-1 h-12 rounded-2xl font-semibold shadow-lg shadow-destructive/20 hover:-translate-y-0.5 transition-all"
                         >
                             {loading ? "Calculando..." : "Cerrar Turno"}

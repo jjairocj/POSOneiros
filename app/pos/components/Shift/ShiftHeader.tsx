@@ -8,7 +8,7 @@ import POSUserMenu from "../POSUserMenu";
 import type { PermissionKey } from "@/lib/permissions";
 
 /** Only what the header needs; the page passes the full Prisma shift. */
-type ActiveShift = { id: string; register?: { name: string } | null; _count?: { sales: number } } | null;
+type ActiveShift = { id: string; baseAmount?: number; register?: { name: string } | null; _count?: { sales: number } } | null;
 
 interface ShiftHeaderProps {
   activeShift: ActiveShift;
@@ -21,6 +21,7 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
     // Keep the id in state: after closeShift revalidates /pos, activeShift becomes null
     // and the summary modal must stay mounted until the cashier acknowledges it.
     const [closingShiftId, setClosingShiftId] = useState<string | null>(null);
+    const [closingBase, setClosingBase] = useState(0);
     const [isOpeningInfo, setIsOpeningInfo] = useState(false);
 
     return (
@@ -75,7 +76,7 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
                     <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => setClosingShiftId(activeShift.id)}
+                        onClick={() => { setClosingBase(activeShift.baseAmount ?? 0); setClosingShiftId(activeShift.id); }}
                         className="font-semibold hover:-translate-y-0.5 transition-transform"
                     >
                         <LogOut className="w-4 h-4 sm:mr-2" />
@@ -91,6 +92,7 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
             {closingShiftId && (
                 <ShiftClosingModal
                     activeShiftId={closingShiftId}
+                    baseAmount={closingBase}
                     onCancel={() => setClosingShiftId(null)}
                 />
             )}

@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { openShift, getActiveShift, closeShift } from '../app/actions/shift';
+import { openShift, getActiveShift, closeShift, getShiftClosePreview } from '../app/actions/shift';
 import prisma from '../lib/prisma';
 import { getServerSession } from 'next-auth/next';
 
@@ -38,8 +38,117 @@ vi.mock('next-auth/next', () => ({
     getServerSession: vi.fn(),
 }));
 
+// ─── closeShift: per-method cuadre + required reason ─────────────────────────
+
+describe('closeShift — cuadre por método y motivo obligatorio', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    const openShiftWithSales = () => ({
+        id: 'shift_1', userId: 'user_1', status: 'OPEN', baseAmount: 100000,
+        sales: [
+            makeSale(50000, 10, [{ name: 'Café', qty: 2 }], 'CASH'),
+            makeSale(30000, 11, [{ name: 'Jugo', qty: 1 }], 'CARD'),
+            makeSale(20000, 12, [{ name: 'Té', qty: 1 }], 'TRANSFER'),
+        ],
+        user: { name: 'Ana López' },
+    });
+
+    it('closes without a reason when cash, card and transfer all match the expected amounts', async () => {
+        (getServerSession as any).mockResolvedValue(mockSession());
+        (prisma.shift.findUnique as any).mockResolvedValue(openShiftWithSales());
+        (prisma.shift.update as any).mockResolvedValue({});
+
+        const summary = unwrap(await closeShift('shift_1', decl(150000, 30000, 20000)));
+
+        expect(summary.difference).toBe(0);
+        expect(summary.card).toEqual({ expected: 30000, declared: 30000, difference: 0 });
+        expect(summary.transfer).toEqual({ expected: 20000, declared: 20000, difference: 0 });
+        expect(summary.note).toBeNull();
+        expect(summary.baseAmount).toBe(100000);
+    });
+
+    it.each([
+        ['cash', decl(149000, 30000, 20000)],
+        ['card', decl(150000, 29000, 20000)],
+        ['transfer', decl(150000, 30000, 21000)],
+    ])('refuses to close when only %s is off and no reason is given', async (_label, declared) => {
+        (getServerSession as any).mockResolvedValue(mockSession());
+        (prisma.shift.findUnique as any).mockResolvedValue(openShiftWithSales());
+
+        const res = await closeShift('shift_1', declared);
+
+        expect(res).toMatchObject({ ok: false, error: expect.stringMatching(/motivo/i) });
+        expect(prisma.shift.update).not.toHaveBeenCalled();
+    });
+
+    it('treats a whitespace-only reason as missing', async () => {
+        (getServerSession as any).mockResolvedValue(mockSession());
+        (prisma.shift.findUnique as any).mockResolvedValue(openShiftWithSales());
+        expect((await closeShift('shift_1', decl(0, 0, 0), '   ')).ok).toBe(false);
+    });
+
+    it('persists the full breakdown and the reason on the shift when there is a mismatch', async () => {
+        (getServerSession as any).mockResolvedValue(mockSession());
+        (prisma.shift.findUnique as any).mockResolvedValue(openShiftWithSales());
+        (prisma.shift.update as any).mockResolvedValue({});
+
+        const summary = unwrap(await closeShift('shift_1', decl(148000, 30000, 20000), '  Vuelto de más  '));
+
+        expect(summary.difference).toBe(-2000);
+        expect(summary.note).toBe('Vuelto de más');
+        expect(prisma.shift.update).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({
+                status: 'CLOSED', closeAmount: 148000, closeCard: 30000, closeTransfer: 20000, closeNote: 'Vuelto de más',
+            }),
+        }));
+    });
+
+    it('rejects negative or non-numeric counts', async () => {
+        (getServerSession as any).mockResolvedValue(mockSession());
+        expect((await closeShift('shift_1', decl(-1))).ok).toBe(false);
+        expect((await closeShift('shift_1', { cash: NaN, card: 0, transfer: 0 })).ok).toBe(false);
+        expect((await closeShift('shift_1', { cash: 0 } as any)).ok).toBe(false);
+    });
+});
+
+describe('getShiftClosePreview', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('returns base and expected amounts per method (cancelled sales excluded)', async () => {
+        (getServerSession as any).mockResolvedValue(mockSession());
+        (prisma.shift.findUnique as any).mockResolvedValue({
+            id: 'shift_1', userId: 'user_1', status: 'OPEN', baseAmount: 100000,
+            sales: [
+                makeSale(50000, 10, [{ name: 'Café', qty: 2 }], 'CASH'),
+                makeSale(30000, 11, [{ name: 'Jugo', qty: 1 }], 'CARD'),
+                { ...makeSale(9999, 11, [{ name: 'X', qty: 1 }], 'TRANSFER'), status: 'CANCELLED' },
+            ],
+            user: { name: 'Ana' },
+        });
+
+        expect(await getShiftClosePreview('shift_1')).toEqual({
+            ok: true,
+            data: { baseAmount: 100000, cashSales: 50000, cardSales: 30000, transferSales: 0, expectedCash: 150000 },
+        });
+    });
+
+    it("does not reveal another user's shift to a cashier", async () => {
+        (getServerSession as any).mockResolvedValue(mockSession({ id: 'user_2' }));
+        (prisma.shift.findUnique as any).mockResolvedValue({ id: 'shift_1', userId: 'user_1', status: 'OPEN', baseAmount: 0, sales: [], user: { name: 'Ana' } });
+        expect(await getShiftClosePreview('shift_1')).toMatchObject({ ok: false, error: expect.stringMatching(/otro usuario/) });
+    });
+
+    it('fails for a shift that is not open', async () => {
+        (getServerSession as any).mockResolvedValue(mockSession());
+        (prisma.shift.findUnique as any).mockResolvedValue({ id: 'shift_1', userId: 'user_1', status: 'CLOSED', baseAmount: 0, sales: [], user: { name: 'Ana' } });
+        expect((await getShiftClosePreview('shift_1')).ok).toBe(false);
+    });
+});
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+/** Declared counts for closeShift; a note is passed where the test doesn't care about the cuadre. */
+const decl = (cash: number, card = 0, transfer = 0) => ({ cash, card, transfer });
 const unwrap = (res: any) => { if (!res.ok) throw new Error(res.error); return res.data.summary; };
 const mockSession = (overrides: object = {}) => ({ user: { id: 'user_1', name: 'Ana López', ...overrides } });
 
@@ -145,7 +254,7 @@ describe('closeShift', () => {
 
     it('throws when not authenticated', async () => {
         (getServerSession as any).mockResolvedValue(null);
-        expect(await closeShift('shift_1', 500000)).toEqual({ ok: false, error: 'No autenticado' });
+        expect(await closeShift('shift_1', decl(500000))).toEqual({ ok: false, error: 'No autenticado' });
     });
 
     it('throws when shift does not belong to the current user', async () => {
@@ -154,7 +263,7 @@ describe('closeShift', () => {
             id: 'shift_1', userId: 'user_1', status: 'OPEN', baseAmount: 0,
             sales: [], user: { name: 'Ana' },
         });
-        expect(await closeShift('shift_1', 0)).toMatchObject({ ok: false, error: expect.stringMatching(/otro usuario/) });
+        expect(await closeShift('shift_1', decl(0))).toMatchObject({ ok: false, error: expect.stringMatching(/otro usuario/) });
     });
 
     it('throws when shift is already CLOSED', async () => {
@@ -163,7 +272,7 @@ describe('closeShift', () => {
             id: 'shift_1', userId: 'user_1', status: 'CLOSED', baseAmount: 0,
             sales: [], user: { name: 'Ana' },
         });
-        expect(await closeShift('shift_1', 0)).toMatchObject({ ok: false, error: expect.stringMatching(/no está abierto/) });
+        expect(await closeShift('shift_1', decl(0))).toMatchObject({ ok: false, error: expect.stringMatching(/no está abierto/) });
     });
 
     it('expected cash = base + CASH payments only (card/transfer are not in the drawer)', async () => {
@@ -179,7 +288,7 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeShift('shift_1', 145000));
+        const summary = unwrap(await closeShift('shift_1', decl(145000, 30000, 0), 'Vuelto de más'));
 
         expect(summary.totalSales).toBe(80000);
         expect(summary.cashSales).toBe(50000);
@@ -203,7 +312,7 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeShift('shift_1', 0));
+        const summary = unwrap(await closeShift('shift_1', decl(0), 'test'));
 
         // Café: 1 + 4 = 5 units; Empanada: 3 units → Café wins
         expect(summary.topProduct).toBe('Café');
@@ -222,7 +331,7 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeShift('shift_1', 0));
+        const summary = unwrap(await closeShift('shift_1', decl(0), 'test'));
 
         expect(summary.peakHour).toBe(12);
     });
@@ -236,7 +345,7 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeShift('shift_1', 50000));
+        const summary = unwrap(await closeShift('shift_1', decl(50000)));
 
         expect(summary.topProduct).toBeNull();
         expect(summary.peakHour).toBeNull();
@@ -253,7 +362,7 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeShift('shift_1', 0));
+        const summary = unwrap(await closeShift('shift_1', decl(0), 'test'));
 
         expect(summary.userName).toBe('Carlos Ruiz');
     });
@@ -266,7 +375,7 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({ id: 'shift_1', status: 'CLOSED' });
 
-        await closeShift('shift_1', 0);
+        await closeShift('shift_1', decl(0));
 
         expect(prisma.shift.update).toHaveBeenCalledWith(
             expect.objectContaining({
