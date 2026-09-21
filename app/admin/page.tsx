@@ -12,6 +12,7 @@ import {
     Package,
     Clock,
 } from "lucide-react";
+import { Hint } from "@/app/components/TutorialMode";
 
 export const metadata = {
     title: "Oneiros Admin | Resumen",
@@ -56,9 +57,9 @@ export default async function AdminDashboardPage() {
                             <TrendingUp className="w-5 h-5" />
                         </span>
                     </div>
-                    <p className="text-xs text-muted-foreground font-medium mt-4">
+                    <Hint className="text-xs text-muted-foreground font-medium mt-4">
                         Acumulado desde las 00:00
-                    </p>
+                    </Hint>
                 </div>
 
                 {/* Transacciones */}
@@ -74,9 +75,9 @@ export default async function AdminDashboardPage() {
                             <ShoppingCart className="w-5 h-5" />
                         </span>
                     </div>
-                    <p className="text-xs text-muted-foreground font-medium mt-4">
+                    <Hint className="text-xs text-muted-foreground font-medium mt-4">
                         Ventas completadas hoy
-                    </p>
+                    </Hint>
                 </div>
 
                 {/* Turno activo */}
@@ -146,9 +147,9 @@ export default async function AdminDashboardPage() {
                             <AlertTriangle className="w-5 h-5" />
                         </span>
                     </div>
-                    <p className="text-xs text-muted-foreground font-medium mt-4">
+                    <Hint className="text-xs text-muted-foreground font-medium mt-4">
                         Productos con stock &lt; 5 unidades
-                    </p>
+                    </Hint>
                 </div>
             </div>
 

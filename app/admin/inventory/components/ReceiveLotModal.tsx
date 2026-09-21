@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { receiveProductLot } from "@/app/actions/lots";
 import { getSuppliers, type SupplierRow } from "@/app/actions/suppliers";
+import { Hint } from "@/app/components/TutorialMode";
 
 /** Health-authority traceability: every delivery of a LOT-tracked product
  * gets its own lot number and optional expiration date (see docs/16). */
@@ -87,7 +88,7 @@ export function ReceiveLotModal({ product, onClose }: { product: { id: string; n
                         ))}
                     </select>
                 </div>
-                <p className="text-xs text-muted-foreground ml-1">Ej: una caja con 8 bolsas x 4 sobres = 32 unidades, un solo lote/vencimiento para toda la entrega.</p>
+                <Hint className="text-xs text-muted-foreground ml-1">Ej: una caja con 8 bolsas x 4 sobres = 32 unidades, un solo lote/vencimiento para toda la entrega.</Hint>
 
                 {error && <p className="text-sm text-destructive font-medium bg-destructive/10 p-3 rounded-xl border border-destructive/20 text-center">{error}</p>}
                 <Button type="submit" disabled={loading || quantity === ""} className="w-full h-11 rounded-xl font-bold">

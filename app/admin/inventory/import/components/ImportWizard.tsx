@@ -13,6 +13,7 @@ import {
     ArrowRight, ArrowLeft, Loader2, RefreshCw, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/app/components/TutorialMode";
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -160,20 +161,20 @@ export default function ImportWizard() {
                     <p className="text-lg font-bold text-foreground">
                         {loading ? "Procesando archivo..." : "Arrastra el archivo aquí"}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <Hint className="text-sm text-muted-foreground mt-1">
                         o haz clic para seleccionar — Solo exportaciones de Siigo (.xlsx)
-                    </p>
+                    </Hint>
                 </div>
             </div>
 
-            <div className="bg-muted/40 rounded-2xl p-4 border border-border text-sm text-muted-foreground space-y-1">
+            <Hint as="div" className="bg-muted/40 rounded-2xl p-4 border border-border text-sm text-muted-foreground space-y-1">
                 <p className="font-semibold text-foreground flex items-center gap-2">
                     <Upload className="w-4 h-4" /> Instrucciones
                 </p>
                 <p>1. En Siigo: <strong>Inventario → Productos y servicios → Exportar</strong></p>
                 <p>2. Descarga el archivo <strong>.xlsx</strong> generado.</p>
                 <p>3. Súbelo aquí — los productos existentes se actualizarán, los nuevos se crearán.</p>
-            </div>
+            </Hint>
         </div>
     );
 

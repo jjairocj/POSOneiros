@@ -7,6 +7,7 @@ import { openShift, getRegistersForShift } from "../../../actions/shift";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogIn, X, Loader2 } from "lucide-react";
+import { Hint } from "@/app/components/TutorialMode";
 
 type RegisterOption = { id: string; name: string; prefix: string | null; busyBy: string | null };
 
@@ -67,9 +68,9 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
                 <LogIn className="w-8 h-8 text-primary" />
             </div>
             <h2 className="text-2xl font-bold tracking-tight">Apertura de Turno</h2>
-            <p className="text-muted-foreground text-sm">
+            <Hint className="text-muted-foreground text-sm">
                 Elige la caja e ingresa el efectivo con el que empiezas.
-            </p>
+            </Hint>
         </div>
 
         <div className="space-y-6">

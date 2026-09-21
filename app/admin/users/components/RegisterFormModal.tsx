@@ -10,11 +10,11 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogDescription,
 } from "@/components/ui/dialog";
 import { MonitorSmartphone, Save, Loader2 } from "lucide-react";
 import type { RegisterColumn } from "./register-columns";
 import { toast } from "sonner";
+import { HintDialogDescription } from "@/app/components/TutorialMode";
 
 interface RegisterFormModalProps {
     register?: RegisterColumn;
@@ -73,11 +73,11 @@ export function RegisterFormModal({ register, branches, trigger }: RegisterFormM
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Caja" : "Nueva Caja"}
                     </DialogTitle>
-                    <DialogDescription>
+                    <HintDialogDescription>
                         {isEditing
                             ? "Modifica los datos de la caja registradora."
                             : "Registra una nueva caja registradora para una sucursal."}
-                    </DialogDescription>
+                    </HintDialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleAction} className="space-y-4 mt-4">

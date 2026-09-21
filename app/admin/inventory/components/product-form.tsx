@@ -12,13 +12,13 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
-    DialogDescription
+    DialogTrigger
 } from "@/components/ui/dialog";
 import { PackagePlus, Save, Loader2, Star, Image as ImageIcon } from "lucide-react";
 import { ProductColumn } from "./columns";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { Hint, HintDialogDescription } from "@/app/components/TutorialMode";
 
 interface ProductFormProps {
     product?: ProductColumn;
@@ -93,9 +93,9 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Producto" : "Nuevo Producto"}
                     </DialogTitle>
-                    <DialogDescription>
+                    <HintDialogDescription>
                         Completa la información del inventario. Los campos de impuestos son porcentajes (Ej: 19 para 19%).
-                    </DialogDescription>
+                    </HintDialogDescription>
                 </DialogHeader>
 
                 <form action={handleAction} className="space-y-6 mt-4">
@@ -165,9 +165,9 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                             <datalist id="family-options">
                                 {families.map((f) => <option key={f.id} value={f.name} />)}
                             </datalist>
-                            <p className="text-xs text-muted-foreground ml-1">
+                            <Hint className="text-xs text-muted-foreground ml-1">
                                 Escribe un nombre nuevo o elige uno existente de la lista. Deja vacío si este producto no participa en ninguna promoción.
-                            </p>
+                            </Hint>
                         </div>
 
                         <div className="space-y-1.5">
@@ -183,13 +183,13 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                 <option value="LOT">Por lote — exige lote/vencimiento al recibir mercancía</option>
                                 <option value="NONE">Sin inventario — no se cuenta (ej. café, helado soft)</option>
                             </select>
-                            <p className="text-xs text-muted-foreground ml-1">
+                            <Hint className="text-xs text-muted-foreground ml-1">
                                 {trackingMode === "LOT"
                                     ? "La entrada de mercancía se hace desde \"Recibir lote\" en la tabla de inventario, no aquí."
                                     : trackingMode === "NONE"
                                         ? "Este producto se podrá vender siempre, sin descontar existencias."
                                         : "Como hoy: un número de existencias, sin lote."}
-                            </p>
+                            </Hint>
                         </div>
 
                         <div className="space-y-1.5">
@@ -206,9 +206,9 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                 <option value="none">Ninguno</option>
                                 {rawMaterials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                             </select>
-                            <p className="text-xs text-muted-foreground ml-1">
+                            <Hint className="text-xs text-muted-foreground ml-1">
                                 Ej: “Café Americano” hecho con el insumo “Café en grano” — permite reportar qué se vendió mientras duró cada lote. Los insumos se crean en la pestaña “Insumos”.
-                            </p>
+                            </Hint>
                         </div>
 
                         {/* Image URL and Favorite */}

@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Sparkles, Save, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { getProducts } from "@/app/actions/product";
 import { getProductFamilies } from "@/app/actions/product";
 import { createPromotion, updatePromotion, type PromotionInput, type PromotionRow } from "@/app/actions/promotions";
+import { Hint, HintDialogDescription } from "@/app/components/TutorialMode";
 
 type Pick = { kind: "product" | "family"; id: string };
 
@@ -142,9 +143,9 @@ export function PromotionForm({ promotion, trigger }: { promotion?: PromotionRow
             <DialogContent className="max-w-[95vw] sm:max-w-[640px] max-h-[92vh] overflow-y-auto rounded-[2rem] p-5 sm:p-8 bg-card border-border shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-black">{isEditing ? "Editar Promoción" : "Nueva Promoción"}</DialogTitle>
-                    <DialogDescription>
+                    <HintDialogDescription>
                         Se aplica sola cuando el carrito cumple las condiciones — el cajero no la activa. Las promociones no se acumulan: si varias aplican a la vez, gana la de menor número de prioridad.
-                    </DialogDescription>
+                    </HintDialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-6 mt-4">
@@ -253,11 +254,11 @@ export function PromotionForm({ promotion, trigger }: { promotion?: PromotionRow
                                 </div>
                             )}
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <Hint className="text-xs text-muted-foreground">
                             {targetType === "CONDITION_ITEMS"
                                 ? "El efecto se calcula sobre las cantidades exactas de las condiciones (el combo), no sobre unidades extra del mismo producto en el carrito."
                                 : "El producto/familia del efecto debe estar también en el carrito — si no está, la promoción simplemente no aplica."}
-                        </p>
+                        </Hint>
                     </div>
                 </div>
 

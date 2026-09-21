@@ -10,12 +10,12 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogDescription,
 } from "@/components/ui/dialog";
 import { UserPlus, Save, Loader2 } from "lucide-react";
 import type { UserColumn } from "./user-columns";
 import { roleLabel, ROLE_DESCRIPTION } from "./role-labels";
 import { toast } from "sonner";
+import { Hint, HintDialogDescription } from "@/app/components/TutorialMode";
 
 interface UserFormModalProps {
     user?: UserColumn;
@@ -79,11 +79,11 @@ export function UserFormModal({ user, roles, branches, trigger }: UserFormModalP
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Usuario" : "Nuevo Usuario"}
                     </DialogTitle>
-                    <DialogDescription>
+                    <HintDialogDescription>
                         {isEditing
                             ? "Modifica los datos del usuario. Deja la contraseña vacía para no cambiarla."
                             : "Completa los datos para crear un nuevo usuario del sistema."}
-                    </DialogDescription>
+                    </HintDialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleAction} className="space-y-4 mt-4">
@@ -143,7 +143,7 @@ export function UserFormModal({ user, roles, branches, trigger }: UserFormModalP
                                     ))}
                                 </select>
                                 {selectedRoleName && (
-                                    <p className="text-xs text-muted-foreground ml-1">{ROLE_DESCRIPTION[selectedRoleName]}</p>
+                                    <Hint className="text-xs text-muted-foreground ml-1">{ROLE_DESCRIPTION[selectedRoleName]}</Hint>
                                 )}
                             </div>
 

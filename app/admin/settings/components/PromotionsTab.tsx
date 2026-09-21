@@ -5,6 +5,7 @@ import { Sparkles, Pencil, Power, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { deletePromotion, togglePromotionActive, type PromotionRow } from "@/app/actions/promotions";
 import { PromotionForm } from "./PromotionForm";
+import { Hint } from "@/app/components/TutorialMode";
 
 const EFFECT_SUMMARY: Record<string, string> = {
     FREE_ITEM: "Regala",
@@ -45,10 +46,10 @@ export function PromotionsTab({ promotions }: { promotions: PromotionRow[] }) {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <p className="text-sm text-muted-foreground max-w-lg">
+                <Hint className="text-sm text-muted-foreground max-w-lg">
                     Se aplican solas cuando el carrito las cumple — el cajero no las activa. No se acumulan: si varias
                     aplican a la vez, gana la de menor número de prioridad.
-                </p>
+                </Hint>
                 <PromotionForm />
             </div>
 

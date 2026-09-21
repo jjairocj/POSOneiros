@@ -10,8 +10,9 @@ import {
     getRawMaterialConsumptionReport, type RawMaterialRow, type RawMaterialConsumptionLot,
 } from "@/app/actions/lots";
 import type { SupplierRow } from "@/app/actions/suppliers";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatMoney } from "@/app/lib/money";
+import { Hint, HintDialogDescription } from "@/app/components/TutorialMode";
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { timeZone: "America/Bogota" });
 
@@ -102,7 +103,7 @@ function ConsumptionReportModal({ materialId, materialName, onClose }: { materia
             <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Consumo de &quot;{materialName}&quot;</DialogTitle>
-                    <DialogDescription>Qué se vendió mientras duró cada lote de este insumo.</DialogDescription>
+                    <HintDialogDescription>Qué se vendió mientras duró cada lote de este insumo.</HintDialogDescription>
                 </DialogHeader>
                 {loading ? (
                     <div className="flex items-center justify-center py-10 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Calculando...</div>
@@ -168,10 +169,10 @@ export function RawMaterialsTable({ materials, suppliers }: { materials: RawMate
     return (
         <div className="space-y-4">
             <div className="bg-card border border-border rounded-2xl p-4">
-                <p className="text-sm text-muted-foreground mb-2">
+                <Hint className="text-sm text-muted-foreground mb-2">
                     Bitácora de insumos a granel (café, mezcla de helado) que no se cuentan por unidad vendida —
                     solo se registra el lote/vencimiento de lo que está actualmente en uso, para trazabilidad sanitaria.
-                </p>
+                </Hint>
                 <NewMaterialForm />
             </div>
 

@@ -6,6 +6,7 @@ import { ShieldCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { updateRolePermissions, type RolePermissionsRow } from "@/app/actions/roles";
 import { PERMISSION_KEYS, PERMISSION_LABEL, type PermissionKey } from "@/lib/permissions";
+import { Hint } from "@/app/components/TutorialMode";
 
 const ROLE_LABEL: Record<string, string> = { SUPERVISOR: "Supervisor", CASHIER: "Cajero" };
 
@@ -42,10 +43,10 @@ export function RolePermissionsForm({ initial }: { initial: RolePermissionsRow[]
                 <ShieldCheck className="w-5 h-5 text-primary" />
                 <h2 className="text-lg font-bold">Roles y Permisos</h2>
             </div>
-            <p className="text-sm text-muted-foreground mb-5">
+            <Hint className="text-sm text-muted-foreground mb-5">
                 Qué puede hacer cada rol más allá de la caja. El Administrador siempre tiene acceso completo;
                 personal, cajas, ajustes e importación de Siigo son exclusivos de Administrador y no se pueden delegar.
-            </p>
+            </Hint>
 
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">

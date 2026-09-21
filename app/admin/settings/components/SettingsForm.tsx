@@ -15,6 +15,7 @@ import { saveSettings, type SettingsData } from "@/app/actions/settings";
 import { Building2, Settings2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./SettingsForm.module.css";
+import { Hint } from "@/app/components/TutorialMode";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SettingsFormProps {
@@ -65,7 +66,7 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
           </div>
           <div>
             <h2 className={styles.cardTitle}>Información del negocio</h2>
-            <p className={styles.cardDesc}>Datos que aparecen en recibos y facturas.</p>
+            <Hint className={styles.cardDesc}>Datos que aparecen en recibos y facturas.</Hint>
           </div>
         </div>
 
@@ -124,7 +125,7 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
           </div>
           <div>
             <h2 className={styles.cardTitle}>Configuración operacional</h2>
-            <p className={styles.cardDesc}>Comportamiento del sistema en ventas y productos.</p>
+            <Hint className={styles.cardDesc}>Comportamiento del sistema en ventas y productos.</Hint>
           </div>
         </div>
 
@@ -167,9 +168,9 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
         <div className={styles.switchRow}>
           <div className={styles.switchInfo}>
             <span className={styles.switchLabel}>Permitir stock negativo</span>
-            <span className={styles.switchDesc}>
+            <Hint as="span" className={styles.switchDesc}>
               Si está desactivado, no se podrá vender un producto con stock 0.
-            </span>
+            </Hint>
           </div>
           <Switch
             checked={data.allowNegativeStock === "true"}
@@ -188,7 +189,7 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
           </div>
           <div>
             <h2 className={styles.cardTitle}>Recibo / Ticket</h2>
-            <p className={styles.cardDesc}>Personaliza la apariencia del recibo impreso.</p>
+            <Hint className={styles.cardDesc}>Personaliza la apariencia del recibo impreso.</Hint>
           </div>
         </div>
 
@@ -206,7 +207,7 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
         <div className={styles.switchRow}>
           <div className={styles.switchInfo}>
             <span className={styles.switchLabel}>Mostrar logo en recibo</span>
-            <span className={styles.switchDesc}>Imprime el logo del negocio en la cabecera del ticket.</span>
+            <Hint as="span" className={styles.switchDesc}>Imprime el logo del negocio en la cabecera del ticket.</Hint>
           </div>
           <Switch
             checked={data.showLogoOnReceipt === "true"}
@@ -237,14 +238,14 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
                 )}
               </div>
             </div>
-            <p className={styles.switchDesc}>Pega la URL pública (https://) de una imagen. Si no carga, el recibo usa solo el nombre del negocio.</p>
+            <Hint className={styles.switchDesc}>Pega la URL pública (https://) de una imagen. Si no carga, el recibo usa solo el nombre del negocio.</Hint>
           </div>
         )}
 
         <div className={styles.switchRow}>
           <div className={styles.switchInfo}>
             <span className={styles.switchLabel}>Mostrar desglose de impuestos</span>
-            <span className={styles.switchDesc}>Muestra IVA, ICA e ImpoConsumo por separado en el recibo.</span>
+            <Hint as="span" className={styles.switchDesc}>Muestra IVA, ICA e ImpoConsumo por separado en el recibo.</Hint>
           </div>
           <Switch
             checked={data.showTaxBreakdown === "true"}
@@ -263,11 +264,11 @@ export function SettingsForm({ initialData }: SettingsFormProps) {
             onChange={(e) => updateField("receiptWidthMm", e.target.value)}
             placeholder="Ej: 48"
           />
-          <p className={styles.switchDesc}>
+          <Hint className={styles.switchDesc}>
             Ancho real que tu impresora puede imprimir, no el ancho nominal del rollo. Un rollo de
             58mm suele imprimir solo ~44-48mm de contenido; si el recibo sale cortado al imprimir,
             reduce este valor.
-          </p>
+          </Hint>
         </div>
       </section>
         </TabsContent>

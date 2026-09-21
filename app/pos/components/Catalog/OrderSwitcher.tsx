@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useCartStore } from "@/app/store/useCartStore";
 import { Button } from "@/components/ui/button";
 import { X, Plus, AlertTriangle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { HintDialogDescription } from "@/app/components/TutorialMode";
 
 export default function OrderSwitcher() {
     const { orders, activeOrderId, setActiveOrder, addOrder, removeOrder } = useCartStore();
@@ -62,9 +63,9 @@ export default function OrderSwitcher() {
                 <DialogContent className="sm:max-w-md rounded-[2rem]">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold">Nueva Cuenta</DialogTitle>
-                        <DialogDescription>
+                        <HintDialogDescription>
                             Asigna un nombre para identificar este pedido o mesa.
-                        </DialogDescription>
+                        </HintDialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                         <Input
@@ -101,9 +102,9 @@ export default function OrderSwitcher() {
                         </div>
                         <DialogHeader>
                             <DialogTitle className="text-xl font-bold text-center">¿Eliminar esta cuenta?</DialogTitle>
-                            <DialogDescription className="text-center pt-2">
+                            <HintDialogDescription className="text-center pt-2">
                                 Se perderán todos los productos agregados a <br/><strong className="text-foreground">{orderToRemove ? orders[orderToRemove]?.name : ""}</strong>.
-                            </DialogDescription>
+                            </HintDialogDescription>
                         </DialogHeader>
                     </div>
                     <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 border-t pt-4">

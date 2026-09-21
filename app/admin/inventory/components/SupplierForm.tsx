@@ -9,10 +9,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogDescription
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Truck, Save, Loader2 } from "lucide-react";
+import { HintDialogDescription } from "@/app/components/TutorialMode";
 
 interface SupplierFormProps {
     supplier?: SupplierRow;
@@ -60,9 +60,9 @@ export function SupplierForm({ supplier, trigger }: SupplierFormProps) {
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Proveedor" : "Nuevo Proveedor"}
                     </DialogTitle>
-                    <DialogDescription>
+                    <HintDialogDescription>
                         Datos de contacto para saber a quién le compraste cada lote.
-                    </DialogDescription>
+                    </HintDialogDescription>
                 </DialogHeader>
 
                 <form action={handleAction} className="space-y-4 mt-4">

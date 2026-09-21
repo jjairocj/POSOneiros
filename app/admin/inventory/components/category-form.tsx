@@ -9,11 +9,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogDescription
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { FolderPlus, Save, Loader2 } from "lucide-react";
 import { CategoryColumn } from "./category-columns";
+import { Hint, HintDialogDescription } from "@/app/components/TutorialMode";
 
 interface CategoryFormProps {
     category?: CategoryColumn;
@@ -63,9 +63,9 @@ export function CategoryForm({ category, trigger }: CategoryFormProps) {
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Categoría" : "Nueva Categoría"}
                     </DialogTitle>
-                    <DialogDescription>
+                    <HintDialogDescription>
                         Define el nombre y el orden en el que aparecerá en el punto de venta (de izquierda a derecha).
-                    </DialogDescription>
+                    </HintDialogDescription>
                 </DialogHeader>
 
                 <form action={handleAction} className="space-y-4 mt-4">
@@ -97,9 +97,9 @@ export function CategoryForm({ category, trigger }: CategoryFormProps) {
                                 className="rounded-xl h-12 bg-muted/50" 
                                 placeholder="0"
                             />
-                            <p className="text-xs text-muted-foreground ml-1">
+                            <Hint className="text-xs text-muted-foreground ml-1">
                                 Menor número = Aparece más a la izquierda.
-                            </p>
+                            </Hint>
                         </div>
                     </div>
 

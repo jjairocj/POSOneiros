@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { adjustStock, type MovementType } from "@/app/actions/product";
+import { Hint } from "@/app/components/TutorialMode";
 
 const TYPES: { value: MovementType; label: string; hint: string; icon: React.ReactNode }[] = [
     { value: "PURCHASE", label: "Entrada", hint: "Compra o reposición: suma unidades.", icon: <PackagePlus className="w-4 h-4" /> },
@@ -66,7 +67,7 @@ export function StockMovementModal({ product, onClose }: { product: { id: string
                         </button>
                     ))}
                 </div>
-                <p className="text-xs text-muted-foreground -mt-2 ml-1">{current.hint}</p>
+                <Hint className="text-xs text-muted-foreground -mt-2 ml-1">{current.hint}</Hint>
 
                 <div className={`grid gap-3 ${type === "PURCHASE" ? "grid-cols-2" : "grid-cols-1"}`}>
                     <div className="space-y-1.5">
