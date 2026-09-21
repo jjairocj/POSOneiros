@@ -66,6 +66,22 @@ beforeEach(() => {
     mockSaleFindUnique.mockResolvedValue(null);
 });
 
+describe('processSale — shift already in closing', () => {
+    it('refuses new sales once the closing count is frozen, so expected amounts can not move after the cashier saw them', async () => {
+        mockShiftFindUnique.mockResolvedValue({ ...OPEN_SHIFT, closeAmount: 150000 });
+        const result: any = await processSale('s1', ITEMS, PAYMENTS);
+        expect(result.ok).toBe(false);
+        expect(result.error).toMatch(/proceso de cierre/i);
+        expect(mockTransaction).not.toHaveBeenCalled();
+    });
+
+    it('sells normally while no count has been frozen', async () => {
+        makeTx();
+        mockShiftFindUnique.mockResolvedValue({ ...OPEN_SHIFT, closeAmount: null });
+        expect((await processSale('s1', ITEMS, PAYMENTS)).ok).toBe(true);
+    });
+});
+
 describe('processSale — offline-retry idempotency (clientRef)', () => {
     it('returns the already-created sale instead of registering a duplicate when clientRef matches an existing sale', async () => {
         const existing = { id: 'sale-existing', total: 6000 };

@@ -114,6 +114,9 @@ export async function processSale(
         const shift = await prisma.shift.findUnique({ where: { id: activeShiftId }, include: { register: true } });
         if (!shift || shift.status !== "OPEN") return fail("El turno no está abierto. Abre un turno para vender.");
         if (shift.userId !== user.id && !roleAtLeast(user.role, "SUPERVISOR")) return fail("Este turno pertenece a otro usuario.");
+        // The cashier already submitted the closing count; a new sale would
+        // change what was expected after they've seen it.
+        if (shift.closeAmount != null) return fail("El turno está en proceso de cierre: termina de cerrarlo para poder vender.");
 
         const allowNegative = (await prisma.systemConfig.findUnique({ where: { key: "allowNegativeStock" } }))?.value === "true";
 

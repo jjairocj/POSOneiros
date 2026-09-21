@@ -8,9 +8,11 @@
  *   Nothing about expected amounts is shown yet, so the count stays blind.
  *
  * STAGE 2 — Reconciliation review (after clicking "Cerrar Turno")
- *   Fetches the expected figures and shows expected vs typed per method with
- *   the differences. If anything doesn't match, a reason is required before
- *   the shift can be closed (also enforced server-side).
+ *   Submitting the count freezes it on the server and returns the expected
+ *   figures: expected vs counted per method with the differences. The count
+ *   can NOT be edited from here on — no "back" button, and reopening the
+ *   modal resumes at this screen with the frozen values. If anything doesn't
+ *   match, a reason is required before closing (also enforced server-side).
  *
  * STAGE 3 — Z-report summary
  *   Compact stats, reconciliation per method, the recorded reason and the
@@ -24,9 +26,9 @@
 
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { closeShift, getShiftClosePreview, type ShiftSummary, type ShiftClosePreview } from "@/app/actions/shift";
+import { closeShift, getShiftClosePreview, getShiftCloseState, type ShiftSummary, type ShiftClosePreview } from "@/app/actions/shift";
 import { Hint } from "@/app/components/TutorialMode";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -59,16 +61,34 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
     const [summary, setSummary] = useState<ShiftSummary | null>(null);
     const router = useRouter();
 
-    const declared = { cash: toAmount(cash), card: toAmount(card), transfer: toAmount(transfer) };
+    const [resuming, setResuming] = useState(true);
+
+    // A count already submitted earlier can't be re-entered: jump straight to its cuadre.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const state = await getShiftCloseState(activeShiftId);
+                if (cancelled || !state.ok || !state.data.declared) return;
+                const res = await getShiftClosePreview(activeShiftId);
+                if (!cancelled && res.ok) setPreview(res.data);
+            } finally {
+                if (!cancelled) setResuming(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [activeShiftId]);
+
+    const typed = { cash: toAmount(cash), card: toAmount(card), transfer: toAmount(transfer) };
 
     /** Stage 1 → 2: fetch what was expected and show the comparison. */
     const handleReview = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        if (Object.values(declared).some((v) => isNaN(v) || v < 0)) { setError("Monto inválido"); return; }
+        if (Object.values(typed).some((v) => isNaN(v) || v < 0)) { setError("Monto inválido"); return; }
         setLoading(true);
         try {
-            const res = await getShiftClosePreview(activeShiftId);
+            const res = await getShiftClosePreview(activeShiftId, typed);
             if (!res.ok) { setError(res.error); return; }
             setPreview(res.data);
         } catch {
@@ -83,7 +103,7 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
         setError("");
         setLoading(true);
         try {
-            const res = await closeShift(activeShiftId, declared, note);
+            const res = await closeShift(activeShiftId, note);
             if (!res.ok) { setError(res.error); return; }
             setSummary(res.data.summary);
         } catch {
@@ -201,20 +221,22 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
         );
     }
 
+    if (resuming) return null;
+
     // ── Stage 2: reconciliation review ─────────────────────────────────────
     if (preview) {
         const rows = [
-            { label: "Efectivo", icon: Banknote, expected: preview.expectedCash, declared: declared.cash },
-            { label: "Tarjeta", icon: CreditCard, expected: preview.cardSales, declared: declared.card },
-            { label: "Transferencias", icon: ArrowRightLeft, expected: preview.transferSales, declared: declared.transfer },
-        ].map((r) => ({ ...r, difference: Math.round(r.declared) - r.expected }));
+            { label: "Efectivo", icon: Banknote, expected: preview.expectedCash, declared: preview.declared.cash },
+            { label: "Tarjeta", icon: CreditCard, expected: preview.cardSales, declared: preview.declared.card },
+            { label: "Transferencias", icon: ArrowRightLeft, expected: preview.transferSales, declared: preview.declared.transfer },
+        ].map((r) => ({ ...r, difference: r.declared - r.expected }));
         const mismatch = rows.some((r) => r.difference !== 0);
 
         return createPortal(
             <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto p-4">
                 <div className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 duration-300 border border-border my-auto">
                     <h2 className="text-xl font-bold tracking-tight text-center mb-1">Cuadre del turno</h2>
-                    <Hint className="text-muted-foreground text-sm text-center mb-4">Compara lo que digitaste con lo que el sistema esperaba.</Hint>
+                    <Hint className="text-muted-foreground text-sm text-center mb-4">Compara lo que digitaste con lo que el sistema esperaba. El conteo ya quedó registrado y no se puede modificar.</Hint>
 
                     <div className="bg-muted/50 p-4 rounded-2xl border border-border/50 mb-4">
                         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 text-sm items-center">
@@ -256,8 +278,8 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                     )}
 
                     <div className="flex gap-3">
-                        <Button type="button" variant="outline" onClick={() => { setPreview(null); setNote(""); setError(""); }} disabled={loading} className="flex-1 h-12 rounded-2xl font-semibold">
-                            Volver a editar
+                        <Button type="button" variant="outline" onClick={onCancel} disabled={loading} className="flex-1 h-12 rounded-2xl font-semibold">
+                            Cerrar ventana
                         </Button>
                         <Button
                             type="button"

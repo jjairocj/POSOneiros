@@ -17,9 +17,11 @@ import ShiftClosingModal from '../app/pos/components/Shift/ShiftClosingModal';
 
 const mockCloseShift = vi.fn();
 const mockPreview = vi.fn();
+const mockState = vi.fn();
 vi.mock('../app/actions/shift', () => ({
     closeShift: (...a: any[]) => mockCloseShift(...a),
     getShiftClosePreview: (...a: any[]) => mockPreview(...a),
+    getShiftCloseState: (...a: any[]) => mockState(...a),
 }));
 
 // Modo Tutorial off (default): helper text must not be required by any assertion.
@@ -55,11 +57,18 @@ function makeSummary(overrides: object = {}) {
     };
 }
 
-const PREVIEW = { baseAmount: 100000, cashSales: 120000, cardSales: 30000, transferSales: 20000, expectedCash: 220000 };
+const previewFor = (cash: number, card = 0, transfer = 0) => ({
+    baseAmount: 100000, cashSales: 120000, cardSales: 30000, transferSales: 20000, expectedCash: 220000,
+    declared: { cash, card, transfer },
+});
+const PREVIEW = previewFor(220000, 30000, 20000);
+
+// By default no count has been frozen yet, so the modal opens on the count form.
+beforeEach(() => mockState.mockResolvedValue({ ok: true, data: { declared: null } }));
 
 /** Fill the count form and click "Cerrar Turno". */
-function fillAndSubmit(cash: string, transfer = '', card = '') {
-    fireEvent.change(screen.getByLabelText(/efectivo en caja/i), { target: { value: cash } });
+async function fillAndSubmit(cash: string, transfer = '', card = '') {
+    fireEvent.change(await screen.findByLabelText(/efectivo en caja/i), { target: { value: cash } });
     if (transfer) fireEvent.change(screen.getByLabelText(/transferencias/i), { target: { value: transfer } });
     if (card) fireEvent.change(screen.getByLabelText(/tarjeta/i), { target: { value: card } });
     fireEvent.click(screen.getByRole('button', { name: /cerrar turno/i }));
@@ -70,9 +79,11 @@ function fillAndSubmit(cash: string, transfer = '', card = '') {
 describe('ShiftClosingModal — form stage', () => {
     const onCancel = vi.fn();
 
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        mockState.mockResolvedValue({ ok: true, data: { declared: null } });
         render(<ShiftClosingModal activeShiftId="shift_1" baseAmount={100000} onCancel={onCancel} />);
+        await screen.findByLabelText(/efectivo en caja/i);
     });
 
     it('shows the opening base read-only', () => {
@@ -101,16 +112,16 @@ describe('ShiftClosingModal — form stage', () => {
         expect(onCancel).toHaveBeenCalledOnce();
     });
 
-    it('does NOT close the shift yet: it fetches the cuadre preview first', async () => {
-        mockPreview.mockResolvedValue({ ok: true, data: PREVIEW });
-        fillAndSubmit('220000');
-        await waitFor(() => expect(mockPreview).toHaveBeenCalledWith('shift_1'));
+    it('does NOT close the shift yet: it submits the count (which freezes it) and fetches the cuadre', async () => {
+        mockPreview.mockResolvedValue({ ok: true, data: previewFor(220000) });
+        await fillAndSubmit('220000');
+        await waitFor(() => expect(mockPreview).toHaveBeenCalledWith('shift_1', { cash: 220000, card: 0, transfer: 0 }));
         expect(mockCloseShift).not.toHaveBeenCalled();
     });
 
     it('shows the server error when the preview fails', async () => {
         mockPreview.mockResolvedValue({ ok: false, error: 'El turno no está abierto.' });
-        fillAndSubmit('100');
+        await fillAndSubmit('100');
         await waitFor(() => expect(screen.getByText('El turno no está abierto.')).toBeInTheDocument());
     });
 });
@@ -120,12 +131,12 @@ describe('ShiftClosingModal — form stage', () => {
 describe('ShiftClosingModal — cuadre review', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockPreview.mockResolvedValue({ ok: true, data: PREVIEW });
+        mockPreview.mockImplementation(async (_id: string, d: any) => ({ ok: true, data: { ...previewFor(0), declared: d } }));
         render(<ShiftClosingModal activeShiftId="shift_1" baseAmount={100000} onCancel={vi.fn()} />);
     });
 
     async function toReview(cash: string, transfer = '', card = '') {
-        fillAndSubmit(cash, transfer, card);
+        await fillAndSubmit(cash, transfer, card);
         await waitFor(() => expect(screen.getByText(/cuadre del turno/i)).toBeInTheDocument());
     }
 
@@ -142,7 +153,7 @@ describe('ShiftClosingModal — cuadre review', () => {
         expect(screen.queryByLabelText(/motivo del descuadre/i)).not.toBeInTheDocument();
         expect(screen.getAllByText('OK')).toHaveLength(3);
         fireEvent.click(screen.getByRole('button', { name: /confirmar cierre/i }));
-        await waitFor(() => expect(mockCloseShift).toHaveBeenCalledWith('shift_1', { cash: 220000, card: 30000, transfer: 20000 }, ''));
+        await waitFor(() => expect(mockCloseShift).toHaveBeenCalledWith('shift_1', ''));
     });
 
     it('when a method is off: shows the signed difference and requires a reason', async () => {
@@ -162,13 +173,14 @@ describe('ShiftClosingModal — cuadre review', () => {
         await toReview('210000', '20000', '30000');
         fireEvent.change(screen.getByLabelText(/motivo del descuadre/i), { target: { value: 'Vuelto de más' } });
         fireEvent.click(screen.getByRole('button', { name: /confirmar cierre/i }));
-        await waitFor(() => expect(mockCloseShift).toHaveBeenCalledWith('shift_1', { cash: 210000, card: 30000, transfer: 20000 }, 'Vuelto de más'));
+        await waitFor(() => expect(mockCloseShift).toHaveBeenCalledWith('shift_1', 'Vuelto de más'));
     });
 
-    it('"Volver a editar" returns to the count form', async () => {
+    it('the count can not be edited once the cuadre is shown: no "volver a editar", no inputs to change', async () => {
         await toReview('210000');
-        fireEvent.click(screen.getByRole('button', { name: /volver a editar/i }));
-        expect(screen.getByLabelText(/efectivo en caja/i)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /volver a editar/i })).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/efectivo en caja/i)).not.toBeInTheDocument();
+        expect(document.querySelectorAll('input')).toHaveLength(0);
     });
 
     it('shows the server error if closing is rejected', async () => {
@@ -179,15 +191,39 @@ describe('ShiftClosingModal — cuadre review', () => {
     });
 });
 
+// ─── Frozen count: reopening resumes at the cuadre ─────────────────────────────
+
+describe('ShiftClosingModal — count already submitted', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('skips the count form and shows the frozen values so the cashier can only confirm', async () => {
+        mockState.mockResolvedValue({ ok: true, data: { declared: { cash: 210000, card: 30000, transfer: 20000 } } });
+        mockPreview.mockResolvedValue({ ok: true, data: previewFor(210000, 30000, 20000) });
+        render(<ShiftClosingModal activeShiftId="shift_1" baseAmount={100000} onCancel={vi.fn()} />);
+
+        await waitFor(() => expect(screen.getByText(/cuadre del turno/i)).toBeInTheDocument());
+        expect(mockPreview).toHaveBeenCalledWith('shift_1'); // no amounts sent: nothing can be re-typed
+        expect(screen.queryByLabelText(/efectivo en caja/i)).not.toBeInTheDocument();
+        expect(screen.getByText('-$10.000')).toBeInTheDocument();
+    });
+
+    it('opens the normal count form when nothing has been submitted yet', async () => {
+        mockState.mockResolvedValue({ ok: true, data: { declared: null } });
+        render(<ShiftClosingModal activeShiftId="shift_1" baseAmount={100000} onCancel={vi.fn()} />);
+        expect(await screen.findByLabelText(/efectivo en caja/i)).toBeInTheDocument();
+        expect(mockPreview).not.toHaveBeenCalled();
+    });
+});
+
 // ─── Stage 3: narrative summary ───────────────────────────────────────────────
 
 describe('ShiftClosingModal — summary stage', () => {
     async function renderSummary(summaryOverrides: object = {}) {
-        mockPreview.mockResolvedValue({ ok: true, data: PREVIEW });
+        mockPreview.mockImplementation(async (_id: string, d: any) => ({ ok: true, data: { ...previewFor(0), declared: d } }));
         mockCloseShift.mockResolvedValue({ ok: true, data: { summary: makeSummary(summaryOverrides) } });
         render(<ShiftClosingModal activeShiftId="shift_1" baseAmount={100000} onCancel={vi.fn()} />);
         // Match the preview exactly so no reason is needed to reach the summary.
-        fillAndSubmit('220000', '20000', '30000');
+        await fillAndSubmit('220000', '20000', '30000');
         await waitFor(() => expect(screen.getByText(/cuadre del turno/i)).toBeInTheDocument());
         fireEvent.click(screen.getByRole('button', { name: /confirmar cierre/i }));
         await waitFor(() => expect(screen.getByText(/confirmar y salir/i)).toBeInTheDocument());

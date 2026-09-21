@@ -37,6 +37,8 @@ export interface ShiftClosePreview {
     transferSales: number;
     /** Cash the drawer should hold: base + cash sales. */
     expectedCash: number;
+    /** The counts as frozen on the server when first submitted — the cashier can't change them afterwards. */
+    declared: DeclaredAmounts;
 }
 
 export interface ShiftSummary {
@@ -155,17 +157,68 @@ async function loadShiftForClose(shiftId: string, user: Awaited<ReturnType<typeo
     return { shift } as const;
 }
 
+/** Counts already frozen on an open shift, or null while the cashier hasn't submitted them. */
+function lockedCounts(shift: { closeAmount: number | null; closeCard: number | null; closeTransfer: number | null }): DeclaredAmounts | null {
+    if (shift.closeAmount == null) return null;
+    return { cash: shift.closeAmount, card: shift.closeCard ?? 0, transfer: shift.closeTransfer ?? 0 };
+}
+
 /**
- * Numbers the cashier is compared against on the review step of the close
- * flow. Fetched only after they've typed their counts, so the count itself
- * stays blind (they can't just copy the expected figures).
+ * Already-submitted counts for this shift (null if none yet). Lets the close
+ * modal resume straight at the cuadre review after the cashier dismissed it,
+ * instead of offering the count form again — expected figures reveal how far
+ * off the count was, so a second attempt must never be possible.
  */
-export async function getShiftClosePreview(shiftId: string): Promise<ActionResult<ShiftClosePreview>> {
+export async function getShiftCloseState(shiftId: string): Promise<ActionResult<{ declared: DeclaredAmounts | null }>> {
+    try {
+        const user = await requireSession();
+        const loaded = await loadShiftForClose(shiftId, user);
+        if (!loaded.shift) return fail(loaded.error ?? "El turno no está abierto.");
+        return ok({ declared: lockedCounts(loaded.shift) });
+    } catch (err) {
+        console.error("[getShiftCloseState]", err);
+        return fail(toUserMessage(err, "No se pudo consultar el cierre."));
+    }
+}
+
+/**
+ * Submits the cashier's count and returns what was expected. The count is
+ * FROZEN on the shift at this moment (first submission wins, atomically):
+ * later calls — from the UI, a retry after cancelling, or a hand-crafted
+ * request — get the original count back and cannot replace it. Expected
+ * figures are only revealed together with the freeze, so the count is blind.
+ */
+export async function getShiftClosePreview(shiftId: string, declaredInput?: DeclaredAmounts): Promise<ActionResult<ShiftClosePreview>> {
     try {
         const user = await requireSession();
         const loaded = await loadShiftForClose(shiftId, user);
         if (!loaded.shift) return fail(loaded.error ?? "El turno no está abierto.");
         const { shift } = loaded;
+
+        let declared = lockedCounts(shift);
+        if (!declared) {
+            const values = [declaredInput?.cash, declaredInput?.card, declaredInput?.transfer];
+            if (values.some((v) => typeof v !== "number" || !Number.isFinite(v) || v < 0)) {
+                return fail("Los montos contados deben ser números mayores o iguales a cero.");
+            }
+            declared = {
+                cash: Math.round(declaredInput!.cash),
+                card: Math.round(declaredInput!.card),
+                transfer: Math.round(declaredInput!.transfer),
+            };
+            // Only succeeds if nobody froze a count in the meantime.
+            const locked = await prisma.shift.updateMany({
+                where: { id: shiftId, status: "OPEN", closeAmount: null },
+                data: { closeAmount: declared.cash, closeCard: declared.card, closeTransfer: declared.transfer },
+            });
+            if (locked.count === 0) {
+                const fresh = await prisma.shift.findUnique({ where: { id: shiftId } });
+                const existing = fresh ? lockedCounts(fresh) : null;
+                if (!existing) return fail("No se pudo registrar el conteo. Intenta de nuevo.");
+                declared = existing;
+            }
+        }
+
         const by = salesByMethod(shift.sales);
         return ok({
             baseAmount: shift.baseAmount,
@@ -173,6 +226,7 @@ export async function getShiftClosePreview(shiftId: string): Promise<ActionResul
             cardSales: by.card,
             transferSales: by.transfer,
             expectedCash: shift.baseAmount + by.cash,
+            declared,
         });
     } catch (err) {
         console.error("[getShiftClosePreview]", err);
@@ -181,30 +235,27 @@ export async function getShiftClosePreview(shiftId: string): Promise<ActionResul
 }
 
 /**
- * Closes the shift and returns the Z-report summary.
+ * Closes the shift and returns the Z-report summary, using the counts frozen
+ * by getShiftClosePreview.
  * Expected cash = base + CASH payments of completed sales (cash payments are
  * stored net of change, so no change adjustment is needed); card and
  * transfer are compared against their own totals. If ANY declared amount
  * differs from expected a reason (`note`) is required — checked here, not
  * only in the UI.
  */
-export async function closeShift(shiftId: string, declaredInput: DeclaredAmounts, note?: string): Promise<ActionResult<{ summary: ShiftSummary }>> {
+export async function closeShift(shiftId: string, note?: string): Promise<ActionResult<{ summary: ShiftSummary }>> {
     try {
         const user = await requireSession();
-
-        const values = [declaredInput?.cash, declaredInput?.card, declaredInput?.transfer];
-        if (values.some((v) => typeof v !== "number" || !Number.isFinite(v) || v < 0)) {
-            return fail("Los montos contados deben ser números mayores o iguales a cero.");
-        }
-        const declared: DeclaredAmounts = {
-            cash: Math.round(declaredInput.cash),
-            card: Math.round(declaredInput.card),
-            transfer: Math.round(declaredInput.transfer),
-        };
 
         const loaded = await loadShiftForClose(shiftId, user);
         if (!loaded.shift) return fail(loaded.error ?? "El turno no está abierto.");
         const { shift } = loaded;
+
+        // The count is never accepted here: it must already be frozen by
+        // getShiftClosePreview, so nothing typed after seeing the expected
+        // figures can end up in the record.
+        const declared = lockedCounts(shift);
+        if (!declared) return fail("Primero digita el conteo del turno.");
 
         const completed = shift.sales.filter((s) => s.status === "COMPLETED");
         const cancelledCount = shift.sales.length - completed.length;
@@ -237,14 +288,8 @@ export async function closeShift(shiftId: string, declaredInput: DeclaredAmounts
 
         await prisma.shift.update({
             where: { id: shiftId },
-            data: {
-                status: "CLOSED",
-                closeAmount: declared.cash,
-                closeCard: declared.card,
-                closeTransfer: declared.transfer,
-                closeNote: cleanNote,
-                endTime: new Date(),
-            },
+            // Counts stay exactly as frozen; only status/note/time are set here.
+            data: { status: "CLOSED", closeNote: cleanNote, endTime: new Date() },
         });
 
         revalidatePath("/pos");
