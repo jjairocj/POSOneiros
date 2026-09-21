@@ -52,3 +52,6 @@ next-env.d.ts
 
 # Obsidian vault state (local to whoever opens docs/ as a vault)
 .obsidian/
+
+# compose con claves reales (no subir)
+oneiros-casaos-listo.yml
