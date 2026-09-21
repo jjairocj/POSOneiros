@@ -11,6 +11,7 @@ import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fail, ok, toUserMessage, type ActionResult } from "@/lib/result";
+import { LIVE_SHIFT_STATUSES } from "@/lib/shift-status";
 import { businessHour } from "@/app/lib/time";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]/route";
@@ -70,7 +71,7 @@ export async function getRegistersForShift() {
             orderBy: { name: "asc" },
         });
         const open = await prisma.shift.findMany({
-            where: { status: "OPEN" },
+            where: { status: { in: LIVE_SHIFT_STATUSES } },
             select: { registerId: true, user: { select: { name: true } } },
         });
         const busy = new Map(open.map((s) => [s.registerId, s.user.name]));
@@ -93,11 +94,11 @@ export async function openShift(baseAmount: number, registerId: string): Promise
         const register = await prisma.register.findUnique({ where: { id: registerId } });
         if (!register) return fail("La caja seleccionada no existe.");
 
-        const existing = await prisma.shift.findFirst({ where: { userId: user.id, status: "OPEN" } });
-        if (existing) return fail("Ya tienes un turno abierto. Ciérralo antes de abrir otro.");
+        const existing = await prisma.shift.findFirst({ where: { userId: user.id, status: { in: LIVE_SHIFT_STATUSES } } });
+        if (existing) return fail(existing.status === "CLOSING" ? "Tu turno está en cierre: termina de cerrarlo antes de abrir otro." : "Ya tienes un turno abierto. Ciérralo antes de abrir otro.");
 
         const registerBusy = await prisma.shift.findFirst({
-            where: { registerId, status: "OPEN" },
+            where: { registerId, status: { in: LIVE_SHIFT_STATUSES } },
             include: { user: { select: { name: true } } },
         });
         if (registerBusy) return fail(`La caja "${register.name}" ya tiene un turno abierto por ${registerBusy.user.name}.`);
@@ -122,7 +123,7 @@ export async function getActiveShift() {
     if (!userId) return null;
 
     return await prisma.shift.findFirst({
-        where: { userId, status: "OPEN" },
+        where: { userId, status: { in: LIVE_SHIFT_STATUSES } },
         include: {
             register: true,
             _count: { select: { sales: true } },
@@ -152,14 +153,14 @@ async function loadShiftForClose(shiftId: string, user: Awaited<ReturnType<typeo
             user: { select: { name: true } },
         },
     });
-    if (!shift || shift.status !== "OPEN") return { error: "El turno no está abierto." } as const;
+    if (!shift || !LIVE_SHIFT_STATUSES.includes(shift.status as never)) return { error: "El turno no está abierto." } as const;
     if (shift.userId !== user.id && !roleAtLeast(user.role, "SUPERVISOR")) return { error: "Este turno pertenece a otro usuario." } as const;
     return { shift } as const;
 }
 
 /** Counts already frozen on an open shift, or null while the cashier hasn't submitted them. */
-function lockedCounts(shift: { closeAmount: number | null; closeCard: number | null; closeTransfer: number | null }): DeclaredAmounts | null {
-    if (shift.closeAmount == null) return null;
+function lockedCounts(shift: { status: string; closeAmount: number | null; closeCard: number | null; closeTransfer: number | null }): DeclaredAmounts | null {
+    if (shift.status !== "CLOSING" || shift.closeAmount == null) return null;
     return { cash: shift.closeAmount, card: shift.closeCard ?? 0, transfer: shift.closeTransfer ?? 0 };
 }
 
@@ -206,11 +207,17 @@ export async function getShiftClosePreview(shiftId: string, declaredInput?: Decl
                 card: Math.round(declaredInput!.card),
                 transfer: Math.round(declaredInput!.transfer),
             };
-            // Only succeeds if nobody froze a count in the meantime.
+            // Only succeeds if nobody froze a count in the meantime. Freezing
+            // also moves the shift to CLOSING, so the state is visible everywhere.
             const locked = await prisma.shift.updateMany({
-                where: { id: shiftId, status: "OPEN", closeAmount: null },
-                data: { closeAmount: declared.cash, closeCard: declared.card, closeTransfer: declared.transfer },
+                where: { id: shiftId, status: "OPEN" },
+                data: { status: "CLOSING", closeAmount: declared.cash, closeCard: declared.card, closeTransfer: declared.transfer },
             });
+            // The shift just became CLOSING: refresh the POS header badge and the admin dashboard.
+            if (locked.count > 0) {
+                revalidatePath("/pos");
+                revalidatePath("/admin");
+            }
             if (locked.count === 0) {
                 const fresh = await prisma.shift.findUnique({ where: { id: shiftId } });
                 const existing = fresh ? lockedCounts(fresh) : null;

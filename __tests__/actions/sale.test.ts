@@ -67,8 +67,8 @@ beforeEach(() => {
 });
 
 describe('processSale — shift already in closing', () => {
-    it('refuses new sales once the closing count is frozen, so expected amounts can not move after the cashier saw them', async () => {
-        mockShiftFindUnique.mockResolvedValue({ ...OPEN_SHIFT, closeAmount: 150000 });
+    it('refuses new sales while the shift is CLOSING (count frozen), so expected amounts can not move after the cashier saw them', async () => {
+        mockShiftFindUnique.mockResolvedValue({ ...OPEN_SHIFT, status: 'CLOSING', closeAmount: 150000 });
         const result: any = await processSale('s1', ITEMS, PAYMENTS);
         expect(result.ok).toBe(false);
         expect(result.error).toMatch(/proceso de cierre/i);

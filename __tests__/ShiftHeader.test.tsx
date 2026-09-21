@@ -122,3 +122,26 @@ describe('ShiftHeader — active shift', () => {
         expect(screen.queryByTestId('closing-modal')).not.toBeInTheDocument();
     });
 });
+
+describe('ShiftHeader — CLOSING state', () => {
+    const closing = { id: 's1', status: 'CLOSING', register: { name: 'Caja Principal' }, _count: { sales: 3 } };
+
+    it('shows a prominent "En cierre" badge and a "Terminar cierre" button when the count is frozen', () => {
+        render(<ShiftHeader activeShift={closing} userName="Ana" userRole="CASHIER" />);
+        expect(screen.getByTestId('shift-closing-badge')).toHaveTextContent(/en cierre/i);
+        expect(screen.getByRole('button', { name: /terminar cierre/i })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /^cerrar turno$/i })).not.toBeInTheDocument();
+    });
+
+    it('does not show the badge on a normal open shift', () => {
+        render(<ShiftHeader activeShift={{ ...closing, status: 'OPEN' }} userName="Ana" userRole="CASHIER" />);
+        expect(screen.queryByTestId('shift-closing-badge')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /cerrar turno/i })).toBeInTheDocument();
+    });
+
+    it('"Terminar cierre" opens the closing modal', () => {
+        render(<ShiftHeader activeShift={closing} userName="Ana" userRole="CASHIER" />);
+        fireEvent.click(screen.getByRole('button', { name: /terminar cierre/i }));
+        expect(screen.getByTestId('closing-modal')).toBeInTheDocument();
+    });
+});

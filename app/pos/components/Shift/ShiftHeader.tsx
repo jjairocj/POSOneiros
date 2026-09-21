@@ -3,12 +3,12 @@ import { useState } from "react";
 import ShiftClosingModal from "./ShiftClosingModal";
 import ShiftOpeningModal from "./ShiftOpeningModal";
 import { Button } from "@/components/ui/button";
-import { LogOut, MonitorPlay, ShoppingBag } from "lucide-react";
+import { LogOut, MonitorPlay, ShoppingBag, Lock } from "lucide-react";
 import POSUserMenu from "../POSUserMenu";
 import type { PermissionKey } from "@/lib/permissions";
 
 /** Only what the header needs; the page passes the full Prisma shift. */
-type ActiveShift = { id: string; baseAmount?: number; register?: { name: string } | null; _count?: { sales: number } } | null;
+type ActiveShift = { id: string; status?: string; baseAmount?: number; register?: { name: string } | null; _count?: { sales: number } } | null;
 
 interface ShiftHeaderProps {
   activeShift: ActiveShift;
@@ -50,6 +50,21 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
                             <span className="hidden sm:inline">Turno:&nbsp;</span>
                             {activeShift.register?.name || "Caja Fija"}
                         </span>
+                        {/* CLOSING = the closing count is already frozen, only the confirmation is missing.
+                            Deliberately loud (amber + pulse): a shift in this state can't sell. */}
+                        {activeShift.status === "CLOSING" && (
+                            <span
+                                data-testid="shift-closing-badge"
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/60 text-amber-800 dark:text-amber-200 text-[10px] sm:text-xs font-black uppercase tracking-wider whitespace-nowrap"
+                            >
+                                <span className="relative flex w-2 h-2">
+                                    <span className="absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75 animate-ping" />
+                                    <span className="relative inline-flex w-2 h-2 rounded-full bg-amber-500" />
+                                </span>
+                                <Lock className="w-3 h-3" />
+                                En cierre
+                            </span>
+                        )}
                         <span className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/12 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
                             <ShoppingBag className="w-3 h-3" />
                             {(activeShift._count?.sales ?? 0)}{" "}
@@ -80,8 +95,8 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
                         className="font-semibold hover:-translate-y-0.5 transition-transform"
                     >
                         <LogOut className="w-4 h-4 sm:mr-2" />
-                        <span className="hidden sm:inline">Cerrar Turno</span>
-                        <span className="sm:hidden">Cerrar</span>
+                        <span className="hidden sm:inline">{activeShift.status === "CLOSING" ? "Terminar cierre" : "Cerrar Turno"}</span>
+                        <span className="sm:hidden">{activeShift.status === "CLOSING" ? "Terminar" : "Cerrar"}</span>
                     </Button>
                 )}
 

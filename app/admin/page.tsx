@@ -100,6 +100,11 @@ export default async function AdminDashboardPage() {
                             >
                                 {kpis.activeShiftRegister ?? "Sin turno"}
                             </p>
+                            {kpis.activeShiftStatus === "CLOSING" && (
+                                <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 text-[11px] font-bold uppercase tracking-wider">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> En cierre
+                                </span>
+                            )}
                         </div>
                         <span
                             className={`p-2 rounded-xl shrink-0 ${
@@ -112,7 +117,11 @@ export default async function AdminDashboardPage() {
                         </span>
                     </div>
                     <p className="text-xs text-muted-foreground font-medium mt-4">
-                        {kpis.activeShiftRegister ? "Caja actualmente abierta" : "No hay caja abierta"}
+                        {!kpis.activeShiftRegister
+                            ? "No hay caja abierta"
+                            : kpis.activeShiftStatus === "CLOSING"
+                                ? "Conteo de cierre enviado, falta confirmar"
+                                : "Caja actualmente abierta"}
                     </p>
                 </div>
 

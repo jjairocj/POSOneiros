@@ -120,6 +120,13 @@ describe('deleteRegister', () => {
         expect(mockDelete).not.toHaveBeenCalled();
     });
 
+    it('treats a CLOSING shift as active too when deciding whether a register can be deleted', async () => {
+        mockShiftFindFirst.mockResolvedValue({ id: 's1', status: 'CLOSING' });
+        const result: any = await deleteRegister('r1');
+        expect(result.success).toBe(false);
+        expect(mockShiftFindFirst).toHaveBeenCalledWith({ where: { registerId: 'r1', status: { in: ['OPEN', 'CLOSING'] } } });
+    });
+
     it('deletes a register with no shift history', async () => {
         mockShiftFindFirst.mockResolvedValue(null);
         mockShiftCount.mockResolvedValue(0);

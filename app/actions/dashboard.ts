@@ -2,6 +2,7 @@
 
 import prisma from "../../lib/prisma";
 import { requirePermission } from "@/lib/auth";
+import { LIVE_SHIFT_STATUSES } from "@/lib/shift-status";
 import { startOfBusinessDay, endOfBusinessDay, businessHour, BUSINESS_TZ } from "@/app/lib/time";
 
 export interface HourlySale {
@@ -37,6 +38,7 @@ export interface DashboardData {
         todaySales: number;
         todayTransactions: number;
         activeShiftRegister: string | null;
+        activeShiftStatus: string | null;
         lowStockCount: number;
     };
     hourlySales: HourlySale[];
@@ -67,7 +69,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
             // 2. Active shift
             prisma.shift.findFirst({
-                where: { status: "OPEN" },
+                where: { status: { in: LIVE_SHIFT_STATUSES } },
                 include: { register: { select: { name: true } } },
                 orderBy: { startTime: "desc" },
             }),
@@ -177,6 +179,7 @@ export async function getDashboardData(): Promise<DashboardData> {
             todaySales: todaySales._sum.total ?? 0,
             todayTransactions: todaySales._count.id,
             activeShiftRegister: activeShift?.register.name ?? null,
+            activeShiftStatus: activeShift?.status ?? null,
             lowStockCount,
         },
         hourlySales,

@@ -3,6 +3,7 @@ import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireSession, requireAdmin } from "@/lib/auth";
 import { toUserMessage } from "@/lib/result";
+import { LIVE_SHIFT_STATUSES } from "@/lib/shift-status";
 
 export async function getRegisters() {
     try {
@@ -77,7 +78,7 @@ export async function deleteRegister(id: string) {
     try {
         await requireAdmin();
         const activeShift = await prisma.shift.findFirst({
-            where: { registerId: id, status: "OPEN" },
+            where: { registerId: id, status: { in: LIVE_SHIFT_STATUSES } },
         });
         if (activeShift) {
             return {

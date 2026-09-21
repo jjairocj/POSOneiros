@@ -48,13 +48,14 @@ describe('getDashboardData', () => {
 
     it("fills today's KPIs from the aggregate and active shift", async () => {
         mockSaleAggregate.mockResolvedValue({ _sum: { total: 275000 }, _count: { id: 8 } });
-        mockShiftFindFirst.mockResolvedValue({ register: { name: 'Caja Principal' } });
+        mockShiftFindFirst.mockResolvedValue({ status: 'CLOSING', register: { name: 'Caja Principal' } });
         mockProductCount.mockResolvedValue(3);
         const result = await getDashboardData();
         expect(result.kpis).toEqual({
             todaySales: 275000,
             todayTransactions: 8,
             activeShiftRegister: 'Caja Principal',
+            activeShiftStatus: 'CLOSING',
             lowStockCount: 3,
         });
     });
