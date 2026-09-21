@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: oneiros
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-cambia-esta-clave-de-la-base}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-CAMBIAR_CLAVE_DE_LA_BASE}
       POSTGRES_DB: oneirospos
       TZ: America/Bogota
     volumes:
@@ -44,15 +44,16 @@ services:
         published: "3000"
         protocol: tcp
     environment:
-      # Misma clave que DB_PASSWORD de arriba.
-      DATABASE_URL: postgresql://oneiros:${DB_PASSWORD:-cambia-esta-clave-de-la-base}@db:5432/oneirospos
-      # Secreto para firmar sesiones. Genera uno: openssl rand -base64 32
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-cambia-esto-por-un-secreto-largo-y-aleatorio}
+      # Misma clave que DB_PASSWORD de arriba. Los valores CAMBIAR_* son marcadores: la app se niega a arrancar
+      # mientras sigan ahí, así nunca queda funcionando con una clave conocida.
+      DATABASE_URL: postgresql://oneiros:${DB_PASSWORD:-CAMBIAR_CLAVE_DE_LA_BASE}@db:5432/oneirospos
+      # Secreto para firmar sesiones (mín. 32 caracteres). Genera uno: openssl rand -base64 32
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-CAMBIAR_SECRETO_DE_SESIONES}
       # Dirección con la que ABRES la app desde tus dispositivos (IP del servidor o su nombre, sin barra final).
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://192.168.1.50:3000}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://CAMBIAR_IP_DEL_SERVIDOR:3000}
       # Sólo se usan la PRIMERA vez (base vacía) para crear el administrador.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@tunegocio.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-cambia-esta-clave}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-CAMBIAR_CLAVE_DEL_ADMIN}
       BUSINESS_NAME: ${BUSINESS_NAME:-Sucursal Principal}
       TZ: America/Bogota
     networks: [oneiros]

@@ -43,10 +43,12 @@ ssh usuario@IP-DEL-SERVIDOR "docker load -i /tmp/oneiros-pos.tar && rm /tmp/onei
 
 | Variable | Qué poner |
 |---|---|
-| `DB_PASSWORD` | Clave de la base (la usan `db` y `DATABASE_URL`; deben coincidir). |
+| `DB_PASSWORD` | Clave de la base (la usan `db` y `DATABASE_URL`; deben coincidir). Defínela **antes del primer arranque**: PostgreSQL la fija al crear el volumen. |
 | `NEXTAUTH_SECRET` | Un secreto propio: `openssl rand -base64 32`. |
 | `NEXTAUTH_URL` | La dirección con la que abres la app, p. ej. `http://192.168.1.50:3000`. **Debe ser exactamente la que escribes en el navegador** (IP o nombre, con puerto, sin `/` final). |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Primer administrador (mín. 8 caracteres). Solo se usan con la base vacía. |
+
+Los valores `CAMBIAR_*` del compose son **marcadores**: si dejas alguno, el contenedor se niega a arrancar con un mensaje claro (así nunca queda corriendo con un secreto o una clave conocidos). El `NEXTAUTH_SECRET` debe tener al menos 32 caracteres.
 
 3. Instala. La primera vez tarda ~1 minuto (migraciones). Abre `http://IP:3000` e inicia sesión.
 

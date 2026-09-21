@@ -26,6 +26,10 @@ async function main() {
     if (!email || !password || password.length < 8) {
         throw new Error("Base de datos vacía: define ADMIN_EMAIL y ADMIN_PASSWORD (mínimo 8 caracteres) para crear el primer administrador.");
     }
+    // Never create an administrator with the placeholder shipped in the compose file.
+    if (/CAMBIAR|cambia/i.test(password)) {
+        throw new Error("ADMIN_PASSWORD sigue siendo el marcador del compose: elige una clave propia antes del primer arranque.");
+    }
 
     const branch = await prisma.branch.upsert({
         where: { id: "branch-1" }, update: {},
