@@ -22,9 +22,9 @@ RUN npm ci
 FROM deps AS builder
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NEXTAUTH_SECRET="build-time-placeholder" \
     NODE_ENV=production
-RUN npm run build
+# El secreto es solo un marcador para que el build no falle; no llega a la imagen final.
+RUN NEXTAUTH_SECRET=build-time-placeholder npm run build && rm -rf .next/cache
 
 # ── Runtime ───────────────────────────────────────────────────────────────
 FROM base AS runner
@@ -33,15 +33,15 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     TZ=America/Bogota
-COPY --from=builder /app/package.json /app/package-lock.json /app/prisma.config.ts ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts /app/tsconfig.json ./
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/lib ./lib
-COPY --from=builder /app/docker ./docker
-RUN chmod +x docker/entrypoint.sh && chown -R node:node /app
+# --chown en cada COPY (un `chown -R` posterior duplicaría todas las capas y duplicaría el peso).
+COPY --chown=node:node --from=builder /app/package.json /app/package-lock.json /app/prisma.config.ts ./
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/.next ./.next
+COPY --chown=node:node --from=builder /app/public ./public
+COPY --chown=node:node --from=builder /app/next.config.ts /app/tsconfig.json ./
+COPY --chown=node:node --from=builder /app/prisma ./prisma
+COPY --chown=node:node --from=builder /app/lib ./lib
+COPY --chown=node:node --from=builder /app/docker ./docker
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \

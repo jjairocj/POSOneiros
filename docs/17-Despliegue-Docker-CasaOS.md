@@ -84,8 +84,12 @@ Construye y carga la imagen nueva (pasos 1–2) y reinicia el contenedor `oneiro
 - El limitador de intentos de login vive en memoria: un reinicio lo reinicia.
 - Sin modo offline completo: el navegador necesita alcanzar el servidor (la cola de ventas pendientes cubre cortes breves).
 
-## Qué se verificó y qué no
+## Qué se verificó
 
-Verificado simulando los pasos del `Dockerfile` (sin `.env`): `npm ci` + `prisma generate`, `next build`, las **18 migraciones desde una base vacía**, el bootstrap (con/sin credenciales, idempotente) y `next start` en modo producción con login por HTTP y acceso al panel.
+Con Docker real (imagen arm64 nativa y construcción para amd64 con `build-image.sh`):
 
-**No verificado:** el `docker build` en sí y el `docker-compose` (el equipo de desarrollo no tenía Docker). Si algún paso falla al construir, revisa el `Dockerfile` primero — la lógica de la app y del arranque ya está probada.
+- `docker build` completo y `docker compose config` válido.
+- Con los marcadores `CAMBIAR_*` el contenedor **se niega a arrancar** (mensaje claro).
+- Con valores propios: PostgreSQL sano → migraciones (las 18, desde cero) → administrador creado una sola vez → app "healthy".
+- Login real por HTTP (clave errónea 401, correcta 200), sesión, `/admin` protegido sin sesión (307) y datos intactos tras reiniciar los contenedores.
+- La imagen pesa ~1,8 GB (el `.tar` comprime bastante menos que eso al enviarlo por red con `gzip`).
