@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin, requireSession, requirePermission } from "@/lib/auth";
 import { toCsv, csvResponse } from "@/app/lib/csv";
-import { buildXlsx, xlsxResponse } from "@/app/lib/xlsx";
+import { buildXlsx, buildWorkbook, xlsxResponse } from "@/app/lib/xlsx";
 import { getProductRankingReport, getPromotionUsageReport } from "@/app/actions/report";
 import { startOfBusinessDay, endOfBusinessDay, BUSINESS_TZ, businessDayKey } from "@/app/lib/time";
 
@@ -20,8 +20,9 @@ function parseRange(req: NextRequest) {
 }
 
 /**
- * GET /api/export/{sales|sales-detail|inventory|shift}?from=YYYY-MM-DD&to=YYYY-MM-DD&id=...
- * Returns a CSV that opens correctly in Excel (UTF-8 BOM, ';' separator).
+ * GET /api/export/{sales|sales-detail|inventory|movements|shift|product-ranking|promotion-usage}?from=YYYY-MM-DD&to=YYYY-MM-DD&id=...
+ * shift and the report kinds return a formatted .xlsx; the rest a CSV that opens
+ * correctly in Excel (UTF-8 BOM, ';' separator).
  */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: string }> }) {
     const { kind } = await ctx.params;
@@ -37,15 +38,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
             if (!shift) return new Response("Turno no encontrado", { status: 404 });
             if (shift.userId !== user.id && user.role !== "ADMIN") return new Response("Sin permiso", { status: 403 });
 
-            // One row per product line, same as before — but "Pagos" used to
-            // cram every payment of the sale into a single cell
-            // ("Efectivo 2.000 | Tarjeta 1.400 | ...") repeated on every
-            // line. That was fine when a sale had 2-3 payments; a split
-            // bill can have a dozen (one per person per method), and the
-            // cell became an unreadable blob in Excel. Sum by method
-            // instead — same shape the "sales" export already uses — and
-            // flag split sales separately rather than trying to cram the
-            // per-person detail into this row-per-product-line grain.
+            // Sheet "Ventas": one row per product line. Payments are summed
+            // per method into their own numeric columns (a split bill can
+            // have a dozen payments — crammed into one text cell it became an
+            // unreadable blob), with split sales flagged separately.
             const rows: (string | number | null)[][] = [];
             for (const s of shift.sales) {
                 const isSplit = s.payments.some((p) => p.subAccountLabel);
@@ -59,17 +55,42 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
                     ]);
                 }
             }
-            const cash = shift.sales.filter((s) => s.status === "COMPLETED").flatMap((s) => s.payments).filter((p) => p.method === "CASH").reduce((a, p) => a + p.amount, 0);
-            rows.push([]);
-            rows.push(["Turno", shift.id, "Caja", shift.register.name, "Cajero", shift.user.name]);
-            rows.push(["Apertura", fmtDate(shift.startTime), "Cierre", shift.endTime ? fmtDate(shift.endTime) : "", "Base", shift.baseAmount]);
-            rows.push(["Efectivo vendido", cash, "Esperado en caja", shift.baseAmount + cash, "Contado", shift.closeAmount ?? ""]);
 
-            const csv = toCsv(
-                ["Fecha", "Comprobante", "Estado", "Código", "Producto", "Cantidad", "Precio unit.", "Base", "IVA", "ICA", "Impoconsumo", "Total línea", "Efectivo", "Tarjeta", "Transferencia", "Cuenta dividida"],
-                rows
-            );
-            return csvResponse(`turno_${businessDayKey(shift.startTime)}_${shift.register.name.replace(/\s+/g, "_")}.csv`, csv);
+            // Sheet "Resumen": the cuadre per method + shift facts.
+            const completed = shift.sales.filter((s) => s.status === "COMPLETED");
+            const sumMethod = (m: string) => completed.flatMap((s) => s.payments).filter((p) => p.method === m).reduce((a, p) => a + p.amount, 0);
+            const cashSales = sumMethod("CASH"), cardSales = sumMethod("CARD"), transferSales = sumMethod("TRANSFER");
+            const expectedCash = shift.baseAmount + cashSales;
+            // Shifts closed before the breakdown existed only have the cash count.
+            const diff = (declared: number | null, expected: number) => (declared == null ? "" : declared - expected);
+            const declaredTotal = shift.closeAmount == null ? null : shift.closeAmount + (shift.closeCard ?? 0) + (shift.closeTransfer ?? 0);
+            const summaryRows: (string | number | null)[][] = [
+                ["Efectivo (base + ventas)", expectedCash, shift.closeAmount ?? "", diff(shift.closeAmount, expectedCash)],
+                ["Tarjeta / Datáfono", cardSales, shift.closeCard ?? "", diff(shift.closeCard, cardSales)],
+                ["Transferencias", transferSales, shift.closeTransfer ?? "", diff(shift.closeTransfer, transferSales)],
+                ["Total", expectedCash + cardSales + transferSales, declaredTotal ?? "", diff(declaredTotal, expectedCash + cardSales + transferSales)],
+                [],
+                ["Turno", shift.id],
+                ["Caja", shift.register.name],
+                ["Cajero", shift.user.name],
+                ["Apertura", fmtDate(shift.startTime)],
+                ["Cierre", shift.endTime ? fmtDate(shift.endTime) : ""],
+                ["Base de apertura", shift.baseAmount],
+                ["Total vendido", completed.reduce((a, s) => a + s.total, 0)],
+                ["Transacciones", String(completed.length)], // text: column B is a money column
+                ["Ventas anuladas", String(shift.sales.length - completed.length)],
+                ["Motivo del descuadre", shift.closeNote ?? ""],
+            ];
+
+            const buffer = await buildWorkbook([
+                { name: "Resumen", headers: ["Concepto", "Esperado$", "Contado$", "Diferencia$"], rows: summaryRows },
+                {
+                    name: "Ventas",
+                    headers: ["Fecha", "Comprobante", "Estado", "Código", "Producto", "Cantidad", "Precio unit.$", "Base$", "IVA$", "ICA$", "Impoconsumo$", "Total línea$", "Efectivo$", "Tarjeta$", "Transferencia$", "Cuenta dividida"],
+                    rows,
+                },
+            ]);
+            return xlsxResponse(`turno_${businessDayKey(shift.startTime)}_${shift.register.name.replace(/\s+/g, "_")}.xlsx`, buffer);
         }
 
         // These two are real .xlsx (colors, currency formatting) instead of

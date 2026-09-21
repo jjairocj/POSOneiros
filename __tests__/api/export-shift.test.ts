@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import ExcelJS from 'exceljs';
 
 const mockShiftFindUnique = vi.fn();
 const mockRequireSession = vi.fn();
@@ -59,44 +60,62 @@ describe('GET /api/export/shift', () => {
         expect(res.status).toBe(403);
     });
 
-    it('sums payments by method into separate columns instead of one crammed cell, and flags split sales', async () => {
-        // The bug: an 8-person split bill sale used to cram all 13 payments
-        // into a single "Pagos" text cell, repeated per product line. Now
-        // each method gets its own numeric column, summed per sale.
-        const splitSale = {
-            id: 'sale1', number: 10, createdAt: new Date('2026-09-11T12:00:00-05:00'), status: 'COMPLETED',
-            details: [{ productCode: 'C1', productName: 'Buldak Ramen', quantity: 3, unitPrice: 20000, taxIvaAmount: 0, taxIcaAmount: 0, taxImpoConsumoAmount: 0, subtotal: 51000 }],
-            payments: [
-                { method: 'CASH', amount: 10000, subAccountLabel: 'Persona 1' },
-                { method: 'CARD', amount: 15000, subAccountLabel: 'Persona 2' },
-                { method: 'TRANSFER', amount: 26000, subAccountLabel: 'Persona 3' },
-            ],
-        };
-        mockShiftFindUnique.mockResolvedValue(makeShift({ sales: [splitSale] }));
+    it('returns an .xlsx workbook with a Resumen sheet (cuadre) and a Ventas sheet (line detail)', async () => {
+        mockShiftFindUnique.mockResolvedValue(makeShift({
+            closeAmount: 60000, closeCard: 15000, closeTransfer: 26000, closeNote: 'Se dio un vuelto de más',
+            sales: [{
+                id: 'sale1', number: 10, createdAt: new Date('2026-09-11T12:00:00-05:00'), status: 'COMPLETED', total: 51000,
+                details: [{ productCode: 'C1', productName: 'Buldak Ramen', quantity: 3, unitPrice: 20000, taxIvaAmount: 0, taxIcaAmount: 0, taxImpoConsumoAmount: 0, subtotal: 51000 }],
+                payments: [
+                    { method: 'CASH', amount: 10000, subAccountLabel: 'Persona 1' },
+                    { method: 'CARD', amount: 15000, subAccountLabel: 'Persona 2' },
+                    { method: 'TRANSFER', amount: 26000, subAccountLabel: 'Persona 3' },
+                ],
+            }],
+        }));
 
         const res = await callShiftExport();
         expect(res.status).toBe(200);
-        const csv = await res.text();
-        const lines = csv.replace(/^﻿/, '').split('\r\n');
-        expect(lines[0]).toBe('Fecha;Comprobante;Estado;Código;Producto;Cantidad;Precio unit.;Base;IVA;ICA;Impoconsumo;Total línea;Efectivo;Tarjeta;Transferencia;Cuenta dividida');
+        expect(res.headers.get('content-type')).toContain('spreadsheetml');
+        expect(res.headers.get('content-disposition')).toMatch(/\.xlsx"/);
 
-        const dataLine = lines[1].split(';');
-        // No crammed "Efectivo 10000 | Tarjeta 15000 | ..." blob anywhere.
-        expect(csv).not.toMatch(/\|/);
-        expect(dataLine).toEqual(expect.arrayContaining(['10000', '15000', '26000', 'Sí']));
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(Buffer.from(await res.arrayBuffer()) as any);
+        expect(wb.worksheets.map((w) => w.name)).toEqual(['Resumen', 'Ventas']);
+
+        // Cuadre: base 50000 + cash 10000 = 60000 expected; counted 60000 → 0 diff.
+        const resumen = wb.getWorksheet('Resumen')!;
+        expect(resumen.getRow(1).values).toEqual([undefined, 'Concepto', 'Esperado', 'Contado', 'Diferencia']);
+        expect(resumen.getRow(2).values).toEqual([undefined, 'Efectivo (base + ventas)', 60000, 60000, 0]);
+        expect(resumen.getRow(3).values).toEqual([undefined, 'Tarjeta / Datáfono', 15000, 15000, 0]);
+        expect(resumen.getRow(4).values).toEqual([undefined, 'Transferencias', 26000, 26000, 0]);
+        const text = JSON.stringify(resumen.getSheetValues());
+        expect(text).toContain('Se dio un vuelto de más');
+
+        // Ventas: per-method numeric columns and the split flag, no crammed text.
+        const ventas = wb.getWorksheet('Ventas')!;
+        const header = ventas.getRow(1).values as any[];
+        expect(header.slice(13, 17)).toEqual(['Efectivo', 'Tarjeta', 'Transferencia', 'Cuenta dividida']);
+        expect(ventas.getRow(2).values).toEqual(expect.arrayContaining([10000, 15000, 26000, 'Sí']));
+        expect(text + JSON.stringify(ventas.getSheetValues())).not.toMatch(/\|/);
     });
 
-    it('marks a normal (non-split) sale as not split, with zero in unused method columns', async () => {
-        const normalSale = {
-            id: 'sale2', number: 11, createdAt: new Date('2026-09-11T13:00:00-05:00'), status: 'COMPLETED',
-            details: [{ productCode: 'C2', productName: 'Agua', quantity: 1, unitPrice: 2000, taxIvaAmount: 0, taxIcaAmount: 0, taxImpoConsumoAmount: 0, subtotal: 2000 }],
-            payments: [{ method: 'CASH', amount: 2000 }],
-        };
-        mockShiftFindUnique.mockResolvedValue(makeShift({ sales: [normalSale] }));
+    it('marks a normal (non-split) sale as not split and shows blank counts for shifts closed before the breakdown existed', async () => {
+        mockShiftFindUnique.mockResolvedValue(makeShift({
+            closeAmount: 52000, // legacy: only the cash count was stored
+            sales: [{
+                id: 'sale2', number: 11, createdAt: new Date('2026-09-11T13:00:00-05:00'), status: 'COMPLETED', total: 2000,
+                details: [{ productCode: 'C2', productName: 'Agua', quantity: 1, unitPrice: 2000, taxIvaAmount: 0, taxIcaAmount: 0, taxImpoConsumoAmount: 0, subtotal: 2000 }],
+                payments: [{ method: 'CASH', amount: 2000 }],
+            }],
+        }));
 
         const res = await callShiftExport();
-        const csv = await res.text();
-        const dataLine = csv.replace(/^﻿/, '').split('\r\n')[1].split(';');
-        expect(dataLine).toEqual(expect.arrayContaining(['2000', '0', '0', 'No']));
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(Buffer.from(await res.arrayBuffer()) as any);
+        expect(wb.getWorksheet('Ventas')!.getRow(2).values).toEqual(expect.arrayContaining([2000, 0, 0, 'No']));
+        const resumen = wb.getWorksheet('Resumen')!;
+        expect(resumen.getRow(2).getCell(3).value).toBe(52000);
+        expect(resumen.getRow(3).getCell(3).value === null || resumen.getRow(3).getCell(3).value === '').toBe(true);
     });
 });

@@ -13,16 +13,16 @@ function escapeFormula(value: string | number | null | undefined): string | numb
     return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
-/**
- * Builds a single-sheet, styled .xlsx workbook: bold header row with a fill
- * color, auto-sized columns, and a currency number format on any column
- * whose header ends in "$" (stripped from the displayed header). Used by the
- * report exports that need real formatting — plain CSV (see app/lib/csv.ts)
- * is still the default everywhere a data dump is enough.
- */
-export async function buildXlsx(sheetName: string, headers: string[], rows: (string | number | null | undefined)[][]): Promise<Buffer> {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet(sheetName);
+export interface SheetSpec {
+    name: string;
+    /** A header ending in "$" is a money column (currency format, "$" stripped from the title). */
+    headers: string[];
+    rows: (string | number | null | undefined)[][];
+}
+
+function addStyledSheet(workbook: ExcelJS.Workbook, spec: SheetSpec) {
+    const { name, headers, rows } = spec;
+    const sheet = workbook.addWorksheet(name);
 
     const isMoneyCol = headers.map((h) => h.endsWith("$"));
     const cleanHeaders = headers.map((h, i) => (isMoneyCol[i] ? h.slice(0, -1).trim() : h));
@@ -54,9 +54,25 @@ export async function buildXlsx(sheetName: string, headers: string[], rows: (str
     }
 
     sheet.views = [{ state: "frozen", ySplit: 1 }];
+}
 
+/**
+ * Builds a styled .xlsx workbook: per sheet a bold header row with a fill
+ * color, auto-sized columns, and a currency number format on any column
+ * whose header ends in "$". Used by the report/shift exports that need real
+ * formatting — plain CSV (see app/lib/csv.ts) is still the default
+ * everywhere a data dump is enough.
+ */
+export async function buildWorkbook(sheets: SheetSpec[]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    for (const spec of sheets) addStyledSheet(workbook, spec);
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
+}
+
+/** Single-sheet convenience wrapper around {@link buildWorkbook}. */
+export async function buildXlsx(sheetName: string, headers: string[], rows: (string | number | null | undefined)[][]): Promise<Buffer> {
+    return buildWorkbook([{ name: sheetName, headers, rows }]);
 }
 
 export function xlsxResponse(fileName: string, buffer: Buffer): Response {
