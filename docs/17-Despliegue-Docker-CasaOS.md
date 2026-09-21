@@ -64,19 +64,25 @@ postgresql://USUARIO:CLAVE@IP:5432/BASE      # símbolos en la clave codificados
 
 Si esa base ya viene copiada/migrada (con sus usuarios), `ADMIN_EMAIL`/`ADMIN_PASSWORD` no se usan. Las migraciones pendientes se aplican solas al arrancar. Verificado contra una copia real de la base de producción en otro equipo de la red: arranque sano, 18 migraciones ya aplicadas (sin cambios), login y todas las páginas del admin cargando datos reales.
 
-## CI/CD: publicar y actualizar sin tocar el servidor
+## CI/CD con Docker Hub (`opplystr/oneiros-pos`)
 
-```
-git push origin main  ->  GitHub Actions: typecheck + tests  ->  imagen linux/amd64  ->  GHCR (privada)
-                                                                  ->  Watchtower en el PC la detecta y reinicia la app
+Antes de nada: en hub.docker.com → Repositories → **Create repository** → nombre `oneiros-pos`, visibilidad **Private** (el plan gratuito incluye 1 privado). Si haces `push` a un repo que no existe, Docker Hub lo crea **público**.
+
+**Publicar desde tu Mac** (usa tu `docker login` actual, sin configurar nada más):
+
+```bash
+./docker/publish.sh        # construye linux/amd64 y sube :latest y :<hash-del-commit>
 ```
 
-- **Workflow:** `.github/workflows/docker-image.yml`. Solo publica si los tests pasan. Etiquetas: `latest` y el hash corto del commit (`ghcr.io/jjairocj/oneiros-pos:<sha>`, sirve para volver atrás). También se lanza a mano en GitHub → Actions → *Imagen Docker* → *Run workflow*. Los `.md`/`docs` no disparan el build.
-- **Sin secretos extra:** el workflow publica con el `GITHUB_TOKEN` propio de GitHub. La imagen queda **privada** (paquete vinculado al repo).
-- **Configuración única en el PC:** `docker login ghcr.io -u jjairocj` con un token clásico de GitHub con solo el permiso `read:packages` (GitHub → Settings → Developer settings → Tokens). El mismo token va en `REPO_PASS` del servicio `watchtower` del compose.
-- **Actualización automática:** Watchtower revisa cada 5 min y solo toca los contenedores con la etiqueta `com.centurylinklabs.watchtower.enable=true` (la app, nunca la base). Para actualizar a mano: `docker compose pull && docker compose up -d`.
-- **Migraciones:** cada versión nueva aplica sus migraciones al arrancar, contra la base real. Antes de cambios grandes de esquema haz una copia (`pg_dump`, ver abajo). Volver a una imagen anterior no deshace migraciones ya aplicadas.
-- **Vercel** sigue siendo independiente (despliegue por CLI); este flujo solo cubre la imagen del servidor local.
+(En un Mac Apple Silicon la construcción amd64 es emulada: unos 10 min.)
+
+**Publicar desde GitHub Actions** (`.github/workflows/docker-image.yml`, en cada push a `main`, solo si tests y typecheck pasan): GitHub no puede usar tu sesión local, así que necesita dos *secrets* en el repo (Settings → Secrets and variables → Actions): `DOCKERHUB_USERNAME` = `opplystr` y `DOCKERHUB_TOKEN` = un token de Docker Hub con permiso *Read & Write* (Account settings → Personal access tokens). Los cambios que solo tocan `docs`/`.md` no disparan el build; también se puede lanzar a mano (Actions → *Imagen Docker* → *Run workflow*).
+
+**En el PC Ubuntu** (una vez): `docker login -u opplystr` con un token de Docker Hub de permiso *Read-only*; ese mismo token va en `REPO_PASS` del servicio `watchtower` del compose. Watchtower revisa cada 5 min y solo reinicia contenedores con la etiqueta `com.centurylinklabs.watchtower.enable=true` (la app, nunca la base). A mano: `docker compose pull && docker compose up -d`.
+
+- **Volver atrás:** cambia `:latest` por el hash del commit en `image:` y `docker compose up -d`.
+- **Migraciones:** cada versión aplica las suyas al arrancar, contra la base real; volver a una imagen antigua no las deshace. Haz un `pg_dump` antes de cambios grandes de esquema.
+- **Vercel** sigue siendo independiente (despliegue por CLI).
 
 ## Datos y copias de seguridad
 
