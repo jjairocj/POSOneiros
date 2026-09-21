@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Receipt, Users, Settings, LineChart, ShoppingCart, BarChart3 } from "lucide-react";
+import { Package, Receipt, Users, Settings, LineChart, ShoppingCart, BarChart3, Sparkles } from "lucide-react";
 
 const NAV_ITEMS = [
     { name: "Resumen", href: "/admin", icon: LineChart },
     { name: "Inventario", href: "/admin/inventory", icon: Package },
+    { name: "Promos", href: "/admin/promotions", icon: Sparkles },
     { name: "Ventas", href: "/admin/sales", icon: Receipt },
     { name: "Reportes", href: "/admin/reports", icon: BarChart3 },
     { name: "Personal", href: "/admin/users", icon: Users },

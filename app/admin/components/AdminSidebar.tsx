@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Receipt, Users, Settings, LogOut, LineChart, Sun, Moon, KeyRound, BarChart3 } from "lucide-react";
+import { Package, Receipt, Users, Settings, LogOut, LineChart, Sun, Moon, KeyRound, BarChart3, Sparkles } from "lucide-react";
 import ChangePasswordModal from "@/app/components/ChangePasswordModal";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 const NAV_ITEMS = [
     { name: "Resumen", href: "/admin", icon: LineChart },
     { name: "Inventario", href: "/admin/inventory", icon: Package },
+    { name: "Promociones", href: "/admin/promotions", icon: Sparkles },
     { name: "Ventas", href: "/admin/sales", icon: Receipt },
     { name: "Reportes", href: "/admin/reports", icon: BarChart3 },
     { name: "Usuarios y Cajas", href: "/admin/users", icon: Users },

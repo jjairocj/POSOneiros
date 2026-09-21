@@ -33,6 +33,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     const visiblePaths = [
         canSee(["VIEW_DASHBOARD"]) ? "/admin" : null,
         canSee(["RECEIVE_INVENTORY", "MANAGE_CATALOG"]) ? "/admin/inventory" : null,
+        // Promotions: managers only (the proxy keeps CASHIER out of /admin except inventory).
+        role !== "CASHIER" && canSee(["MANAGE_CATALOG"]) ? "/admin/promotions" : null,
         canSee(["VIEW_REPORTS"]) ? "/admin/sales" : null,
         canSee(["VIEW_REPORTS"]) ? "/admin/reports" : null,
         role === "ADMIN" ? "/admin/users" : null,
