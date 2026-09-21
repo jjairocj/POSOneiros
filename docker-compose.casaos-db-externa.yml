@@ -1,0 +1,87 @@
+# VARIANTE con base de datos EXTERNA: la app se conecta a un PostgreSQL que ya tienes (otro equipo o app de CasaOS),
+# en vez de levantar el suyo. Es la misma imagen; solo cambia DATABASE_URL.
+# Oneiros POS para CasaOS (instalación personalizada: "+" → "Install a customized app" → pegar/importar este YAML).
+# También funciona con `docker compose -f docker-compose.casaos.yml up -d`.
+# Guía completa: docs/17-Despliegue-Docker-CasaOS.md
+#
+# Antes de instalar, la imagen debe existir en el servidor (ver la guía):
+#   docker load < oneiros-pos.tar     ->  oneiros-pos:latest
+name: oneiros-pos-app
+
+services:
+  app:
+    image: oneiros-pos:latest
+    pull_policy: never          # la imagen se carga localmente, no se descarga de internet
+    container_name: oneiros-pos
+    restart: unless-stopped
+    ports:
+      - target: 3000
+        published: "3000"
+        protocol: tcp
+    environment:
+      # postgresql://USUARIO:CLAVE@IP:5432/BASE  — si la clave lleva símbolos, codifícalos (! = %21, @ = %40, # = %23).
+      # Los valores CAMBIAR_* son marcadores: la app se niega a arrancar mientras sigan ahí,
+      # así nunca queda funcionando con una clave conocida.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://CAMBIAR_USUARIO:CAMBIAR_CLAVE@192.168.1.10:5432/CAMBIAR_BASE}
+      # Secreto para firmar sesiones (mín. 32 caracteres). Genera uno: openssl rand -base64 32
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-CAMBIAR_SECRETO_DE_SESIONES}
+      # Dirección con la que ABRES la app desde tus dispositivos (IP del servidor o su nombre, sin barra final).
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://CAMBIAR_IP_DEL_SERVIDOR:3000}
+      # Sólo se usan la PRIMERA vez (base vacía) para crear el administrador.
+      # Solo se usan si la base está VACÍA (una base ya migrada/copiada ya trae sus usuarios).
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@tunegocio.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-CAMBIAR_CLAVE_DEL_ADMIN}
+      BUSINESS_NAME: ${BUSINESS_NAME:-Sucursal Principal}
+      TZ: America/Bogota
+    networks: [oneiros]
+    x-casaos:
+      envs:
+        - container: DATABASE_URL
+          description:
+            es_es: Conexión a tu PostgreSQL externo, ej. postgresql://casaos:CLAVE@192.168.68.201:5432/pos
+            en_us: Connection to your external PostgreSQL
+        - container: NEXTAUTH_SECRET
+          description:
+            es_es: Secreto de sesiones — cámbialo por uno propio (openssl rand -base64 32)
+            en_us: Session secret — replace with your own
+        - container: NEXTAUTH_URL
+          description:
+            es_es: URL con la que abres la app, ej. http://192.168.1.50:3000
+            en_us: URL you use to open the app
+        - container: ADMIN_EMAIL
+          description:
+            es_es: Correo del primer administrador (solo se usa con la base vacía)
+            en_us: First admin email (only used on an empty database)
+        - container: ADMIN_PASSWORD
+          description:
+            es_es: Clave del primer administrador, mínimo 8 caracteres (solo se usa con la base vacía)
+            en_us: First admin password, min 8 chars (only used on an empty database)
+      ports:
+        - container: "3000"
+          description:
+            es_es: Puerto web de Oneiros POS
+            en_us: Oneiros POS web port
+
+networks:
+  oneiros:
+    driver: bridge
+
+x-casaos:
+  architectures: [amd64, arm64]
+  main: app
+  index: /login
+  port_map: "3000"
+  category: Business
+  title:
+    en_us: Oneiros POS
+    es_es: Oneiros POS
+  tagline:
+    en_us: Point of sale, inventory and reports for a small business
+    es_es: Punto de venta, inventario y reportes para un negocio pequeño
+  description:
+    en_us: Private point-of-sale app with its own PostgreSQL database. Runs only on your local network.
+    es_es: App privada de punto de venta con su propia base PostgreSQL. Funciona solo en tu red local.
+  author: Oneiros
+  developer: Oneiros
+  icon: ""
+  thumbnail: ""

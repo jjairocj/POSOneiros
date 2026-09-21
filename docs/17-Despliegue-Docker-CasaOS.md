@@ -54,6 +54,16 @@ Los valores `CAMBIAR_*` del compose son **marcadores**: si dejas alguno, el cont
 
 Si abres la app con otra dirección (p. ej. por nombre en vez de IP) y el login falla o redirige mal, es que `NEXTAUTH_URL` no coincide.
 
+## Variante: usar un PostgreSQL que ya tienes (base externa)
+
+`docker-compose.casaos-db-externa.yml` es la misma imagen pero **sin** contenedor de base de datos: la app se conecta a un PostgreSQL existente. Solo cambia `DATABASE_URL`:
+
+```
+postgresql://USUARIO:CLAVE@IP:5432/BASE      # símbolos en la clave codificados: ! = %21, @ = %40, # = %23
+```
+
+Si esa base ya viene copiada/migrada (con sus usuarios), `ADMIN_EMAIL`/`ADMIN_PASSWORD` no se usan. Las migraciones pendientes se aplican solas al arrancar. Verificado contra una copia real de la base de producción en otro equipo de la red: arranque sano, 18 migraciones ya aplicadas (sin cambios), login y todas las páginas del admin cargando datos reales.
+
 ## Datos y copias de seguridad
 
 Los datos viven en `/DATA/AppData/oneiros-pos/postgres` (volumen del contenedor `db`). **Haz copias**: por ejemplo un cron en el servidor:
