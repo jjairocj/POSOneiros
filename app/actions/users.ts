@@ -200,3 +200,25 @@ export async function changeOwnPassword(currentPassword: string, newPassword: st
         return { success: false, error: toUserMessage(error) };
     }
 }
+
+/** "Modo Tutorial" preference of the signed-in user (explanatory helper text in the UI). */
+export async function getMyTutorialMode(): Promise<boolean> {
+    try {
+        const me = await requireSession();
+        const user = await prisma.user.findUnique({ where: { id: me.id }, select: { tutorialMode: true } });
+        return user?.tutorialMode ?? false;
+    } catch {
+        return false;
+    }
+}
+
+export async function setMyTutorialMode(enabled: boolean): Promise<{ success: boolean; error?: string }> {
+    try {
+        const me = await requireSession();
+        await prisma.user.update({ where: { id: me.id }, data: { tutorialMode: !!enabled } });
+        return { success: true };
+    } catch (error: unknown) {
+        console.error("Error saving tutorial mode:", error);
+        return { success: false, error: toUserMessage(error, "No se pudo guardar la preferencia.") };
+    }
+}

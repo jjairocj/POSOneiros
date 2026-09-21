@@ -5,6 +5,8 @@ import { useState, useRef, useEffect } from "react";
 import { useMounted } from "@/app/lib/useMounted";
 import { LogOut, LayoutDashboard, BarChart2, Package, ChevronDown, Sun, Moon, KeyRound } from "lucide-react";
 import ChangePasswordModal from "@/app/components/ChangePasswordModal";
+import { useTutorialMode } from "@/app/components/TutorialMode";
+import { Switch } from "@/components/ui/switch";
 import { useTheme } from "next-themes";
 import { hasPermission, type PermissionKey } from "@/lib/permissions";
 
@@ -25,6 +27,7 @@ export default function POSUserMenu({ userName, userRole, permissions = "ALL" }:
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
+  const { enabled: tutorialOn, setEnabled: setTutorialOn } = useTutorialMode();
   const dark = theme === "dark";
   const canViewDashboard = hasPermission(permissions, "VIEW_DASHBOARD");
   const canOpenInventory = hasPermission(permissions, "RECEIVE_INVENTORY") || hasPermission(permissions, "MANAGE_CATALOG");
@@ -100,6 +103,14 @@ export default function POSUserMenu({ userName, userRole, permissions = "ALL" }:
                   </span>
                 )}
               </button>
+            </div>
+
+            {/* Modo Tutorial: show/hide the explanatory helper text across the app */}
+            <div className="px-3 py-2 border-b border-border/50">
+              <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/50">
+                <label htmlFor="pos-tutorial-mode" className="text-sm font-medium text-foreground cursor-pointer">Modo Tutorial</label>
+                <Switch id="pos-tutorial-mode" checked={tutorialOn} onCheckedChange={setTutorialOn} />
+              </div>
             </div>
 
             {/* Navigation links — each shown only if this session's permissions

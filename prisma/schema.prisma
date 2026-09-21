@@ -16,6 +16,9 @@ model User {
   role              Role      @relation(fields: [roleId], references: [id])
   branchId          String?
   branch            Branch?   @relation(fields: [branchId], references: [id])
+  /// "Modo Tutorial": when on, the UI shows the explanatory helper text under
+  /// fields/dialogs; off by default so the app stays uncluttered.
+  tutorialMode      Boolean   @default(false)
   shifts            Shift[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -53,20 +56,23 @@ model Register {
 }
 
 model Shift {
-  id          String       @id @default(uuid())
-  userId      String
-  user        User         @relation(fields: [userId], references: [id])
-  registerId  String
-  register    Register     @relation(fields: [registerId], references: [id])
-  baseAmount  Float        @default(0)
-  closeAmount Float?
-  status      String       @default("OPEN") // OPEN, CLOSED
-  startTime   DateTime     @default(now())
-  endTime     DateTime?
-  sales       Sale[]
-  subAccounts SubAccount[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  registerId    String
+  register      Register     @relation(fields: [registerId], references: [id])
+  baseAmount    Float        @default(0)
+  closeAmount   Float? // cash counted in the drawer at close (includes the base)
+  closeCard     Float? // datáfono total declared at close
+  closeTransfer Float? // transfers total declared at close
+  closeNote     String? // required reason whenever any declared amount differs from expected
+  status        String       @default("OPEN") // OPEN, CLOSED
+  startTime     DateTime     @default(now())
+  endTime       DateTime?
+  sales         Sale[]
+  subAccounts   SubAccount[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model Category {

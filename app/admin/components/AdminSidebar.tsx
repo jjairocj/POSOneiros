@@ -7,6 +7,8 @@ import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useState } from "react";
 import { useMounted } from "@/app/lib/useMounted";
+import { useTutorialMode } from "@/app/components/TutorialMode";
+import { Switch } from "@/components/ui/switch";
 
 const NAV_ITEMS = [
     { name: "Resumen", href: "/admin", icon: LineChart },
@@ -30,6 +32,7 @@ export default function AdminSidebar({ role, visiblePaths }: AdminSidebarProps) 
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const mounted = useMounted();
+    const { enabled: tutorialOn, setEnabled: setTutorialOn } = useTutorialMode();
     const [changingPw, setChangingPw] = useState(false);
     const dark = theme === "dark";
 
@@ -86,6 +89,11 @@ export default function AdminSidebar({ role, visiblePaths }: AdminSidebarProps) 
                     {mounted && (dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />)}
                     <span>{mounted ? (dark ? "Modo claro" : "Modo oscuro") : "Tema"}</span>
                 </button>
+
+                <div className="flex w-full items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium text-muted-foreground border border-transparent">
+                    <label htmlFor="admin-tutorial-mode" className="cursor-pointer">Modo Tutorial</label>
+                    <Switch id="admin-tutorial-mode" checked={tutorialOn} onCheckedChange={setTutorialOn} />
+                </div>
 
                 <Link
                     href="/pos"
