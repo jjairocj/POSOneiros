@@ -15,7 +15,7 @@ Trabajo en el branch `feat/pos-offline-first`, sobre `main`. No mergear hasta va
 - **Fallback de catálogo en memoria**: `app/pos/components/Catalog/ProductGrid.tsx` detecta fallo de red y no borra lo ya renderizado, reintenta al reconectar — pero no persiste nada, un refresh de página en pleno corte deja el POS sin productos.
 - **Servidor como verdad final**: precios, impuestos, stock y promociones se recalculan siempre dentro de la transacción de `processSale` (`app/actions/sale.ts`), nunca confía en lo que mandó el cliente.
 - **Sesión JWT de 12h** (`app/api/auth/[...nextauth]/route.ts`) — más que suficiente para cualquier corte, no requiere cambios.
-- **Alcance ya acotado deliberadamente**: la cola offline solo cubre `CheckoutModal` (pago único); `SplitBillModal` (cuenta dividida) queda fuera por ahora.
+- ✅ **Ya no acotado (2026-09-23)**: la cola offline cubría solo `CheckoutModal` (pago único); ahora `SplitBillModal` (cuenta dividida) también encola, por ser un flujo frecuente en el negocio — ver punto 8 en "Qué se verificó".
 
 ## Estado
 
@@ -68,7 +68,11 @@ El primer intento de Fase 2 fallaba: `/pos` no abría offline pese al service wo
 6. Turno cerrado manualmente en la base mientras la app seguía offline (para forzar un rechazo real, no de red) → al reconectar, `ReviewPanel` mostró el motivo exacto del servidor ("El turno no está abierto..."), con cantidad de productos y total.
 7. Botón "Descartar" con confirmación probado — limpia el panel sin tocar el resto de la cola.
 
-Falta probar (no bloqueante para continuar desarrollando, sí antes de mergear a producción real): `retryReviewSale` con un rechazo transitorio real (ej. stock) que sí se resuelve solo en el segundo intento; y la imagen Docker/CasaOS empaquetada (el `next build` de esta prueba fue local, no la imagen final).
+8. **Cuenta dividida (`SplitBillModal`) extendida a la cola offline** (2026-09-23, antes fuera de alcance deliberadamente): el único fetch real del flujo es el `handleRegisterSale` final (cobrar cada persona con `CheckoutModal mode="collect"` es 100% local, sin red) — ahora usa el mismo patrón `clientRef` + `useOfflineSalesQueue` que `CheckoutModal`. Probado offline de punta a punta: 2 personas cobradas localmente sin red, "Registrar venta" con servidor caído → pantalla "Cuenta dividida guardada, sin conexión" + banner de pendiente; servidor restaurado → sincronización automática confirmada en la base (`Sale.total = 6200`, 2 `SubAccount` con `paid=true`, sin duplicados).
+9. **Reintento exitoso probado** (el caso que faltaba de la fase 3): la misma prueba del punto 8 cubre esto — el reintento automático del poll de 20s, sin manipular la base esta vez, sincronizó la venta sola en el primer intento tras reconectar.
+10. **Íconos reales del manifest**: `public/icon.svg` (la misma marca "OP" del sidebar) referenciado en `app/manifest.ts` en 192x192/512x512/any. SVG es suficiente porque el despliegue real corre solo en Chrome/Edge de escritorio, una sola caja — no hace falta cubrir Safari/iOS.
+
+Falta probar (no bloqueante, pendiente para cuando la imagen Docker/CasaOS esté publicada): todo lo anterior se probó con `next build`/`next start` locales — falta repetirlo contra la imagen Docker real desplegada en CasaOS.
 
 ## Ambiente de pruebas en CasaOS
 

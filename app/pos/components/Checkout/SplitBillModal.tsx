@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    X, Plus, Pencil, CheckCircle2, Users, SplitSquareHorizontal, Minus,
+    X, Plus, Pencil, CheckCircle2, Users, SplitSquareHorizontal, Minus, CloudOff,
 } from "lucide-react";
 import { CartItem, OrderDiscount } from "@/app/types/cart";
 import { useSubAccountStore } from "@/app/store/useSubAccountStore";
@@ -12,6 +12,7 @@ import CheckoutModal from "./CheckoutModal";
 import SaleSuccess from "./SaleSuccess";
 import type { ReceiptSale } from "./Receipt";
 import { processSale, type PaymentInput } from "@/app/actions/sale";
+import { useOfflineSalesQueue } from "@/app/lib/offlineSalesQueue";
 
 interface SplitBillModalProps {
     activeShiftId: string;
@@ -316,6 +317,12 @@ export default function SplitBillModal({ activeShiftId, items, orderDiscount = n
     const [finalError, setFinalError] = useState("");
     const [completedSale, setCompletedSale] = useState<ReceiptSale | null>(null);
     const [pendingItemForPicker, setPendingItemForPicker] = useState<CartItem | null>(null);
+    const [queuedOffline, setQueuedOffline] = useState(false);
+    const enqueueOfflineSale = useOfflineSalesQueue((s) => s.enqueue);
+    // Stable per split attempt, same reasoning as CheckoutModal: reused across
+    // the queue's automatic retries so the server recognizes a retry instead
+    // of registering the cuenta dividida twice.
+    const [clientRef] = useState(() => crypto.randomUUID());
 
     // Compute assigned quantities per item
     const assignedQtyMap: Record<string, number> = {};
@@ -365,25 +372,31 @@ export default function SplitBillModal({ activeShiftId, items, orderDiscount = n
         const payments: PaymentInput[] = subAccounts.flatMap((sa) =>
             (sa.payments ?? []).map((p) => ({ ...p, subAccountLabel: sa.label }))
         );
+        const saleItems = items.map((i) => ({ id: i.id, quantity: i.quantity, discount: i.discount ?? 0 }));
+        const options = {
+            discount: orderDiscount,
+            subAccounts: subAccounts.map((sa) => ({
+                label: sa.label,
+                items: sa.items.map((i) => ({ id: i.id, quantity: i.quantity })),
+                amount: sa.customAmount ?? sa.total,
+            })),
+            clientRef,
+        };
         setFinalizing(true);
         try {
-            const res = await processSale(
-                activeShiftId,
-                items.map((i) => ({ id: i.id, quantity: i.quantity, discount: i.discount ?? 0 })),
-                payments,
-                {
-                    discount: orderDiscount,
-                    subAccounts: subAccounts.map((sa) => ({
-                        label: sa.label,
-                        items: sa.items.map((i) => ({ id: i.id, quantity: i.quantity })),
-                        amount: sa.customAmount ?? sa.total,
-                    })),
-                }
-            );
+            const res = await processSale(activeShiftId, saleItems, payments, options);
             if (!res.ok) { setFinalError(res.error); return; }
             setCompletedSale(res.data as unknown as ReceiptSale);
         } catch {
-            setFinalError("No se pudo conectar con el servidor. Los pagos siguen registrados aquí; intenta de nuevo.");
+            // Same reasoning as CheckoutModal: a thrown error here means the
+            // connection dropped before a real answer came back, not that the
+            // server rejected the sale — queue it for automatic retry instead
+            // of making the cashier lose every sub-account's collected payments.
+            enqueueOfflineSale({
+                clientRef, activeShiftId, items: saleItems, payments, options, enqueuedAt: Date.now(),
+                summary: { itemCount: items.length, total: cartTotal },
+            });
+            setQueuedOffline(true);
         } finally {
             setFinalizing(false);
         }
@@ -422,7 +435,27 @@ export default function SplitBillModal({ activeShiftId, items, orderDiscount = n
                     </button>
                 </div>
 
-                {completedSale ? (
+                {queuedOffline ? (
+                    <div className="p-8 flex flex-col items-center text-center gap-4">
+                        <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center">
+                            <CloudOff className="w-7 h-7 text-amber-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black tracking-tight">Cuenta dividida guardada, sin conexión</h2>
+                            <p className="text-muted-foreground text-sm mt-1">
+                                No hay conexión con el servidor en este momento. La venta por {formatMoney(cartTotal)} (todas las
+                                personas ya pagaron) quedó guardada y se enviará sola apenas vuelva la conexión — no necesitas repetirla.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleAllDone}
+                            className="w-full py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90 transition-colors"
+                        >
+                            Continuar
+                        </button>
+                    </div>
+                ) : completedSale ? (
                     <SaleSuccess sale={completedSale} change={0} subtitle="Cuenta dividida registrada como una sola venta." onClose={handleAllDone} />
                 ) : everythingPaid ? (
                     /* ── All paid: register the sale ── */
