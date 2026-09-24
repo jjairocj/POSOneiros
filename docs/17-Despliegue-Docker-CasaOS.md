@@ -104,6 +104,23 @@ pg_dump --no-owner --no-acl "<URL directa de Neon, sin -pooler>" | docker exec -
 
 Hazlo con la app recién instalada y **antes** de crear ventas nuevas; si el bootstrap ya creó el administrador, restaura sobre una base vacía (borra el volumen o usa `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`).
 
+## Almacenamiento de imágenes de producto (MinIO)
+
+Opcional. Un servidor [MinIO](https://min.io) (S3-compatible) en CasaOS para que el botón "Subir" del formulario de producto (`/admin/inventory`) guarde las imágenes ahí en vez de depender solo de pegar una URL externa a mano.
+
+Instalado vía el App Store de CasaOS: **Big Bear MinIO** (`bigbeartechworld/big-bear-minio`), no un compose propio de este repo — se administra igual que cualquier otra app de CasaOS. Esa app mapea:
+- `9000` (API S3, interno) → publicado en `9010`
+- `9001` (consola web) → publicado en `9011`
+
+Pasos:
+
+1. Entra a la consola (`http://IP_SERVIDOR:9011`), crea un bucket (ej. `oneiros`) y ponle política de **lectura pública** (Access Policy → Public, o `mc anonymous set download local/oneiros` desde la CLI de `mc`) — las imágenes se sirven directo por URL sin pasar por la app, así que necesitan poder leerse sin autenticación.
+2. Expón el puerto **`9010`** (la API, no la consola `9011`) con cloudflared bajo un hostname propio, ej. `https://storage.tudominio.dev`.
+3. En el compose de la app, define `S3_ENDPOINT` y `S3_PUBLIC_URL` con esa misma URL, `S3_BUCKET` con el nombre del bucket, y `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` (el root de `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` sirve, o mejor un access key dedicado creado en Identity → Access Keys). Reinicia el contenedor `oneiros-pos` para que tome las nuevas variables.
+4. Detalle completo de cada variable en [[14-Configuración-y-variables-de-entorno]].
+
+Sin estas variables configuradas, el campo de imagen sigue funcionando exactamente igual que antes (pegar una URL externa) — MinIO es aditivo, no reemplaza nada. El botón "Buscar en Google" (abre Google Imágenes con el nombre del producto en una pestaña nueva) funciona siempre, con o sin MinIO configurado — solo automatiza encontrar una URL para pegar a mano.
+
 ## Actualizar a una versión nueva
 
 Construye y carga la imagen nueva (pasos 1–2) y reinicia el contenedor `oneiros-pos`: las migraciones se aplican solas al arrancar.

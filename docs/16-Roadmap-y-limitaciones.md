@@ -51,6 +51,9 @@ Cosas identificadas en revisiones previas del proyecto, no priorizadas aún — 
 ### Variantes de producto (US4.2, revisado 2026-09-12)
 - **No hay variantes reales con stock independiente** (ej. talla/color como unidades de inventario separadas). `ProductFamily` (2026-09-11) cubre el caso de "agrupar para que una promoción aplique a cualquier sabor/variedad", pero no resuelve stock por variante — son necesidades distintas, no confundir una con la otra si se retoma este ítem.
 
+### Rediseño del formulario Agregar/Editar Producto (pendiente, anotado 2026-09-24)
+- El modal (`app/admin/inventory/components/product-form.tsx`) fue creciendo por partes (código/nombre, categoría/disponibilidad, familia, seguimiento de inventario, insumo, imagen — con "Subir"/"Buscar en Google" agregados esta sesión —, favorito, calculadora de precios, inventario, impuestos...) sin una revisión de conjunto. El usuario pidió explícitamente separar responsabilidades y ganar claridad visual antes de seguir agregándole cosas — no es solo "cabe todo" sino "se entiende de un vistazo qué es cada bloque". Candidato a dividir en secciones/tabs (ej. Datos básicos / Precio y costos / Inventario y seguimiento / Imagen) en vez de una sola columna larga.
+
 ## Dominio (descartado, no pendiente)
 - Se evaluó un subdominio propio (`byoneiros.com`) y se descartó explícitamente por decisión del usuario — el dominio `.vercel.app` es suficiente mientras haya un solo cliente. Ver [[08-Despliegue]].
 

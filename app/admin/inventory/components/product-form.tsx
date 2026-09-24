@@ -14,7 +14,8 @@ import {
     DialogTitle,
     DialogTrigger
 } from "@/components/ui/dialog";
-import { PackagePlus, Save, Loader2, Star, Image as ImageIcon } from "lucide-react";
+import { PackagePlus, Save, Loader2, Star, Image as ImageIcon, Upload, Search } from "lucide-react";
+import { uploadProductImageAction } from "@/app/actions/upload";
 import { ProductColumn } from "./columns";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -31,6 +32,10 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const [loading, setLoading] = useState(false);
     const [imageUrl, setImageUrl] = useState(product?.imageUrl || "");
     const [imageFailed, setImageFailed] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState("");
+    // Mirrors the (uncontrolled) name input, only to build the Google Images search link.
+    const [nameValue, setNameValue] = useState(product?.name || "");
     const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
     const [categoryId, setCategoryId] = useState<string>(product?.categoryId ?? "none");
     const [families, setFamilies] = useState<{ id: string; name: string }[]>([]);
@@ -56,6 +61,26 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const suggestedPrice = cost + (cost * (expectedMargin / 100));
     const realMarginValue = price - cost;
     const realMarginPercent = cost > 0 ? (realMarginValue / cost) * 100 : 0;
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = ""; // allow re-selecting the same file
+        if (!file) return;
+        setUploading(true);
+        setUploadError("");
+        try {
+            const fd = new FormData();
+            fd.set("file", file);
+            const res = await uploadProductImageAction(fd);
+            if (!res.ok) { setUploadError(res.error); return; }
+            setImageUrl(res.data.url);
+            setImageFailed(false);
+        } catch {
+            setUploadError("No se pudo conectar con el servidor. Intenta de nuevo.");
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const handleAction = async (formData: FormData) => {
         setLoading(true);
@@ -118,6 +143,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     name="name"
                                     required
                                     defaultValue={product?.name}
+                                    onChange={(e) => setNameValue(e.target.value)}
                                     className="rounded-xl h-12 bg-muted/50"
                                     placeholder="Ej: Chocoramo"
                                 />
@@ -227,6 +253,21 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                         className="rounded-xl h-11 bg-muted/50"
                                         placeholder="https://ejemplo.com/imagen.jpg"
                                     />
+                                    <label className={`shrink-0 h-11 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors ${uploading ? "opacity-60 pointer-events-none" : "hover:border-primary hover:text-primary"}`}>
+                                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                        Subir
+                                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelect} disabled={uploading} />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        disabled={!nameValue.trim()}
+                                        onClick={() => window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(nameValue.trim())}`, "_blank", "noopener,noreferrer")}
+                                        title={nameValue.trim() ? undefined : "Escribe primero el nombre del producto"}
+                                        className="shrink-0 h-11 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none"
+                                    >
+                                        <Search className="w-4 h-4" />
+                                        Buscar en Google
+                                    </button>
                                     <div className="shrink-0 w-11 h-11 rounded-xl border bg-muted/30 flex items-center justify-center overflow-hidden">
                                         {imageUrl && !imageFailed ? (
                                             // eslint-disable-next-line @next/next/no-img-element -- external product photo, unknown size
@@ -242,9 +283,13 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                         )}
                                     </div>
                                 </div>
+                                {uploadError && <p className="text-xs text-destructive ml-1">{uploadError}</p>}
                                 {imageUrl && imageFailed && (
                                     <p className="text-xs text-destructive ml-1">No se pudo cargar esta imagen. Revisa la URL o prueba con otra.</p>
                                 )}
+                                <Hint className="text-xs text-muted-foreground ml-1">
+                                    "Buscar en Google" abre una pestaña con imágenes de "{nameValue.trim() || "el nombre del producto"}" — clic derecho → copiar dirección de la imagen, pégala arriba. "Subir" guarda la imagen en tu almacenamiento propio (MinIO).
+                                </Hint>
                             </div>
                             <div className="flex items-center gap-3 h-11 px-4 rounded-xl border bg-muted/30 w-fit">
                                 <Switch

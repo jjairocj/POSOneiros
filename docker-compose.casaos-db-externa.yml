@@ -32,6 +32,15 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@tunegocio.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-CAMBIAR_CLAVE_DEL_ADMIN}
       BUSINESS_NAME: ${BUSINESS_NAME:-Sucursal Principal}
+      # Opcionales — solo habilitan el botón "Subir" en el formulario de producto
+      # (almacenamiento MinIO propio, ver docker-compose.casaos-minio.yml).
+      # Vacíos por defecto: sin configurarlos, el campo de URL de imagen sigue
+      # funcionando igual (pegar un link a mano).
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
       TZ: America/Bogota
     networks: [oneiros]
     x-casaos:
@@ -56,6 +65,26 @@ services:
           description:
             es_es: Clave del primer administrador, mínimo 8 caracteres (solo se usa con la base vacía)
             en_us: First admin password, min 8 chars (only used on an empty database)
+        - container: S3_ENDPOINT
+          description:
+            es_es: "Opcional — URL de tu MinIO, ej. https://storage.tudominio.dev (habilita subir imágenes de producto)"
+            en_us: "Optional — your MinIO URL (enables product image uploads)"
+        - container: S3_ACCESS_KEY_ID
+          description:
+            es_es: Opcional — usuario/access key de MinIO
+            en_us: Optional — MinIO access key
+        - container: S3_SECRET_ACCESS_KEY
+          description:
+            es_es: Opcional — clave/secret key de MinIO
+            en_us: Optional — MinIO secret key
+        - container: S3_BUCKET
+          description:
+            es_es: Opcional — nombre del bucket (debe existir y tener lectura pública)
+            en_us: Optional — bucket name (must exist, public read)
+        - container: S3_PUBLIC_URL
+          description:
+            es_es: Opcional — normalmente igual a S3_ENDPOINT
+            en_us: Optional — usually the same as S3_ENDPOINT
       ports:
         - container: "3000"
           description:
