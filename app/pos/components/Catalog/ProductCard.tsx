@@ -62,17 +62,17 @@ export default function ProductCard({ product }: ProductCardProps) {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                 ) : (
-                    <span className="text-4xl opacity-20">📦</span>
+                    <span className="text-2xl opacity-20">📦</span>
                 )}
 
                 {/* Favorite toggle */}
                 <button
                     onClick={handleToggleFavorite}
                     disabled={isPending}
-                    className="absolute top-2 left-2 w-9 h-9 flex items-center justify-center rounded-full bg-background/80 backdrop-blur-sm border border-border/50 shadow-sm hover:scale-110 active:scale-95 transition-all z-10"
+                    className="absolute top-1 left-1 w-6 h-6 flex items-center justify-center rounded-full bg-background/80 backdrop-blur-sm border border-border/50 shadow-sm hover:scale-110 active:scale-95 transition-all z-10"
                 >
                     <Star
-                        className={`w-4 h-4 transition-colors ${
+                        className={`w-3 h-3 transition-colors ${
                             isFavorite
                                 ? "fill-yellow-400 text-yellow-500"
                                 : "text-muted-foreground hover:text-foreground"
@@ -83,29 +83,29 @@ export default function ProductCard({ product }: ProductCardProps) {
                 {/* Stock badges */}
                 {isOutOfStock && (
                     <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
-                        <Badge variant="destructive" className="text-xs font-bold shadow">Agotado</Badge>
+                        <Badge variant="destructive" className="text-[9px] font-bold shadow px-1.5 py-0">Agotado</Badge>
                     </div>
                 )}
                 {!isOutOfStock && product.stock <= 5 && (
-                    <Badge variant="destructive" className="absolute top-2 right-2 shadow-sm z-10 text-[10px]">
-                        ¡Poco Stock!
+                    <Badge variant="destructive" className="absolute top-1 right-1 shadow-sm z-10 text-[8px] px-1 py-0">
+                        Poco Stock
                     </Badge>
                 )}
 
                 {/* "Añadido" flash */}
                 {added && (
                     <div className="absolute inset-0 flex items-center justify-center bg-primary/20 backdrop-blur-sm animate-in fade-in zoom-in duration-150 pointer-events-none">
-                        <span className="text-2xl font-black text-primary">+1</span>
+                        <span className="text-lg font-black text-primary">+1</span>
                     </div>
                 )}
             </div>
 
             {/* Info */}
-            <div className="p-3 flex flex-col gap-0.5">
-                <h3 className="font-semibold text-sm line-clamp-2 leading-tight text-card-foreground">
+            <div className="p-1.5 flex flex-col gap-0">
+                <h3 className="font-semibold text-[11px] line-clamp-2 leading-tight text-card-foreground">
                     {product.name}
                 </h3>
-                <p className="text-primary font-bold text-sm mt-1">
+                <p className="text-primary font-bold text-[11px] mt-0.5">
                     ${product.price.toLocaleString()}
                 </p>
             </div>
