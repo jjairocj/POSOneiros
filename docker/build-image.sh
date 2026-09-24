@@ -9,8 +9,9 @@ PLATFORM="${PLATFORM:-linux/amd64}"
 TAG="${TAG:-oneiros-pos:latest}"
 OUT="${OUT:-oneiros-pos.tar}"
 
+GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
 echo "Construyendo $TAG para $PLATFORM ..."
-docker buildx build --platform "$PLATFORM" -t "$TAG" --load .
+docker buildx build --platform "$PLATFORM" --build-arg GIT_SHA="$GIT_SHA" -t "$TAG" --load .
 echo "Exportando a $OUT (puede tardar) ..."
 docker save "$TAG" -o "$OUT"
 ls -lh "$OUT"

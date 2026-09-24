@@ -55,57 +55,61 @@ export default function LoginPage() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.card}>
-        <div className={styles.header}>
-          <h1>Oneiros POS</h1>
-          <p>Bienvenido. Inicia sesión para abrir tu turno.</p>
-        </div>
-
-        {error && <div className={styles.error}>{error}</div>}
-
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.inputGroup}>
-            <label htmlFor="email">Correo electrónico</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@correo.com"
-              required
-              disabled={loading}
-              className={styles.input}
-            />
+      <div className={styles.backdrop} aria-hidden="true" />
+      <div className={styles.content}>
+        <div className={styles.card}>
+          <div className={styles.header}>
+            <h1>Oneiros POS</h1>
+            <p>Bienvenido. Inicia sesión para abrir tu turno.</p>
           </div>
 
-          <div className={styles.inputGroup}>
-            <label htmlFor="password">Contraseña</label>
-            <div className={styles.passwordWrapper}>
+          {error && <div className={styles.error}>{error}</div>}
+
+          <form onSubmit={handleSubmit} className={styles.form}>
+            <div className={styles.inputGroup}>
+              <label htmlFor="email">Correo electrónico</label>
               <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@correo.com"
                 required
                 disabled={loading}
                 className={styles.input}
               />
-              <button
-                type="button"
-                className={styles.togglePassword}
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
-              >
-                {showPassword ? "Ocultar" : "Mostrar"}
-              </button>
             </div>
-          </div>
 
-          <button type="submit" disabled={loading} className={styles.submitBtn}>
-            {loading ? "Ingresando..." : "Ingresar"}
-          </button>
-        </form>
+            <div className={styles.inputGroup}>
+              <label htmlFor="password">Contraseña</label>
+              <div className={styles.passwordWrapper}>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  disabled={loading}
+                  className={styles.input}
+                />
+                <button
+                  type="button"
+                  className={styles.togglePassword}
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? "Ocultar" : "Mostrar"}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" disabled={loading} className={styles.submitBtn}>
+              {loading ? "Ingresando..." : "Ingresar"}
+            </button>
+          </form>
+        </div>
+        <span className={styles.version}>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
       </div>
     </div>
   );

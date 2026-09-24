@@ -16,6 +16,7 @@ fi
 
 echo "Construyendo y subiendo $REPO:latest y $REPO:$SHA (linux/amd64)..."
 docker buildx build --platform linux/amd64 \
+  --build-arg GIT_SHA="$SHA" \
   -t "$REPO:latest" -t "$REPO:$SHA" \
   --push .
 echo "Listo. En el PC:  docker pull $REPO:latest   (o deja que Watchtower la actualice)"

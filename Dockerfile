@@ -23,8 +23,12 @@ FROM deps AS builder
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
+# Mostrado al pie del login (app/login/page.tsx). .git no viaja al contexto de
+# build (ver .dockerignore), por eso el hash llega como build-arg desde afuera
+# en vez de leerse con git dentro de la imagen.
+ARG GIT_SHA=dev
 # El secreto es solo un marcador para que el build no falle; no llega a la imagen final.
-RUN NEXTAUTH_SECRET=build-time-placeholder npm run build && rm -rf .next/cache
+RUN GIT_SHA=$GIT_SHA NEXTAUTH_SECRET=build-time-placeholder npm run build && rm -rf .next/cache
 
 # ── Runtime ───────────────────────────────────────────────────────────────
 FROM base AS runner

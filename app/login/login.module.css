@@ -1,10 +1,89 @@
 .container {
+    position: relative;
     display: flex;
     min-height: 100vh;
     align-items: center;
     justify-content: center;
     background-color: var(--background);
     padding: 1rem;
+    overflow: hidden;
+}
+
+/* Two soft blurred gradient blobs instead of a photo — no asset to ship,
+   works in both themes since they're built from the active --primary token.
+   Kept behind everything (z-index 0) and pointer-events: none so they never
+   interfere with the form. */
+.backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.backdrop::before,
+.backdrop::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.35;
+}
+
+.backdrop::before {
+    width: 32rem;
+    height: 32rem;
+    top: -10rem;
+    left: -8rem;
+    background: var(--primary);
+    animation: drift 22s ease-in-out infinite;
+}
+
+.backdrop::after {
+    width: 26rem;
+    height: 26rem;
+    bottom: -8rem;
+    right: -6rem;
+    background: color-mix(in srgb, var(--primary) 60%, #06b6d4);
+    animation: drift 26s ease-in-out infinite reverse;
+}
+
+@keyframes drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(2rem, 3rem) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .backdrop::before,
+    .backdrop::after {
+        animation: none;
+    }
+}
+
+/* Same accessibility fallback as .glass-chrome in globals.css: when the OS
+   asks for reduced transparency, drop the blur/blobs instead of degrading
+   contrast under a translucent card. */
+@media (prefers-reduced-transparency: reduce) {
+    .backdrop {
+        display: none;
+    }
+}
+
+.content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    max-width: 400px;
+}
+
+.version {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    opacity: 0.7;
 }
 
 .card {
@@ -122,7 +201,12 @@
 }
 
 .submitBtn:hover:not(:disabled) {
-    background-color: var(--primary-hover);
+    /* --primary-hover was never defined anywhere in the app (checked
+       globals.css) — var() with an undefined custom property and no
+       fallback makes the whole declaration a no-op, so hover never
+       actually changed color. color-mix darkens --primary directly,
+       works the same regardless of which theme's --primary is active. */
+    background-color: color-mix(in srgb, var(--primary) 88%, black);
     transform: translateY(-1px);
 }
 
