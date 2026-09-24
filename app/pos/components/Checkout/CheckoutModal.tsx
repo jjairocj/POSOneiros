@@ -280,52 +280,58 @@ export default function CheckoutModal({
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-card w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-border flex flex-col max-h-[90vh]">
-
-                {queuedOffline ? (
-                    <div className="p-8 flex flex-col items-center text-center gap-4">
-                        <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center">
-                            <CloudOff className="w-7 h-7 text-amber-500" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black tracking-tight">Venta guardada, sin conexión</h2>
-                            <p className="text-muted-foreground text-sm mt-1">
-                                No hay conexión con el servidor en este momento. La venta por {formatMoney(orderTotal)} quedó guardada
-                                y se enviará sola apenas vuelva la conexión — no necesitas repetirla.
-                            </p>
-                        </div>
-                        <Button onClick={onSuccess} className="w-full rounded-2xl h-12 font-bold">Continuar</Button>
+        // Fullscreen instead of a centered card: the payment form (3 methods +
+        // customer picker + quick-cash + totals) doesn't reliably fit inside a
+        // capped-height modal on a laptop-sized screen without internal
+        // scrolling — using the whole viewport removes that ceiling entirely.
+        <div className="fixed inset-0 z-[200] bg-card flex flex-col animate-in fade-in duration-200">
+            {queuedOffline ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 p-8">
+                    <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center">
+                        <CloudOff className="w-7 h-7 text-amber-500" />
                     </div>
-                ) : completedSale || collected ? (
-                    <SaleSuccess
-                        sale={completedSale}
-                        change={change}
-                        title={collected ? "Pago registrado" : "¡Venta registrada!"}
-                        subtitle={collected ? "Continúa con la siguiente persona." : undefined}
-                        subAccountLabel={subAccountLabel}
-                        onClose={onSuccess}
-                    />
-                ) : (
-                    <>
-                        {/* Header */}
-                        <div className="bg-primary/5 p-6 border-b border-border/50 relative flex flex-col items-center">
-                            <button onClick={onCancel} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors bg-background hover:bg-muted p-2 rounded-full shadow-sm border border-border">
+                    <div className="max-w-sm">
+                        <h2 className="text-xl font-black tracking-tight">Venta guardada, sin conexión</h2>
+                        <p className="text-muted-foreground text-sm mt-1">
+                            No hay conexión con el servidor en este momento. La venta por {formatMoney(orderTotal)} quedó guardada
+                            y se enviará sola apenas vuelva la conexión — no necesitas repetirla.
+                        </p>
+                    </div>
+                    <Button onClick={onSuccess} className="w-full max-w-sm rounded-2xl h-12 font-bold">Continuar</Button>
+                </div>
+            ) : completedSale || collected ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-lg">
+                        <SaleSuccess
+                            sale={completedSale}
+                            change={change}
+                            title={collected ? "Pago registrado" : "¡Venta registrada!"}
+                            subtitle={collected ? "Continúa con la siguiente persona." : undefined}
+                            subAccountLabel={subAccountLabel}
+                            onClose={onSuccess}
+                        />
+                    </div>
+                </div>
+            ) : (
+                <div className="w-full max-w-lg mx-auto flex flex-col h-full">
+                    {/* Header */}
+                        <div className="bg-primary/5 p-4 border-b border-border/50 relative flex flex-col items-center shrink-0">
+                            <button onClick={onCancel} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors bg-background hover:bg-muted p-2 rounded-full shadow-sm border border-border">
                                 <X className="w-5 h-5" />
                             </button>
-                            <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                                <ReceiptIcon className="w-7 h-7 text-primary" />
+                            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                                <ReceiptIcon className="w-6 h-6 text-primary" />
                             </div>
-                            <h2 className="text-2xl font-black tracking-tight">
+                            <h2 className="text-xl font-black tracking-tight">
                                 {subAccountLabel ? subAccountLabel : "Checkout"}
                             </h2>
-                            <p className="text-muted-foreground text-sm font-medium mt-1">
+                            <p className="text-muted-foreground text-sm font-medium mt-0.5">
                                 Total a cobrar:{" "}
-                                <span className="text-foreground text-xl font-bold ml-1">{formatMoney(orderTotal)}</span>
+                                <span className="text-foreground text-lg font-bold ml-1">{formatMoney(orderTotal)}</span>
                             </p>
                         </div>
 
-                        <div className="p-6 overflow-y-auto space-y-4">
+                        <div className="p-4 flex-1 overflow-y-auto space-y-3">
                             {/* Customer picker */}
                             {mode === "sale" && <CustomerPicker onSelect={(c) => setCustomerId(c?.id ?? null)} />}
 
@@ -343,18 +349,21 @@ export default function CheckoutModal({
                                 ))}
                             </div>
 
-                            {/* Payment methods */}
-                            <div className="space-y-3">
+                            {/* Payment methods — cash first (most common), then transfer, then card last
+                                (needs the datáfono, the slowest to reach for). One row per method
+                                (icon + label beside the input, not stacked above it) so all three fit
+                                without scrolling on a small-height screen. */}
+                            <div className="space-y-2">
                                 {[
-                                    { label: "Efectivo", icon: <Banknote className="w-5 h-5 text-green-600 dark:text-green-500" />, value: cash, set: setCash },
-                                    { label: "Tarjeta / Datáfono", icon: <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-500" />, value: card, set: setCard },
-                                    { label: "Transferencia (Nequi / Daviplata)", icon: <ArrowRightLeft className="w-5 h-5 text-purple-600 dark:text-purple-500" />, value: transfer, set: setTransfer },
-                                ].map(({ label, icon, value, set }) => (
-                                    <div key={label} className="bg-accent/30 p-4 rounded-3xl border border-border">
-                                        <label className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
+                                    { label: "Efectivo", placeholder: "0", icon: <Banknote className="w-5 h-5 text-green-600 dark:text-green-500 shrink-0" />, value: cash, set: setCash },
+                                    { label: "Transferencia", placeholder: "0 · Nequi/Daviplata", icon: <ArrowRightLeft className="w-5 h-5 text-purple-600 dark:text-purple-500 shrink-0" />, value: transfer, set: setTransfer },
+                                    { label: "Tarjeta", placeholder: "0 · Datáfono", icon: <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-500 shrink-0" />, value: card, set: setCard },
+                                ].map(({ label, placeholder, icon, value, set }) => (
+                                    <div key={label} className="bg-accent/30 p-2.5 rounded-2xl border border-border flex items-center gap-2.5">
+                                        <label className="text-sm font-semibold flex items-center gap-1.5 text-foreground w-[8.5rem] shrink-0 leading-tight whitespace-nowrap">
                                             {icon}{label}
                                         </label>
-                                        <div className="relative">
+                                        <div className="relative flex-1">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
                                             <Input
                                                 type="number"
@@ -362,8 +371,8 @@ export default function CheckoutModal({
                                                 inputMode="numeric"
                                                 value={value}
                                                 onChange={(e) => set(e.target.value)}
-                                                placeholder="0"
-                                                className="pl-8 h-12 text-lg rounded-2xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
+                                                placeholder={placeholder}
+                                                className="pl-8 h-10 text-lg rounded-xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
                                             />
                                         </div>
                                     </div>
@@ -378,15 +387,15 @@ export default function CheckoutModal({
                         </div>
 
                         {/* Footer totals */}
-                        <div className="p-6 bg-muted/30 border-t border-border mt-auto">
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
+                        <div className="p-4 bg-muted/30 border-t border-border mt-auto shrink-0">
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                <div className="bg-background p-3 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
                                     <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Restante</span>
                                     <span className={`text-xl font-black ${remaining > 0 ? "text-destructive" : "text-emerald-500"}`}>
                                         {formatMoney(remaining)}
                                     </span>
                                 </div>
-                                <div className="bg-background p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
+                                <div className="bg-background p-3 rounded-2xl border border-border shadow-sm flex flex-col justify-center items-center">
                                     <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Vuelto / Cambio</span>
                                     <span className="text-xl font-black text-primary">{formatMoney(change)}</span>
                                 </div>
@@ -394,14 +403,13 @@ export default function CheckoutModal({
                             <Button
                                 onClick={handleCheckout}
                                 disabled={loading || !canSubmit}
-                                className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all"
+                                className="w-full h-12 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-all"
                             >
                                 {loading ? "PROCESANDO..." : mode === "collect" ? "REGISTRAR PAGO" : "FINALIZAR VENTA"}
                             </Button>
                         </div>
-                    </>
-                )}
-            </div>
+                </div>
+            )}
         </div>,
         document.body
     );
