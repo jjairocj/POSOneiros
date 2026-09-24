@@ -16,6 +16,15 @@ const nextConfig: NextConfig = {
         source: '/:path*',
         headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
       },
+      {
+        // The POS shell's service worker — never let a stale copy of it get cached,
+        // or an outdated cache strategy could stick to a device indefinitely.
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+        ],
+      },
     ];
   },
 };
