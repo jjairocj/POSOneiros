@@ -7,6 +7,23 @@ import { getCategories } from "@/app/actions/category";
 import OrderSwitcher from "./OrderSwitcher";
 import { Loader2, Search, X, CloudOff } from "lucide-react";
 import type { CatalogProduct, CatalogCategory } from "@/app/types/cart";
+import { saveCatalogSnapshot, loadCatalogSnapshot, filterCatalogLocally } from "@/app/lib/offlineCatalog";
+
+const FULL_CATALOG_RESYNC_MS = 5 * 60 * 1000;
+
+/** Tries the server first; on failure, falls back to the last IndexedDB snapshot
+ * filtered client-side. `usedFallback` distinguishes "served from cache" (still
+ * shows the offline banner) from a genuine server hit. */
+async function resolveCatalog(categoryId: string, search?: string): Promise<{ products: CatalogProduct[] | null; usedFallback: boolean }> {
+    const remote = search?.trim()
+        ? await Promise.resolve(getProducts(undefined, search.trim())).catch(() => null)
+        : await Promise.resolve(getProducts(categoryId)).catch(() => null);
+    if (remote != null) return { products: remote, usedFallback: false };
+
+    const snapshot = await loadCatalogSnapshot();
+    if (!snapshot) return { products: null, usedFallback: false };
+    return { products: filterCatalogLocally(snapshot, categoryId, search), usedFallback: true };
+}
 
 export default function ProductGrid() {
     const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -26,20 +43,23 @@ export default function ProductGrid() {
     useEffect(() => {
         async function init() {
             try {
-                const [p, c] = await Promise.all([
-                    getProducts('favorites').catch(() => null),
-                    getCategories().catch(() => [])
-                ]);
-                setCategories(c || []);
-                setOffline(p === null);
+                const { products: p, usedFallback } = await resolveCatalog('favorites');
+                const c = await getCategories().catch(() => null);
+                if (c) {
+                    setCategories(c);
+                } else {
+                    const snapshot = await loadCatalogSnapshot();
+                    if (snapshot) setCategories(snapshot.categories);
+                }
+                setOffline(usedFallback || p === null);
                 if (p && p.length > 0) {
                     setProducts(p);
                 } else if (p !== null) {
-                    // Reached the server, genuinely no favorites yet: don't open on an empty screen.
+                    // Genuinely no favorites yet (server or cache): don't open on an empty screen.
                     setActiveCategoryId('all');
-                    const all = await getProducts('all').catch(() => null);
-                    setOffline(all === null);
-                    if (all !== null) setProducts(all);
+                    const all = await resolveCatalog('all');
+                    setOffline(all.usedFallback || all.products === null);
+                    if (all.products !== null) setProducts(all.products);
                 }
             } catch (error) {
                 console.error("Error initializing catalog:", error);
@@ -50,6 +70,31 @@ export default function ProductGrid() {
         init();
     }, []);
 
+    // Keeps a full-catalog IndexedDB snapshot fresh for offline fallback —
+    // independent of whatever filtered view is on screen. Starts only after
+    // the initial (visible) catalog load finishes, so it never competes with
+    // it for the same network round-trip; then repeats on an interval while
+    // mounted. Deliberately doesn't also listen for "online" — the visible
+    // retry effect below already re-fetches the current view on reconnect,
+    // and doubling up here would just be a second redundant request racing it.
+    useEffect(() => {
+        if (!initialized) return;
+        let cancelled = false;
+        async function syncFullCatalog() {
+            const [all, cats] = await Promise.all([
+                Promise.resolve(getProducts('all')).catch(() => null),
+                Promise.resolve(getCategories()).catch(() => null),
+            ]);
+            if (!cancelled && all && cats) saveCatalogSnapshot(all, cats);
+        }
+        syncFullCatalog();
+        const interval = setInterval(syncFullCatalog, FULL_CATALOG_RESYNC_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [initialized]);
+
     // Silently re-fetch the current view when the browser regains
     // connectivity, so the "sin conexión" banner clears and category/search
     // start working again without the cashier having to do anything.
@@ -57,10 +102,10 @@ export default function ProductGrid() {
         const retry = () => {
             if (!offline) return;
             startTransition(async () => {
-                const results = searchQuery.trim()
-                    ? await getProducts(undefined, searchQuery.trim()).catch(() => null)
-                    : await getProducts(activeCategoryId).catch(() => null);
-                setOffline(results === null);
+                const { products: results, usedFallback } = searchQuery.trim()
+                    ? await resolveCatalog(activeCategoryId, searchQuery.trim())
+                    : await resolveCatalog(activeCategoryId);
+                setOffline(usedFallback || results === null);
                 if (results !== null) setProducts(results);
             });
         };
@@ -75,10 +120,10 @@ export default function ProductGrid() {
             startTransition(async () => {
                 // Search across ALL products ignoring active category, or
                 // restore the current category view when the box is cleared.
-                const results = value.trim()
-                    ? await getProducts(undefined, value.trim()).catch(() => null)
-                    : await getProducts(activeCategoryId).catch(() => null);
-                setOffline(results === null);
+                const { products: results, usedFallback } = value.trim()
+                    ? await resolveCatalog(activeCategoryId, value.trim())
+                    : await resolveCatalog(activeCategoryId);
+                setOffline(usedFallback || results === null);
                 if (results !== null) setProducts(results);
             });
         }, 300);
@@ -88,8 +133,8 @@ export default function ProductGrid() {
         setActiveCategoryId(id);
         setSearchQuery("");
         startTransition(async () => {
-            const filtered = await getProducts(id).catch(() => null);
-            setOffline(filtered === null);
+            const { products: filtered, usedFallback } = await resolveCatalog(id);
+            setOffline(usedFallback || filtered === null);
             if (filtered !== null) setProducts(filtered);
         });
     };
@@ -97,8 +142,8 @@ export default function ProductGrid() {
     const handleClear = () => {
         setSearchQuery("");
         startTransition(async () => {
-            const results = await getProducts(activeCategoryId).catch(() => null);
-            setOffline(results === null);
+            const { products: results, usedFallback } = await resolveCatalog(activeCategoryId);
+            setOffline(usedFallback || results === null);
             if (results !== null) setProducts(results);
         });
     };
@@ -146,7 +191,7 @@ export default function ProductGrid() {
             {offline && (
                 <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-semibold">
                     <CloudOff className="w-4 h-4 shrink-0" />
-                    Sin conexión — mostrando el catálogo que ya tenías cargado. Buscar o cambiar de categoría no funcionará hasta que vuelva la conexión.
+                    Sin conexión — mostrando el catálogo guardado localmente. El stock y los precios pueden no estar actualizados; se confirman al procesar la venta.
                 </div>
             )}
             </div>{/* end sticky header */}
