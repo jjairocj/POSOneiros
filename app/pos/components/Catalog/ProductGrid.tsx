@@ -197,7 +197,7 @@ export default function ProductGrid() {
             </div>{/* end sticky header */}
 
             <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className={`grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 pb-28 lg:pb-4 transition-opacity duration-300 ${isPending ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 pb-28 lg:pb-4 transition-opacity duration-300 ${isPending ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                 {products.length > 0 ? (
                     products.map((product) => (
                         <ProductCard key={product.id} product={product} />

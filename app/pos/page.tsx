@@ -25,7 +25,7 @@ export default async function POSPage() {
   const permissions = await getEffectivePermissions();
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen">
       {/* Sticky header — glass chrome: legible over whatever scrolls behind it (product photos),
           never used over a critical number (those live on solid surfaces, see CartDrawer footer).
           .glass-chrome (app/globals.css) drops the blur when the OS asks to reduce transparency. */}
