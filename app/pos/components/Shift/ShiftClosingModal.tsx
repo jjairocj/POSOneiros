@@ -307,7 +307,7 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                     id={id}
                     type="number"
                     min="0"
-                    step="100"
+                    step="1"
                     value={value}
                     onChange={(e) => set(e.target.value)}
                     placeholder="0"
