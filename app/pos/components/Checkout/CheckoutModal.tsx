@@ -268,7 +268,10 @@ export default function CheckoutModal({
             // the connection dropped mid-checkout. Queue it for automatic
             // retry instead of making the cashier remember to resubmit; from
             // their perspective the sale is done, so treat it like a success.
-            enqueueOfflineSale({ clientRef, activeShiftId, items: saleItems, payments, options, enqueuedAt: Date.now() });
+            enqueueOfflineSale({
+                clientRef, activeShiftId, items: saleItems, payments, options, enqueuedAt: Date.now(),
+                summary: { itemCount: items.length, total: orderTotal },
+            });
             playSaleSound();
             setQueuedOffline(true);
         } finally {
