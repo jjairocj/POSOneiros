@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, ShoppingBag, Package } from "lucide-react";
 import { formatMoney } from "@/app/lib/money";
 import { getShiftDetail, type ShiftDetail } from "@/app/actions/report";
@@ -41,12 +42,17 @@ export function ShiftDetailModal({ shiftId, onClose }: { shiftId: string; onClos
                 ) : error ? (
                     <p className="text-destructive text-sm py-6 text-center">{error}</p>
                 ) : data && (
-                    <div className="space-y-6">
-                        {/* Ventas */}
-                        <div>
-                            <h3 className="font-bold text-sm mb-2 flex items-center gap-1.5">
-                                <ShoppingBag className="w-4 h-4 text-muted-foreground" /> Ventas ({data.sales.length})
-                            </h3>
+                    <Tabs defaultValue="sales">
+                        <TabsList className="bg-muted/50 p-1 rounded-2xl w-full grid grid-cols-2">
+                            <TabsTrigger value="sales" className="rounded-xl font-semibold flex items-center gap-1.5 data-[state=active]:font-bold">
+                                <ShoppingBag className="w-4 h-4" /> Ventas ({data.sales.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="products" className="rounded-xl font-semibold flex items-center gap-1.5 data-[state=active]:font-bold">
+                                <Package className="w-4 h-4" /> Productos vendidos
+                            </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="sales" className="mt-4 m-0 outline-none">
                             {data.sales.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">Sin ventas en este turno.</p>
                             ) : (
@@ -87,13 +93,9 @@ export function ShiftDetailModal({ shiftId, onClose }: { shiftId: string; onClos
                                     </table>
                                 </div>
                             )}
-                        </div>
+                        </TabsContent>
 
-                        {/* Productos vendidos */}
-                        <div>
-                            <h3 className="font-bold text-sm mb-2 flex items-center gap-1.5">
-                                <Package className="w-4 h-4 text-muted-foreground" /> Productos vendidos
-                            </h3>
+                        <TabsContent value="products" className="mt-4 m-0 outline-none">
                             {data.products.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">Sin productos vendidos en este turno.</p>
                             ) : (
@@ -121,8 +123,8 @@ export function ShiftDetailModal({ shiftId, onClose }: { shiftId: string; onClos
                                     </table>
                                 </div>
                             )}
-                        </div>
-                    </div>
+                        </TabsContent>
+                    </Tabs>
                 )}
             </DialogContent>
         </Dialog>
