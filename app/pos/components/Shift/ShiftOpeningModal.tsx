@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { openShift, getRegistersForShift } from "../../../actions/shift";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { LogIn, X, Loader2 } from "lucide-react";
 import { Hint } from "@/app/components/TutorialMode";
 
@@ -13,7 +13,8 @@ type RegisterOption = { id: string; name: string; prefix: string | null; busyBy:
 
 export default function ShiftOpeningModal({ onClose }: { onClose?: () => void }) {
   const router = useRouter();
-  const [baseAmount, setBaseAmount] = useState("");
+  const [baseAmount, setBaseAmount] = useState(0);
+  const [baseTouched, setBaseTouched] = useState(false);
   const [registers, setRegisters] = useState<RegisterOption[] | null>(null);
   const [registerId, setRegisterId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,13 +35,12 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
   }, []);
 
   const handleOpenShift = async () => {
-    const amount = Number(baseAmount);
-    if (!Number.isFinite(amount) || amount < 0) { setError("La base debe ser un número mayor o igual a cero."); return; }
+    if (!Number.isFinite(baseAmount) || baseAmount < 0) { setError("La base debe ser un número mayor o igual a cero."); return; }
     if (!registerId) { setError("Selecciona una caja."); return; }
     setLoading(true);
     setError("");
     try {
-      const res = await openShift(amount, registerId);
+      const res = await openShift(baseAmount, registerId);
       if (!res.ok) { setError(res.error); return; }
       router.refresh();
       onClose?.();
@@ -104,20 +104,13 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
 
           <div className="space-y-2">
             <label htmlFor="baseAmount" className="text-sm font-semibold text-foreground ml-1">Base en efectivo</label>
-            <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                <Input
-                    id="baseAmount"
-                    type="number"
-                    min="0"
-                    step="1000"
-                    inputMode="numeric"
-                    value={baseAmount}
-                    onChange={(e) => setBaseAmount(e.target.value)}
-                    placeholder="Ej. 100000"
-                    className="pl-8 h-12 text-lg rounded-2xl bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background transition-colors"
-                />
-            </div>
+            <MoneyInput
+                id="baseAmount"
+                value={baseAmount}
+                onChange={(v) => { setBaseAmount(v); setBaseTouched(true); }}
+                placeholder="Ej. 100000"
+                className="h-12 text-lg rounded-2xl bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background transition-colors"
+            />
           </div>
 
           {error && (
@@ -128,7 +121,7 @@ export default function ShiftOpeningModal({ onClose }: { onClose?: () => void })
 
           <Button
             onClick={handleOpenShift}
-            disabled={loading || baseAmount === "" || !registerId}
+            disabled={loading || !baseTouched || !registerId}
             className="w-full h-12 rounded-2xl text-base font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all"
           >
             {loading ? "Abriendo Turno..." : "Abrir Turno"}

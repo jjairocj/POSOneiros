@@ -33,7 +33,7 @@ import { closeShift, getShiftClosePreview, getShiftCloseState, type ShiftSummary
 import { Hint } from "@/app/components/TutorialMode";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { LogOut, CheckCircle2, Trophy, Clock, ShoppingBag, TrendingUp, Banknote, CreditCard, ArrowRightLeft, AlertCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -41,8 +41,6 @@ const money = (n: number) => `$${n.toLocaleString("es-CO")}`;
 const signed = (n: number) => (n < 0 ? `-${money(Math.abs(n))}` : `+${money(n)}`);
 const diffColor = (n: number) => (n < 0 ? "text-destructive" : n > 0 ? "text-amber-500" : "text-emerald-500");
 
-/** Empty field = 0 (only the cash count is mandatory). */
-const toAmount = (v: string) => (v.trim() === "" ? 0 : parseFloat(v));
 
 /** Converts a 0–23 hour integer to a human-readable 12h string. */
 function formatHour(h: number) {
@@ -52,9 +50,10 @@ function formatHour(h: number) {
 }
 
 export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCancel }: { activeShiftId: string; baseAmount?: number; onCancel: () => void }) {
-    const [cash, setCash] = useState("");
-    const [transfer, setTransfer] = useState("");
-    const [card, setCard] = useState("");
+    const [cash, setCash] = useState(0);
+    const [cashTouched, setCashTouched] = useState(false);
+    const [transfer, setTransfer] = useState(0);
+    const [card, setCard] = useState(0);
     const [note, setNote] = useState("");
     const [preview, setPreview] = useState<ShiftClosePreview | null>(null);
     const [loading, setLoading] = useState(false);
@@ -80,7 +79,7 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
         return () => { cancelled = true; };
     }, [activeShiftId]);
 
-    const typed = { cash: toAmount(cash), card: toAmount(card), transfer: toAmount(transfer) };
+    const typed = { cash, card, transfer };
 
     /** Stage 1 → 2: fetch what was expected and show the comparison. */
     const handleReview = async (e: React.FormEvent) => {
@@ -299,23 +298,15 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
     }
 
     // ── Stage 1: count form ───────────────────────────────────────────────
-    const field = (id: string, label: string, value: string, set: (v: string) => void, icon: React.ReactNode, required = false) => (
+    const field = (id: string, label: string, value: number, set: (v: number) => void, icon: React.ReactNode) => (
         <div className="space-y-1.5">
             <label htmlFor={id} className="text-sm font-semibold text-foreground ml-1 flex items-center gap-1.5">{icon}{label}</label>
-            <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                <Input
-                    id={id}
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={value}
-                    onChange={(e) => set(e.target.value)}
-                    placeholder="0"
-                    required={required}
-                    className="pl-8 h-11 text-base rounded-2xl bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background transition-colors"
-                />
-            </div>
+            <MoneyInput
+                id={id}
+                value={value}
+                onChange={set}
+                className="h-11 text-base rounded-2xl bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background transition-colors"
+            />
         </div>
     );
 
@@ -338,7 +329,7 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                         <strong className="text-base">{money(baseAmount)}</strong>
                     </div>
 
-                    {field("closeCash", "Efectivo de ventas (sin la base)", cash, setCash, <Banknote className="w-3.5 h-3.5 text-muted-foreground" />, true)}
+                    {field("closeCash", "Efectivo de ventas (sin la base)", cash, (v) => { setCash(v); setCashTouched(true); }, <Banknote className="w-3.5 h-3.5 text-muted-foreground" />)}
                     {field("closeTransfer", "Transferencias", transfer, setTransfer, <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" />)}
                     {field("closeCard", "Tarjeta / Datáfono", card, setCard, <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />)}
 
@@ -356,7 +347,7 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                         <Button
                             type="submit"
                             variant="destructive"
-                            disabled={loading || cash.trim() === ""}
+                            disabled={loading || !cashTouched}
                             className="flex-1 h-12 rounded-2xl font-semibold shadow-lg shadow-destructive/20 hover:-translate-y-0.5 transition-all"
                         >
                             {loading ? "Calculando..." : "Cerrar Turno"}

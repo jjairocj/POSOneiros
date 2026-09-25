@@ -7,6 +7,7 @@ import { getProductFamilies } from "@/app/actions/product";
 import { getRawMaterials } from "@/app/actions/lots";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
     Dialog,
     DialogContent,
@@ -236,13 +237,10 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Costo Base ($)</label>
-                                        <Input
+                                        <MoneyInput
                                             name="cost"
-                                            type="number"
-                                            step="0.01"
-                                            required
                                             value={cost}
-                                            onChange={(e) => setCost(Number(e.target.value))}
+                                            onChange={setCost}
                                             className="rounded-xl h-11 bg-background border-primary/20"
                                         />
                                     </div>
@@ -258,13 +256,10 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Precio Final ($)</label>
-                                        <Input
+                                        <MoneyInput
                                             name="price"
-                                            type="number"
-                                            step="0.01"
-                                            required
                                             value={price}
-                                            onChange={(e) => setPrice(Number(e.target.value))}
+                                            onChange={setPrice}
                                             className="rounded-xl h-11 bg-background border-primary/20 font-bold"
                                         />
                                     </div>

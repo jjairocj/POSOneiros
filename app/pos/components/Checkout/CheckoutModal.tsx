@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
     Receipt as ReceiptIcon, X, Banknote, CreditCard, ArrowRightLeft,
     UserSearch, UserPlus, ChevronDown, ChevronUp, Search, User,
@@ -199,9 +200,9 @@ export default function CheckoutModal({
     orderDiscount?: OrderDiscount | null;
 }) {
     const [loading, setLoading] = useState(false);
-    const [cash, setCash] = useState("");
-    const [card, setCard] = useState("");
-    const [transfer, setTransfer] = useState("");
+    const [cash, setCash] = useState(0);
+    const [card, setCard] = useState(0);
+    const [transfer, setTransfer] = useState(0);
     const [error, setError] = useState("");
     const [completedSale, setCompletedSale] = useState<ReceiptSale | null>(null);
     const [collected, setCollected] = useState(false);
@@ -212,10 +213,9 @@ export default function CheckoutModal({
     // retries so the server can recognize a retry instead of double-selling.
     const [clientRef] = useState(() => crypto.randomUUID());
 
-    const toAmount = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : 0; };
-    const cashAmount = toAmount(cash);
-    const cardAmount = toAmount(card);
-    const transferAmount = toAmount(transfer);
+    const cashAmount = cash;
+    const cardAmount = card;
+    const transferAmount = transfer;
     const totalPaid = cashAmount + cardAmount + transferAmount;
     const remaining = Math.max(0, orderTotal - totalPaid);
     const change = Math.max(0, totalPaid - orderTotal);
@@ -337,12 +337,12 @@ export default function CheckoutModal({
 
                             {/* Quick cash buttons */}
                             <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => setCash(String(Math.ceil(orderTotal)))}
+                                <button type="button" onClick={() => setCash(Math.ceil(orderTotal))}
                                     className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">
                                     Exacto {formatMoney(orderTotal)}
                                 </button>
                                 {QUICK_BILLS.filter((b) => b >= orderTotal).slice(0, 3).map((b) => (
-                                    <button key={b} type="button" onClick={() => setCash(String(b))}
+                                    <button key={b} type="button" onClick={() => setCash(b)}
                                         className="px-3 py-1.5 rounded-xl text-xs font-bold bg-muted text-foreground border border-border hover:border-primary hover:text-primary transition-colors">
                                         {formatMoney(b)}
                                     </button>
@@ -363,16 +363,12 @@ export default function CheckoutModal({
                                         <label className="text-sm font-semibold flex items-center gap-1.5 text-foreground w-[8.5rem] shrink-0 leading-tight whitespace-nowrap">
                                             {icon}{label}
                                         </label>
-                                        <div className="relative flex-1">
-                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                inputMode="numeric"
+                                        <div className="flex-1">
+                                            <MoneyInput
                                                 value={value}
-                                                onChange={(e) => set(e.target.value)}
+                                                onChange={set}
                                                 placeholder={placeholder}
-                                                className="pl-8 h-10 text-lg rounded-xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
+                                                className="h-10 text-lg rounded-xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
                                             />
                                         </div>
                                     </div>

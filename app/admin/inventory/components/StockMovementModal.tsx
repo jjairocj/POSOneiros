@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { adjustStock, type MovementType } from "@/app/actions/product";
 import { Hint } from "@/app/components/TutorialMode";
 
@@ -19,7 +20,7 @@ export function StockMovementModal({ product, onClose }: { product: { id: string
     const router = useRouter();
     const [type, setType] = useState<MovementType>("PURCHASE");
     const [quantity, setQuantity] = useState("");
-    const [unitCost, setUnitCost] = useState(String(product.cost || ""));
+    const [unitCost, setUnitCost] = useState(product.cost || 0);
     const [reason, setReason] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -34,7 +35,7 @@ export function StockMovementModal({ product, onClose }: { product: { id: string
         try {
             const res = await adjustStock({
                 productId: product.id, type, quantity: qty, reason,
-                unitCost: type === "PURCHASE" && unitCost !== "" ? Number(unitCost) : undefined,
+                unitCost: type === "PURCHASE" ? unitCost : undefined,
             });
             if (!res.success) { setError(res.error ?? "No se pudo registrar."); return; }
             toast.success(`Movimiento registrado. Stock de "${product.name}": ${preview}.`);
@@ -81,7 +82,7 @@ export function StockMovementModal({ product, onClose }: { product: { id: string
                     {type === "PURCHASE" && (
                         <div className="space-y-1.5">
                             <label htmlFor="mv-cost" className="text-sm font-semibold ml-1">Costo unitario</label>
-                            <Input id="mv-cost" type="number" min="0" step="1" inputMode="numeric" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} className="h-11 rounded-xl bg-muted/50" />
+                            <MoneyInput id="mv-cost" value={unitCost} onChange={setUnitCost} className="h-11 rounded-xl bg-muted/50" />
                         </div>
                     )}
                 </div>
