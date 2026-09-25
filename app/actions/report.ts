@@ -446,7 +446,7 @@ export async function getShiftDetail(shiftId: string): Promise<{ success: true; 
                 user: true,
                 sales: {
                     include: { payments: true, details: { include: { product: { select: { name: true, code: true } } } } },
-                    orderBy: { createdAt: "asc" },
+                    orderBy: { number: "asc" },
                 },
             },
         });
@@ -474,7 +474,7 @@ export async function getShiftDetail(shiftId: string): Promise<{ success: true; 
                 productMap.set(d.productId, entry);
             }
         }
-        const products = Array.from(productMap.values()).sort((a, b) => b.quantitySold - a.quantitySold);
+        const products = Array.from(productMap.values()).sort((a, b) => b.quantitySold - a.quantitySold || b.revenue - a.revenue);
 
         return { success: true, data: { registerName: shift.register.name, userName: shift.user.name, sales, products } };
     } catch (error: unknown) {

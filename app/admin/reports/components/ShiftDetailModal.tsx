@@ -52,7 +52,7 @@ export function ShiftDetailModal({ shiftId, onClose }: { shiftId: string; onClos
                             </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="sales" className="mt-4 m-0 outline-none">
+                        <TabsContent value="sales" className="mt-5 outline-none">
                             {data.sales.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">Sin ventas en este turno.</p>
                             ) : (
@@ -95,7 +95,7 @@ export function ShiftDetailModal({ shiftId, onClose }: { shiftId: string; onClos
                             )}
                         </TabsContent>
 
-                        <TabsContent value="products" className="mt-4 m-0 outline-none">
+                        <TabsContent value="products" className="mt-5 outline-none">
                             {data.products.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">Sin productos vendidos en este turno.</p>
                             ) : (
