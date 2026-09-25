@@ -10,9 +10,10 @@ import { formatMoney } from "@/app/lib/money";
 import { toast } from "sonner";
 import {
     Upload, FileSpreadsheet, CheckCircle2, AlertCircle,
-    ArrowRight, ArrowLeft, Loader2, RefreshCw, Eye,
+    ArrowRight, ArrowLeft, Loader2, RefreshCw, Eye, Boxes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Hint } from "@/app/components/TutorialMode";
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
@@ -70,6 +71,25 @@ export default function ImportWizard() {
     const [preview, setPreview] = useState<PreviewRow[]>([]);
     const [result, setResult] = useState<ImportResult | null>(null);
     const [filterStatus, setFilterStatus] = useState<PreviewRow["status"] | "all">("all");
+    const [bulkStock, setBulkStock] = useState("");
+
+    /** Siigo doesn't track real inventory, so the "Stock" the file reports is
+     * usually meaningless — cell-by-cell edits and the bulk "set all to N"
+     * control below both write straight into `preview`; a status recompute
+     * (import-side, importProducts() rechecks against current DB values on
+     * submit) keeps the New/Update/Unchanged badges honest either way. */
+    const updateRowStock = (code: string, stock: number) => {
+        setPreview((prev) => prev.map((r) => (
+            r.code !== code ? r : { ...r, stock, status: r.status === "new" ? "new" : "update" }
+        )));
+    };
+
+    const applyBulkStock = () => {
+        const n = Number(bulkStock);
+        if (!Number.isFinite(n) || n < 0) { toast.error("Ingresa un número de inventario válido."); return; }
+        setPreview((prev) => prev.map((r) => ({ ...r, stock: n, status: r.status === "new" ? "new" : "update" })));
+        toast.success(`Inventario ajustado a ${n} para los ${preview.length} productos.`);
+    };
 
     const handleFile = useCallback(async (file: File) => {
         if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
@@ -201,6 +221,32 @@ export default function ImportWizard() {
                 ))}
             </div>
 
+            {/* Bulk stock control — Siigo's export doesn't reflect real inventory,
+                so setting one starting number for every row is the common case. */}
+            <div className="bg-muted/40 rounded-2xl border border-border p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground shrink-0">
+                    <Boxes className="w-4 h-4 text-muted-foreground" />
+                    Ajustar inventario para todos
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                    <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={bulkStock}
+                        onChange={(e) => setBulkStock(e.target.value)}
+                        placeholder="Ej: 100"
+                        className="rounded-xl h-10 max-w-[140px] bg-background"
+                    />
+                    <Button type="button" variant="outline" onClick={applyBulkStock} disabled={bulkStock === ""} className="rounded-xl h-10">
+                        Aplicar a los {preview.length} productos
+                    </Button>
+                </div>
+                <Hint className="text-xs text-muted-foreground sm:max-w-[220px]">
+                    O ajusta el inventario celda a celda en la tabla de abajo.
+                </Hint>
+            </div>
+
             {/* File name + filter hint */}
             <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span className="flex items-center gap-2">
@@ -236,7 +282,16 @@ export default function ImportWizard() {
                                     <td className="px-4 py-2.5 font-medium max-w-[200px] truncate">{row.name}</td>
                                     <td className="px-4 py-2.5 font-semibold">{formatMoney(row.price)}</td>
                                     <td className="px-4 py-2.5">{row.taxIva > 0 ? `${row.taxIva}%` : "—"}</td>
-                                    <td className="px-4 py-2.5">{row.stock}</td>
+                                    <td className="px-4 py-2.5">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            value={row.stock}
+                                            onChange={(e) => updateRowStock(row.code, Number(e.target.value))}
+                                            className="w-20 h-8 rounded-lg border border-border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                        />
+                                    </td>
                                     <td className="px-4 py-2.5">
                                         <span className={`text-xs font-semibold ${row.isActive ? "text-emerald-500" : "text-muted-foreground"}`}>
                                             {row.isActive ? "Sí" : "No"}
