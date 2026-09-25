@@ -68,7 +68,7 @@ beforeEach(() => mockState.mockResolvedValue({ ok: true, data: { declared: null 
 
 /** Fill the count form and click "Cerrar Turno". */
 async function fillAndSubmit(cash: string, transfer = '', card = '') {
-    fireEvent.change(await screen.findByLabelText(/efectivo en caja/i), { target: { value: cash } });
+    fireEvent.change(await screen.findByLabelText(/efectivo de ventas/i), { target: { value: cash } });
     if (transfer) fireEvent.change(screen.getByLabelText(/transferencias/i), { target: { value: transfer } });
     if (card) fireEvent.change(screen.getByLabelText(/tarjeta/i), { target: { value: card } });
     fireEvent.click(screen.getByRole('button', { name: /cerrar turno/i }));
@@ -83,7 +83,7 @@ describe('ShiftClosingModal — form stage', () => {
         vi.clearAllMocks();
         mockState.mockResolvedValue({ ok: true, data: { declared: null } });
         render(<ShiftClosingModal activeShiftId="shift_1" baseAmount={100000} onCancel={onCancel} />);
-        await screen.findByLabelText(/efectivo en caja/i);
+        await screen.findByLabelText(/efectivo de ventas/i);
     });
 
     it('shows the opening base read-only', () => {
@@ -92,7 +92,7 @@ describe('ShiftClosingModal — form stage', () => {
     });
 
     it('renders cash, transfer and card fields', () => {
-        expect(screen.getByLabelText(/efectivo en caja/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/efectivo de ventas/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/transferencias/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/tarjeta/i)).toBeInTheDocument();
     });
@@ -103,7 +103,7 @@ describe('ShiftClosingModal — form stage', () => {
 
     it('"Cerrar Turno" is disabled until the cash count is entered', () => {
         expect(screen.getByRole('button', { name: /cerrar turno/i })).toBeDisabled();
-        fireEvent.change(screen.getByLabelText(/efectivo en caja/i), { target: { value: '150000' } });
+        fireEvent.change(screen.getByLabelText(/efectivo de ventas/i), { target: { value: '150000' } });
         expect(screen.getByRole('button', { name: /cerrar turno/i })).not.toBeDisabled();
     });
 
@@ -179,7 +179,7 @@ describe('ShiftClosingModal — cuadre review', () => {
     it('the count can not be edited once the cuadre is shown: no "volver a editar", no inputs to change', async () => {
         await toReview('210000');
         expect(screen.queryByRole('button', { name: /volver a editar/i })).not.toBeInTheDocument();
-        expect(screen.queryByLabelText(/efectivo en caja/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/efectivo de ventas/i)).not.toBeInTheDocument();
         expect(document.querySelectorAll('input')).toHaveLength(0);
     });
 
@@ -203,14 +203,14 @@ describe('ShiftClosingModal — count already submitted', () => {
 
         await waitFor(() => expect(screen.getByText(/cuadre del turno/i)).toBeInTheDocument());
         expect(mockPreview).toHaveBeenCalledWith('shift_1'); // no amounts sent: nothing can be re-typed
-        expect(screen.queryByLabelText(/efectivo en caja/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/efectivo de ventas/i)).not.toBeInTheDocument();
         expect(screen.getByText('-$10.000')).toBeInTheDocument();
     });
 
     it('opens the normal count form when nothing has been submitted yet', async () => {
         mockState.mockResolvedValue({ ok: true, data: { declared: null } });
         render(<ShiftClosingModal activeShiftId="shift_1" baseAmount={100000} onCancel={vi.fn()} />);
-        expect(await screen.findByLabelText(/efectivo en caja/i)).toBeInTheDocument();
+        expect(await screen.findByLabelText(/efectivo de ventas/i)).toBeInTheDocument();
         expect(mockPreview).not.toHaveBeenCalled();
     });
 });

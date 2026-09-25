@@ -60,7 +60,7 @@ describe('closeShift — cuadre por método y motivo obligatorio', () => {
         (prisma.shift.findUnique as any).mockResolvedValue(openShiftWithSales());
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeWith(decl(150000, 30000, 20000)));
+        const summary = unwrap(await closeWith(decl(50000, 30000, 20000)));
 
         expect(summary.difference).toBe(0);
         expect(summary.card).toEqual({ expected: 30000, declared: 30000, difference: 0 });
@@ -70,9 +70,9 @@ describe('closeShift — cuadre por método y motivo obligatorio', () => {
     });
 
     it.each([
-        ['cash', decl(149000, 30000, 20000)],
-        ['card', decl(150000, 29000, 20000)],
-        ['transfer', decl(150000, 30000, 21000)],
+        ['cash', decl(49000, 30000, 20000)],
+        ['card', decl(50000, 29000, 20000)],
+        ['transfer', decl(50000, 30000, 21000)],
     ])('refuses to close when only %s is off and no reason is given', async (_label, declared) => {
         (getServerSession as any).mockResolvedValue(mockSession());
         (prisma.shift.findUnique as any).mockResolvedValue(openShiftWithSales());
@@ -94,7 +94,7 @@ describe('closeShift — cuadre por método y motivo obligatorio', () => {
         (prisma.shift.findUnique as any).mockResolvedValue(openShiftWithSales());
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeWith(decl(148000, 30000, 20000), '  Vuelto de más  '));
+        const summary = unwrap(await closeWith(decl(48000, 30000, 20000), '  Vuelto de más  '));
 
         expect(summary.difference).toBe(-2000);
         expect(summary.note).toBe('Vuelto de más');
@@ -118,10 +118,10 @@ describe('closeShift — cuadre por método y motivo obligatorio', () => {
 
     it('ignores any count smuggled in through extra arguments', async () => {
         (getServerSession as any).mockResolvedValue(mockSession());
-        (prisma.shift.findUnique as any).mockResolvedValue({ ...openShiftWithSales(), status: 'CLOSING', closeAmount: 150000, closeCard: 30000, closeTransfer: 20000 });
+        (prisma.shift.findUnique as any).mockResolvedValue({ ...openShiftWithSales(), status: 'CLOSING', closeAmount: 50000, closeCard: 30000, closeTransfer: 20000 });
         (prisma.shift.update as any).mockResolvedValue({});
         const summary = unwrap(await (closeShift as any)('shift_1', undefined, { cash: 1, card: 1, transfer: 1 }));
-        expect(summary.declared).toBe(150000);
+        expect(summary.declared).toBe(50000);
         expect(summary.difference).toBe(0);
     });
 });
@@ -148,7 +148,7 @@ describe('getShiftClosePreview — the count is frozen on first submission', () 
 
         expect(res).toEqual({
             ok: true,
-            data: { baseAmount: 100000, cashSales: 50000, cardSales: 30000, transferSales: 0, expectedCash: 150000, declared: decl(149000, 30000, 0) },
+            data: { baseAmount: 100000, cashSales: 50000, cardSales: 30000, transferSales: 0, expectedCash: 50000, declared: decl(149000, 30000, 0) },
         });
         expect(prisma.shift.updateMany).toHaveBeenCalledWith({
             where: { id: 'shift_1', status: 'OPEN' },
@@ -404,7 +404,7 @@ describe('closeShift', () => {
         expect(await closeShift('shift_1')).toMatchObject({ ok: false, error: expect.stringMatching(/no está abierto/) });
     });
 
-    it('expected cash = base + CASH payments only (card/transfer are not in the drawer)', async () => {
+    it('expected cash = CASH payments only (the base is excluded, card/transfer are not in the drawer)', async () => {
         (getServerSession as any).mockResolvedValue(mockSession());
         (prisma.shift.findUnique as any).mockResolvedValue({
             id: 'shift_1', userId: 'user_1', status: 'OPEN', baseAmount: 100000,
@@ -417,13 +417,13 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeWith(decl(145000, 30000, 0), 'Vuelto de más'));
+        const summary = unwrap(await closeWith(decl(45000, 30000, 0), 'Vuelto de más'));
 
         expect(summary.totalSales).toBe(80000);
         expect(summary.cashSales).toBe(50000);
         expect(summary.cardSales).toBe(30000);
-        expect(summary.expected).toBe(150000);   // 100000 base + 50000 cash
-        expect(summary.declared).toBe(145000);
+        expect(summary.expected).toBe(50000);   // cash sales only, base excluded
+        expect(summary.declared).toBe(45000);
         expect(summary.difference).toBe(-5000);  // shortage
         expect(summary.transactionCount).toBe(2);
         expect(summary.cancelledCount).toBe(1);
@@ -474,7 +474,7 @@ describe('closeShift', () => {
         });
         (prisma.shift.update as any).mockResolvedValue({});
 
-        const summary = unwrap(await closeWith(decl(50000)));
+        const summary = unwrap(await closeWith(decl(0)));
 
         expect(summary.topProduct).toBeNull();
         expect(summary.peakHour).toBeNull();

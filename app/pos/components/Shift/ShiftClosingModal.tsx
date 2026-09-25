@@ -3,8 +3,9 @@
  * @description Three-stage modal for closing a cashier's shift.
  *
  * STAGE 1 — Count form
- *   Shows the opening base (read-only) and asks for what the cashier counted:
- *   cash in the drawer (base included), transfers, and card/datáfono totals.
+ *   Shows the opening base (read-only, for reference only) and asks for what
+ *   the cashier counted: cash from sales — SEPARATE from the base, which
+ *   stays in the drawer untouched — plus transfers and card/datáfono totals.
  *   Nothing about expected amounts is shown yet, so the count stays blind.
  *
  * STAGE 2 — Reconciliation review (after clicking "Cerrar Turno")
@@ -192,7 +193,7 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                                 </Fragment>
                             ))}
                         </div>
-                        <Hint className="text-[11px] text-muted-foreground mt-2">Efectivo esperado = base ({money(summary.baseAmount)}) + ventas en efectivo.</Hint>
+                        <Hint className="text-[11px] text-muted-foreground mt-2">Efectivo esperado = ventas en efectivo (sin contar la base de {money(summary.baseAmount)}, que se queda en el cajón).</Hint>
                         {summary.note && (
                             <>
                                 <Separator className="my-3" />
@@ -253,7 +254,7 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                                 </Fragment>
                             ))}
                         </div>
-                        <Hint className="text-[11px] text-muted-foreground mt-2">Efectivo esperado = base ({money(preview.baseAmount)}) + ventas en efectivo ({money(preview.cashSales)}).</Hint>
+                        <Hint className="text-[11px] text-muted-foreground mt-2">Efectivo esperado = ventas en efectivo ({money(preview.cashSales)}), sin contar la base de {money(preview.baseAmount)} (se queda en el cajón).</Hint>
                     </div>
 
                     {mismatch && (
@@ -327,17 +328,17 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                     </div>
                     <h2 className="text-xl font-bold tracking-tight">Cerrar Turno</h2>
                     <Hint className="text-muted-foreground text-sm">
-                        Cuenta lo que hay: efectivo del cajón (incluida la base), transferencias recibidas y el total del datáfono.
+                        Cuenta el efectivo que dejaron las ventas — aparte de la base con la que abriste, que se queda en el cajón — más las transferencias recibidas y el total del datáfono.
                     </Hint>
                 </div>
 
                 <form onSubmit={handleReview} className="space-y-4">
                     <div className="flex justify-between items-center rounded-2xl bg-muted/40 border border-border/50 px-4 py-3">
-                        <span className="text-sm font-semibold text-muted-foreground">Base de apertura</span>
+                        <span className="text-sm font-semibold text-muted-foreground">Base de apertura (no la cuentes aquí)</span>
                         <strong className="text-base">{money(baseAmount)}</strong>
                     </div>
 
-                    {field("closeCash", "Efectivo en caja", cash, setCash, <Banknote className="w-3.5 h-3.5 text-muted-foreground" />, true)}
+                    {field("closeCash", "Efectivo de ventas (sin la base)", cash, setCash, <Banknote className="w-3.5 h-3.5 text-muted-foreground" />, true)}
                     {field("closeTransfer", "Transferencias", transfer, setTransfer, <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" />)}
                     {field("closeCard", "Tarjeta / Datáfono", card, setCard, <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />)}
 

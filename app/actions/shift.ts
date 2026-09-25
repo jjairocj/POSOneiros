@@ -36,7 +36,9 @@ export interface ShiftClosePreview {
     cashSales: number;
     cardSales: number;
     transferSales: number;
-    /** Cash the drawer should hold: base + cash sales. */
+    /** What sales should have added in cash — the base stays out of this;
+     * the cashier declares cash separate from the opening float, not the
+     * drawer's grand total. */
     expectedCash: number;
     /** The counts as frozen on the server when first submitted — the cashier can't change them afterwards. */
     declared: DeclaredAmounts;
@@ -232,7 +234,10 @@ export async function getShiftClosePreview(shiftId: string, declaredInput?: Decl
             cashSales: by.cash,
             cardSales: by.card,
             transferSales: by.transfer,
-            expectedCash: shift.baseAmount + by.cash,
+            // The cashier counts and declares cash SEPARATE from the opening
+            // base (which stays in the drawer, untouched) — not the drawer's
+            // total. So "expected" is just what sales should have added.
+            expectedCash: by.cash,
             declared,
         });
     } catch (err) {
@@ -244,8 +249,8 @@ export async function getShiftClosePreview(shiftId: string, declaredInput?: Decl
 /**
  * Closes the shift and returns the Z-report summary, using the counts frozen
  * by getShiftClosePreview.
- * Expected cash = base + CASH payments of completed sales (cash payments are
- * stored net of change, so no change adjustment is needed); card and
+ * Expected cash = CASH payments of completed sales, base excluded (cash
+ * payments are stored net of change, so no change adjustment is needed); card and
  * transfer are compared against their own totals. If ANY declared amount
  * differs from expected a reason (`note`) is required — checked here, not
  * only in the UI.
@@ -269,7 +274,8 @@ export async function closeShift(shiftId: string, note?: string): Promise<Action
 
         const by = salesByMethod(shift.sales);
         const totalSales = completed.reduce((acc, s) => acc + s.total, 0);
-        const expectedAmount = shift.baseAmount + by.cash;
+        // Same "declared cash excludes the base" reasoning as getShiftClosePreview.
+        const expectedAmount = by.cash;
         const difference = declared.cash - expectedAmount;
         const cardDifference = declared.card - by.card;
         const transferDifference = declared.transfer - by.transfer;
