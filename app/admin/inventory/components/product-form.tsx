@@ -18,7 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     PackagePlus, Save, Loader2, Star, Image as ImageIcon, Upload, Search,
-    Info, DollarSign, Boxes, SlidersHorizontal,
+    Info, DollarSign, Boxes, SlidersHorizontal, Calculator, Percent,
 } from "lucide-react";
 import { uploadProductImageAction } from "@/app/actions/upload";
 import { ProductColumn } from "./columns";
@@ -134,7 +134,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                 )}
             </DialogTrigger>
 
-            <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[92vh] overflow-y-auto rounded-[2rem] p-5 sm:p-8 bg-card border-border shadow-2xl">
+            <DialogContent className="max-w-[95vw] sm:max-w-[680px] max-h-[92vh] overflow-y-auto rounded-[2rem] p-5 sm:p-8 bg-card border-border shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-black">
                         {isEditing ? "Editar Producto" : "Nuevo Producto"}
@@ -165,7 +165,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                             regardless of which tab is showing when the user hits "Guardar". */}
 
                         {/* ── Básico ──────────────────────────────────────────────────────── */}
-                        <TabsContent value="basico" forceMount hidden={tab !== "basico"} className="space-y-5 mt-5 m-0 outline-none">
+                        <TabsContent value="basico" forceMount hidden={tab !== "basico"} className="space-y-5 mt-6 outline-none">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold ml-1">Código / SKU</label>
@@ -231,58 +231,66 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </TabsContent>
 
                         {/* ── Precio ──────────────────────────────────────────────────────── */}
-                        <TabsContent value="precio" forceMount hidden={tab !== "precio"} className="space-y-5 mt-5 m-0 outline-none">
-                            <div className="bg-primary/5 p-5 rounded-2xl border border-primary/10 space-y-4">
-                                <h3 className="font-bold text-primary">Calculadora de Precios</h3>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Costo Base ($)</label>
-                                        <MoneyInput
-                                            name="cost"
-                                            value={cost}
-                                            onChange={setCost}
-                                            className="rounded-xl h-11 bg-background border-primary/20"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Margen (%)</label>
-                                        <Input
-                                            type="number"
-                                            step="0.1"
-                                            value={expectedMargin}
-                                            onChange={(e) => setExpectedMargin(Number(e.target.value))}
-                                            className="rounded-xl h-11 bg-background border-primary/20 text-primary font-bold"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Precio Final ($)</label>
-                                        <MoneyInput
-                                            name="price"
-                                            value={price}
-                                            onChange={setPrice}
-                                            className="rounded-xl h-11 bg-background border-primary/20 font-bold"
-                                        />
-                                    </div>
+                        <TabsContent value="precio" forceMount hidden={tab !== "precio"} className="space-y-6 mt-6 outline-none">
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 ml-1">
+                                    <Calculator className="w-4 h-4 text-muted-foreground" />
+                                    <p className="text-sm font-semibold">Calculadora de precio</p>
                                 </div>
-
-                                <div className="grid grid-cols-2 gap-3 pt-1 text-sm">
-                                    <div className="bg-background p-3 rounded-xl border border-border flex justify-between items-center">
-                                        <span className="text-muted-foreground">Precio Sugerido:</span>
-                                        <span className="font-mono font-bold text-lg">${suggestedPrice.toFixed(0)}</span>
+                                <div className="bg-muted/30 border border-border rounded-2xl p-4 sm:p-5 space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Costo base</label>
+                                            <MoneyInput
+                                                name="cost"
+                                                value={cost}
+                                                onChange={setCost}
+                                                className="rounded-xl h-11 bg-background"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Margen deseado</label>
+                                            <div className="relative">
+                                                <Input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={expectedMargin}
+                                                    onChange={(e) => setExpectedMargin(Number(e.target.value))}
+                                                    className="rounded-xl h-11 bg-background pr-8"
+                                                />
+                                                <Percent className="w-3.5 h-3.5 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Precio final</label>
+                                            <MoneyInput
+                                                name="price"
+                                                value={price}
+                                                onChange={setPrice}
+                                                className="rounded-xl h-11 bg-background font-bold"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className={`p-3 rounded-xl border flex justify-between items-center ${realMarginPercent >= expectedMargin ? 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400'}`}>
-                                        <span className="font-semibold">Margen Real:</span>
-                                        <div className="text-right">
-                                            <div className="font-bold text-lg">{realMarginPercent.toFixed(1)}%</div>
-                                            <div className="text-xs opacity-80">+${realMarginValue.toFixed(0)}</div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                        <div className="bg-background p-3 rounded-xl border border-border flex justify-between items-center">
+                                            <span className="text-muted-foreground">Precio sugerido</span>
+                                            <span className="font-mono font-bold text-lg">${suggestedPrice.toFixed(0)}</span>
+                                        </div>
+                                        <div className={`p-3 rounded-xl border flex justify-between items-center ${realMarginPercent >= expectedMargin ? 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400'}`}>
+                                            <span className="font-semibold">Margen real</span>
+                                            <div className="text-right">
+                                                <div className="font-bold text-lg">{realMarginPercent.toFixed(1)}%</div>
+                                                <div className="text-xs opacity-80">+${realMarginValue.toFixed(0)}</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div>
-                                <p className="text-sm font-semibold ml-1 mb-2">Impuestos</p>
-                                <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-3">
+                                <p className="text-sm font-semibold ml-1">Impuestos <span className="font-normal text-muted-foreground">(opcional)</span></p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">IVA (%)</label>
                                         <Input
@@ -318,7 +326,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </TabsContent>
 
                         {/* ── Inventario ──────────────────────────────────────────────────── */}
-                        <TabsContent value="inventario" forceMount hidden={tab !== "inventario"} className="space-y-5 mt-5 m-0 outline-none">
+                        <TabsContent value="inventario" forceMount hidden={tab !== "inventario"} className="space-y-5 mt-6 outline-none">
                             <div className="space-y-1.5">
                                 <label htmlFor="trackingMode" className="text-sm font-semibold ml-1">Seguimiento de inventario</label>
                                 <Combobox
@@ -415,7 +423,7 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </TabsContent>
 
                         {/* ── Imagen ──────────────────────────────────────────────────────── */}
-                        <TabsContent value="imagen" forceMount hidden={tab !== "imagen"} className="space-y-4 mt-5 m-0 outline-none">
+                        <TabsContent value="imagen" forceMount hidden={tab !== "imagen"} className="space-y-4 mt-6 outline-none">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold ml-1 flex items-center gap-1.5">
                                     <ImageIcon className="w-4 h-4 text-muted-foreground" />
