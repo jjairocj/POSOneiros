@@ -91,18 +91,28 @@ const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
     },
   },
   {
-    accessorKey: "cost",
-    meta: { label: "Costo unitario" },
-    header: () => <div className="text-right">Costo unitario</div>,
+    accessorKey: "family.name",
+    id: "family",
+    meta: { label: "Familia" },
+    header: "Familia",
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("cost"))
-      const formatted = new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        maximumFractionDigits: 0
-      }).format(amount)
- 
-      return <div className="text-right text-muted-foreground">{formatted}</div>
+      const family = row.original.family?.name;
+      return family
+        ? <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">{family}</span>
+        : <span className="text-muted-foreground">—</span>;
+    },
+  },
+  {
+    accessorKey: "trackingMode",
+    meta: { label: "Inventario" },
+    header: "Inventario",
+    cell: ({ row }) => {
+      const mode = row.getValue("trackingMode") as string | undefined;
+      const label = mode === "LOT" ? "Por lote" : mode === "NONE" ? "Sin inventario" : "Simple";
+      const tone = mode === "LOT" ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+        : mode === "NONE" ? "bg-muted text-muted-foreground"
+        : "bg-green-500/10 text-green-700 dark:text-green-400";
+      return <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${tone}`}>{label}</span>;
     },
   },
   {
@@ -118,15 +128,6 @@ const BASE_COLUMNS: ColumnDef<ProductColumn>[] = [
       }).format(amount)
  
       return <div className="text-right font-bold">{formatted}</div>
-    },
-  },
-  {
-    accessorKey: "taxIva",
-    meta: { label: "IVA" },
-    header: () => <div className="text-right">IVA %</div>,
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("taxIva") || "0")
-      return <div className="text-right text-muted-foreground">{isNaN(amount) ? 0 : amount}%</div>
     },
   },
 ];

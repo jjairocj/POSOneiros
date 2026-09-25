@@ -1,20 +1,17 @@
 "use client";
 import { useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { Pencil, PackagePlus, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ProductForm } from "./product-form";
-import { DeleteProductItem } from "./DeleteProductItem";
+import { DeleteProductButton } from "./DeleteProductItem";
 import { StockMovementModal } from "./StockMovementModal";
 import { ReceiveLotModal } from "./ReceiveLotModal";
 import type { ProductColumn } from "./columns";
 
 /**
- * Row menu. Modals are rendered as siblings of the DropdownMenu, not inside it:
- * Radix unmounts the menu content on outside clicks, which would tear down a
- * modal that lived inside the menu before the user could submit it.
+ * Row actions as inline icon buttons — one tap instead of opening a menu
+ * first. Modals are rendered as siblings, not nested inside a trigger, so
+ * they aren't torn down by anything else in the row unmounting.
  */
 interface RowActionsProps {
   product: ProductColumn;
@@ -32,37 +29,46 @@ export function RowActions({ product, canManageCatalog = true, canReceiveInvento
   if (!canManageCatalog && !canReceiveInventory) return null;
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Abrir menú</span>
-            <MoreHorizontal className="h-4 w-4" />
+      <div className="flex items-center justify-end gap-0.5">
+        {canManageCatalog && (
+          <ProductForm
+            product={product}
+            trigger={
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" title="Editar producto">
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Editar producto</span>
+              </Button>
+            }
+          />
+        )}
+        {canReceiveInventory && isLotTracked && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg"
+            title="Recibir lote"
+            onClick={() => setLotOpen(true)}
+          >
+            <PackagePlus className="h-4 w-4" />
+            <span className="sr-only">Recibir lote</span>
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-          {canManageCatalog && (
-            <ProductForm
-              product={product}
-              trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar producto</DropdownMenuItem>}
-            />
-          )}
-          {canReceiveInventory && isLotTracked && (
-            <DropdownMenuItem onSelect={() => setLotOpen(true)}>Recibir lote</DropdownMenuItem>
-          )}
-          {canReceiveInventory && (
-            <DropdownMenuItem onSelect={() => setMovementOpen(true)}>
-              {isLotTracked ? "Merma / ajuste (sin lote)" : "Entrada / merma / ajuste"}
-            </DropdownMenuItem>
-          )}
-          {canManageCatalog && (
-            <>
-              <DropdownMenuSeparator />
-              <DeleteProductItem productId={product.id} productName={product.name} />
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        )}
+        {canReceiveInventory && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg"
+            title={isLotTracked ? "Merma / ajuste (sin lote)" : "Entrada / merma / ajuste"}
+            onClick={() => setMovementOpen(true)}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span className="sr-only">{isLotTracked ? "Merma / ajuste (sin lote)" : "Entrada / merma / ajuste"}</span>
+          </Button>
+        )}
+        {canManageCatalog && (
+          <DeleteProductButton productId={product.id} productName={product.name} />
+        )}
+      </div>
       {movementOpen && (
         <StockMovementModal
           product={{ id: product.id, name: product.name, stock: product.stock, cost: product.cost }}

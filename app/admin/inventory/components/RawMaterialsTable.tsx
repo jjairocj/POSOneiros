@@ -1,12 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FlaskConical, PackagePlus, CheckCircle2, X, BarChart3, Loader2 } from "lucide-react";
+import { FlaskConical, PackagePlus, CheckCircle2, X, BarChart3, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-    createRawMaterial, receiveRawMaterialLot, markRawMaterialLotDepleted,
+    createRawMaterial, receiveRawMaterialLot, markRawMaterialLotDepleted, deleteRawMaterial,
     getRawMaterialConsumptionReport, type RawMaterialRow, type RawMaterialConsumptionLot,
 } from "@/app/actions/lots";
 import type { SupplierRow } from "@/app/actions/suppliers";
@@ -83,6 +83,49 @@ function OpenLotForm({ materialId, suppliers, onDone }: { materialId: string; su
             <Button type="submit" size="sm" disabled={loading} className="h-9 rounded-lg font-bold">Registrar</Button>
             <Button type="button" size="sm" variant="ghost" onClick={onDone} className="h-9 rounded-lg">Cancelar</Button>
         </form>
+    );
+}
+
+/** Two-tap delete: only rendered when the material has never been used
+ * (canDelete) — no product made from it, no lot ever received. */
+function DeleteMaterialButton({ material, onDeleted }: { material: RawMaterialRow; onDeleted: () => void }) {
+    const [confirming, setConfirming] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
+
+    const handle = async () => {
+        if (!confirming) {
+            setConfirming(true);
+            resetTimer.current = setTimeout(() => setConfirming(false), 4000);
+            return;
+        }
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        setLoading(true);
+        try {
+            const res = await deleteRawMaterial(material.id);
+            if (!res.ok) { toast.error(res.error); return; }
+            toast.success(`Insumo "${material.name}" eliminado.`);
+            onDeleted();
+        } finally {
+            setLoading(false);
+            setConfirming(false);
+        }
+    };
+
+    return (
+        <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={handle}
+            disabled={loading}
+            className={`h-8 text-xs ${confirming ? "text-destructive hover:text-destructive" : ""}`}
+        >
+            {loading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}
+            {confirming ? "¿Seguro?" : "Eliminar"}
+        </Button>
     );
 }
 
@@ -206,6 +249,7 @@ export function RawMaterialsTable({ materials, suppliers }: { materials: RawMate
                                     <Button size="sm" variant="outline" onClick={() => setReportFor({ id: m.id, name: m.name })} className="h-8 text-xs">
                                         <BarChart3 className="w-3.5 h-3.5 mr-1" /> Ver consumo
                                     </Button>
+                                    {m.canDelete && <DeleteMaterialButton material={m} onDeleted={() => router.refresh()} />}
                                 </div>
                             </div>
                             {m.activeLot && (

@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   ColumnDef,
   ColumnFiltersState,
+  PaginationState,
   SortingState,
   flexRender,
   getCoreRowModel,
@@ -43,6 +44,15 @@ export function DataTable<TData, TValue>({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
+  // Controlled (not table-internal) pagination state: editing a row triggers
+  // router.refresh(), which hands this table a new `data` array reference —
+  // with table-internal state, react-table's autoResetPageIndex snaps that
+  // back to page 1 on every edit. Controlling it ourselves + turning that
+  // auto-reset off keeps the user on the page they were on.
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  })
 
   const table = useReactTable({
     data,
@@ -53,11 +63,25 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
+    onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,
+      pagination,
     },
   })
+
+  // If the current page no longer exists (e.g. a row was deleted, or a
+  // filter now matches fewer rows), fall back to the last real page instead
+  // of showing a blank one — this is the one case autoResetPageIndex:false
+  // needs a manual clamp for.
+  const pageCount = table.getPageCount()
+  React.useEffect(() => {
+    if (pageCount > 0 && pagination.pageIndex > pageCount - 1) {
+      setPagination((p) => ({ ...p, pageIndex: pageCount - 1 }))
+    }
+  }, [pageCount, pagination.pageIndex])
 
   return (
     <div className="space-y-4">
@@ -169,25 +193,30 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-          className="rounded-xl"
-        >
-          Anterior
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-          className="rounded-xl"
-        >
-          Siguiente
-        </Button>
+      <div className="flex items-center justify-end gap-3 py-4">
+        <p className="text-sm text-muted-foreground">
+          Página {pageCount === 0 ? 0 : pagination.pageIndex + 1} de {pageCount}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            className="rounded-xl"
+          >
+            Anterior
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            className="rounded-xl"
+          >
+            Siguiente
+          </Button>
+        </div>
       </div>
     </div>
   )

@@ -104,8 +104,8 @@ describe('getProductLots', () => {
 describe('getRawMaterials', () => {
     it('returns the active lot per material, or null when none is active', async () => {
         mockRawMaterialFindMany.mockResolvedValue([
-            { id: 'rm1', name: 'Café en grano', lots: [{ id: 'l1', lotNumber: 'A1', expirationDate: null, receivedDate: new Date(), supplier: { name: 'ACME' } }] },
-            { id: 'rm2', name: 'Azúcar', lots: [] },
+            { id: 'rm1', name: 'Café en grano', lots: [{ id: 'l1', lotNumber: 'A1', expirationDate: null, receivedDate: new Date(), supplier: { name: 'ACME' } }], _count: { products: 0, lots: 1 } },
+            { id: 'rm2', name: 'Azúcar', lots: [], _count: { products: 0, lots: 0 } },
         ]);
         const result = await getRawMaterials();
         expect(result[0].activeLot).toEqual(expect.objectContaining({ id: 'l1', lotNumber: 'A1', supplierName: 'ACME' }));

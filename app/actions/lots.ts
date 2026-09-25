@@ -111,6 +111,9 @@ export interface RawMaterialRow {
         receivedDate: string;
         supplierName: string | null;
     } | null;
+    /** No product is made from this insumo and no lot (active or depleted)
+     * was ever received for it — safe to hard-delete. */
+    canDelete: boolean;
 }
 
 /** Every raw material with its currently active lot, if any. */
@@ -123,6 +126,7 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
                     where: { status: "ACTIVE" }, orderBy: { receivedDate: "desc" }, take: 1,
                     include: { supplier: { select: { name: true } } },
                 },
+                _count: { select: { products: true, lots: true } },
             },
             orderBy: { name: "asc" },
         });
@@ -136,10 +140,31 @@ export async function getRawMaterials(): Promise<RawMaterialRow[]> {
                     supplierName: m.lots[0].supplier?.name ?? null,
                 }
                 : null,
+            canDelete: m._count.products === 0 && m._count.lots === 0,
         }));
     } catch (error) {
         console.error("[getRawMaterials]", error);
         return [];
+    }
+}
+
+/** Hard delete — only possible when nothing ever referenced this insumo
+ * (see canDelete above). */
+export async function deleteRawMaterial(id: string): Promise<ActionResult> {
+    try {
+        await requirePermission("RECEIVE_INVENTORY");
+        const [productCount, lotCount] = await Promise.all([
+            prisma.product.count({ where: { rawMaterialId: id } }),
+            prisma.rawMaterialLot.count({ where: { rawMaterialId: id } }),
+        ]);
+        if (productCount > 0) return fail("Hay productos configurados con este insumo — quítalo de esos productos primero.");
+        if (lotCount > 0) return fail("Este insumo ya tiene lotes registrados y no se puede eliminar.");
+        await prisma.rawMaterial.delete({ where: { id } });
+        revalidatePath("/admin/inventory");
+        return ok();
+    } catch (error) {
+        console.error("[deleteRawMaterial]", error);
+        return fail(toUserMessage(error, "No se pudo eliminar el insumo."));
     }
 }
 

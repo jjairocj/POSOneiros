@@ -1,10 +1,55 @@
 "use client";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Truck, Pencil, Power } from "lucide-react";
+import { Truck, Pencil, Power, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toggleSupplierActive, type SupplierRow } from "@/app/actions/suppliers";
+import { toggleSupplierActive, deleteSupplier, type SupplierRow } from "@/app/actions/suppliers";
 import { SupplierForm } from "./SupplierForm";
+
+/** Two-tap delete: only offered when the supplier has never been used on a
+ * lot (canDelete) — otherwise the toggle active/inactive is the safe path. */
+function DeleteSupplierButton({ supplier }: { supplier: SupplierRow }) {
+    const router = useRouter();
+    const [confirming, setConfirming] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
+
+    const handle = async () => {
+        if (!confirming) {
+            setConfirming(true);
+            resetTimer.current = setTimeout(() => setConfirming(false), 4000);
+            return;
+        }
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        setLoading(true);
+        try {
+            const res = await deleteSupplier(supplier.id);
+            if (!res.ok) { toast.error(res.error); return; }
+            toast.success(`Proveedor "${supplier.name}" eliminado.`);
+            router.refresh();
+        } finally {
+            setLoading(false);
+            setConfirming(false);
+        }
+    };
+
+    return (
+        <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={handle}
+            disabled={loading}
+            className={`h-8 text-xs ${confirming ? "text-destructive hover:text-destructive" : ""}`}
+        >
+            {loading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}
+            {confirming ? "¿Seguro?" : "Eliminar"}
+        </Button>
+    );
+}
 
 export function SuppliersTable({ suppliers }: { suppliers: SupplierRow[] }) {
     const router = useRouter();
@@ -50,6 +95,7 @@ export function SuppliersTable({ suppliers }: { suppliers: SupplierRow[] }) {
                                     <Button size="sm" variant="ghost" onClick={() => toggle(s)} className="h-8 text-xs">
                                         <Power className="w-3.5 h-3.5 mr-1" /> {s.isActive ? "Desactivar" : "Reactivar"}
                                     </Button>
+                                    {s.canDelete && <DeleteSupplierButton supplier={s} />}
                                 </div>
                             </div>
                         </li>

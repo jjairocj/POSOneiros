@@ -13,6 +13,9 @@ export interface SupplierRow {
     address: string | null;
     notes: string | null;
     isActive: boolean;
+    /** No product lot or raw-material lot ever pointed at this supplier —
+     * safe to hard-delete instead of just deactivating. */
+    canDelete: boolean;
 }
 
 /** Every supplier, active first — used both by the management screen and the
@@ -20,15 +23,39 @@ export interface SupplierRow {
 export async function getSuppliers(): Promise<SupplierRow[]> {
     try {
         const suppliers = await prisma.supplier.findMany({
+            include: { _count: { select: { productLots: true, rawMaterialLots: true } } },
             orderBy: [{ isActive: "desc" }, { name: "asc" }],
         });
         return suppliers.map((s) => ({
             id: s.id, name: s.name, taxId: s.taxId, phone: s.phone,
             email: s.email, address: s.address, notes: s.notes, isActive: s.isActive,
+            canDelete: s._count.productLots === 0 && s._count.rawMaterialLots === 0,
         }));
     } catch (error) {
         console.error("[getSuppliers]", error);
         return [];
+    }
+}
+
+/** Hard delete — only possible when the supplier was never actually used on
+ * any lot (see canDelete above); otherwise use toggleSupplierActive so
+ * historical lots keep a name to point at. */
+export async function deleteSupplier(id: string): Promise<ActionResult> {
+    try {
+        await requirePermission("MANAGE_CATALOG");
+        const [productLots, rawMaterialLots] = await Promise.all([
+            prisma.productLot.count({ where: { supplierId: id } }),
+            prisma.rawMaterialLot.count({ where: { supplierId: id } }),
+        ]);
+        if (productLots > 0 || rawMaterialLots > 0) {
+            return fail("Este proveedor ya tiene lotes registrados — desactívalo en vez de eliminarlo.");
+        }
+        await prisma.supplier.delete({ where: { id } });
+        revalidatePath("/admin/inventory");
+        return ok();
+    } catch (error) {
+        console.error("[deleteSupplier]", error);
+        return fail(toUserMessage(error, "No se pudo eliminar el proveedor."));
     }
 }
 

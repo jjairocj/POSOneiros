@@ -25,6 +25,7 @@ const makeSupplier = (overrides: object = {}) => ({
     id: 'sup-1', name: 'Distribuidora Andina', taxId: '900123456-7', phone: '3000000000',
     email: 'a@b.com', address: 'Calle 1', notes: null, isActive: true,
     createdAt: new Date(), updatedAt: new Date(),
+    _count: { productLots: 0, rawMaterialLots: 0 },
     ...overrides,
 });
 

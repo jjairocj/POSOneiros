@@ -18,20 +18,57 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, MoreHorizontal, Loader2 } from "lucide-react";
+import { GripVertical, Loader2, Pencil, Trash2 } from "lucide-react";
 
-import { updateCategoryOrders } from "@/app/actions/category";
+import { deleteCategory, updateCategoryOrders } from "@/app/actions/category";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { CategoryForm } from "./category-form";
 import { CategoryColumn } from "./category-columns";
+
+/** Two-tap delete: first tap asks (button turns red), second confirms. */
+function DeleteCategoryButton({ categoryId, categoryName }: { categoryId: string; categoryName: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const resetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
+
+  const handle = async () => {
+    if (!confirming) {
+      setConfirming(true);
+      resetTimer.current = setTimeout(() => setConfirming(false), 4000);
+      return;
+    }
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    setLoading(true);
+    try {
+      const res = await deleteCategory(categoryId);
+      if (res.success) toast.success(`Categoría "${categoryName}" eliminada.`);
+      else toast.error(res.error || "No se pudo eliminar.");
+    } catch {
+      toast.error("No se pudo conectar con el servidor.");
+    } finally {
+      setLoading(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className={`h-8 w-8 rounded-lg ${confirming ? "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
+      title={confirming ? "¿Seguro? Toca de nuevo para eliminar" : "Eliminar categoría"}
+      onClick={handle}
+      disabled={loading}
+    >
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+      <span className="sr-only">{confirming ? "¿Seguro? Toca de nuevo para eliminar" : "Eliminar categoría"}</span>
+    </Button>
+  );
+}
 
 interface CategoryDragListProps {
   initialCategories: CategoryColumn[];
@@ -82,29 +119,17 @@ function SortableCategoryItem({ category, isPending }: { category: CategoryColum
       </div>
 
       {/* Actions */}
-      <div className="flex items-center">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-xl">
-            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <CategoryForm 
-                category={category} 
-                trigger={
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
-                        Editar categoría
-                    </DropdownMenuItem>
-                }
-            />
-            {/* Future wire-up: delete action */}
-            <DropdownMenuItem className="text-destructive cursor-pointer">Eliminar categoría</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="flex items-center gap-0.5">
+        <CategoryForm
+            category={category}
+            trigger={
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" title="Editar categoría">
+                    <Pencil className="h-4 w-4" />
+                    <span className="sr-only">Editar categoría</span>
+                </Button>
+            }
+        />
+        <DeleteCategoryButton categoryId={category.id} categoryName={category.name} />
       </div>
     </div>
   );
