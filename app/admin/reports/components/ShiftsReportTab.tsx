@@ -1,12 +1,16 @@
 "use client";
+import { useState } from "react";
 import { formatMoney } from "@/app/lib/money";
 import type { ShiftReportRow } from "@/app/actions/report";
+import { ShiftDetailModal } from "./ShiftDetailModal";
 
 const fmt = (iso: string) => new Date(iso).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 const STATUS_LABEL: Record<string, string> = { OPEN: "Abierto", CLOSING: "Cerrando", CLOSED: "Cerrado" };
 
 export function ShiftsReportTab({ rows }: { rows: ShiftReportRow[] }) {
+    const [detailShiftId, setDetailShiftId] = useState<string | null>(null);
+
     if (rows.length === 0) {
         return <p className="text-muted-foreground text-sm text-center py-10">Sin turnos en este período.</p>;
     }
@@ -27,7 +31,12 @@ export function ShiftsReportTab({ rows }: { rows: ShiftReportRow[] }) {
                 </thead>
                 <tbody>
                     {rows.map((r) => (
-                        <tr key={r.shiftId} className="border-t border-border/50 hover:bg-accent/50 transition-colors">
+                        <tr
+                            key={r.shiftId}
+                            onClick={() => setDetailShiftId(r.shiftId)}
+                            className="border-t border-border/50 hover:bg-accent/50 transition-colors cursor-pointer"
+                            title="Ver ventas y productos de este turno"
+                        >
                             <td className="py-3 px-4">
                                 <div className="font-medium">{r.registerName}</div>
                                 <div className="text-xs text-muted-foreground">{r.userName}</div>
@@ -48,6 +57,10 @@ export function ShiftsReportTab({ rows }: { rows: ShiftReportRow[] }) {
                     ))}
                 </tbody>
             </table>
+
+            {detailShiftId && (
+                <ShiftDetailModal shiftId={detailShiftId} onClose={() => setDetailShiftId(null)} />
+            )}
         </div>
     );
 }

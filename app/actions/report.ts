@@ -408,3 +408,77 @@ export async function getShiftsReport(filters: { startDate: Date; endDate: Date 
         return { success: false, error: toUserMessage(error, "No se pudo generar el reporte.") };
     }
 }
+
+export interface ShiftDetailSale {
+    id: string;
+    shortId: string;
+    createdAt: string;
+    total: number;
+    status: string;
+    payments: string;
+}
+
+export interface ShiftDetailProduct {
+    productId: string;
+    productName: string;
+    productCode: string;
+    quantitySold: number;
+    revenue: number;
+}
+
+export interface ShiftDetail {
+    registerName: string;
+    userName: string;
+    sales: ShiftDetailSale[];
+    products: ShiftDetailProduct[];
+}
+
+/** Drill-down for one row of the Turnos report: every sale in that shift,
+ * plus the products sold aggregated the same way as getProductRankingReport
+ * (but scoped to this one shift instead of a date range). */
+export async function getShiftDetail(shiftId: string): Promise<{ success: true; data: ShiftDetail } | { success: false; error: string }> {
+    try {
+        await requirePermission("VIEW_REPORTS");
+        const shift = await prisma.shift.findUnique({
+            where: { id: shiftId },
+            include: {
+                register: true,
+                user: true,
+                sales: {
+                    include: { payments: true, details: { include: { product: { select: { name: true, code: true } } } } },
+                    orderBy: { createdAt: "asc" },
+                },
+            },
+        });
+        if (!shift) return { success: false, error: "Turno no encontrado." };
+
+        const sales: ShiftDetailSale[] = shift.sales.map((s) => ({
+            id: s.id,
+            shortId: s.number != null ? `${shift.register.prefix ? shift.register.prefix + "-" : ""}${s.number}` : s.id.slice(0, 8).toUpperCase(),
+            createdAt: s.createdAt.toISOString(),
+            total: s.total,
+            status: s.status,
+            payments: [...new Set(s.payments.map((p) => p.method))].join(", "),
+        }));
+
+        const productMap = new Map<string, ShiftDetailProduct>();
+        for (const s of shift.sales) {
+            if (s.status !== "COMPLETED") continue;
+            for (const d of s.details) {
+                const entry = productMap.get(d.productId) ?? {
+                    productId: d.productId, productName: d.product?.name ?? "Producto eliminado",
+                    productCode: d.product?.code ?? "", quantitySold: 0, revenue: 0,
+                };
+                entry.quantitySold += d.quantity;
+                entry.revenue += d.subtotal;
+                productMap.set(d.productId, entry);
+            }
+        }
+        const products = Array.from(productMap.values()).sort((a, b) => b.quantitySold - a.quantitySold);
+
+        return { success: true, data: { registerName: shift.register.name, userName: shift.user.name, sales, products } };
+    } catch (error: unknown) {
+        console.error("Error building shift detail:", error);
+        return { success: false, error: toUserMessage(error, "No se pudo cargar el detalle del turno.") };
+    }
+}
