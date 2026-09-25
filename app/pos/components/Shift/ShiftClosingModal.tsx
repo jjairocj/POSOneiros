@@ -318,14 +318,12 @@ export default function ShiftClosingModal({ activeShiftId, baseAmount = 0, onCan
                         <LogOut className="w-6 h-6 text-destructive" />
                     </div>
                     <h2 className="text-xl font-bold tracking-tight">Cerrar Turno</h2>
-                    <Hint className="text-muted-foreground text-sm">
-                        Cuenta el efectivo que dejaron las ventas — aparte de la base con la que abriste, que se queda en el cajón — más las transferencias recibidas y el total del datáfono.
-                    </Hint>
+
                 </div>
 
                 <form onSubmit={handleReview} className="space-y-4">
                     <div className="flex justify-between items-center rounded-2xl bg-muted/40 border border-border/50 px-4 py-3">
-                        <span className="text-sm font-semibold text-muted-foreground">Base de apertura (no la cuentes aquí)</span>
+                        <span className="text-sm font-semibold text-muted-foreground">Base de apertura</span>
                         <strong className="text-base">{money(baseAmount)}</strong>
                     </div>
 
