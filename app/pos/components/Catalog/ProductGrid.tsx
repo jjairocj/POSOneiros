@@ -8,6 +8,7 @@ import OrderSwitcher from "./OrderSwitcher";
 import { Loader2, Search, X, CloudOff } from "lucide-react";
 import type { CatalogProduct, CatalogCategory } from "@/app/types/cart";
 import { saveCatalogSnapshot, loadCatalogSnapshot, filterCatalogLocally } from "@/app/lib/offlineCatalog";
+import { useCartStore } from "@/app/store/useCartStore";
 
 const FULL_CATALOG_RESYNC_MS = 5 * 60 * 1000;
 
@@ -39,6 +40,14 @@ export default function ProductGrid() {
     // category/search until the connection is back.
     const [offline, setOffline] = useState(false);
     const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Autocomplete dropdown under the search box: lets a cashier type a
+    // product name and add it with Enter/click, no scrolling through the
+    // grid needed — separate from the grid re-filtering below, which still
+    // happens for browsing.
+    const [searchFocused, setSearchFocused] = useState(false);
+    const [highlightIndex, setHighlightIndex] = useState(0);
+    const searchBoxRef = useRef<HTMLDivElement>(null);
+    const addItem = useCartStore((state) => state.addItem);
 
     useEffect(() => {
         async function init() {
@@ -113,8 +122,40 @@ export default function ProductGrid() {
         return () => window.removeEventListener("online", retry);
     }, [offline, activeCategoryId, searchQuery]);
 
+    // Closes the suggestions dropdown on an outside click.
+    useEffect(() => {
+        function onDocClick(e: MouseEvent) {
+            if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) setSearchFocused(false);
+        }
+        document.addEventListener("mousedown", onDocClick);
+        return () => document.removeEventListener("mousedown", onDocClick);
+    }, []);
+
+    const suggestions = searchQuery.trim() ? products.slice(0, 6) : [];
+
+    const addFromSuggestion = (product: CatalogProduct) => {
+        if (product.stock <= 0) return;
+        addItem(product);
+        setSearchQuery("");
+        setHighlightIndex(0);
+        startTransition(async () => {
+            const { products: results, usedFallback } = await resolveCatalog(activeCategoryId);
+            setOffline(usedFallback || results === null);
+            if (results !== null) setProducts(results);
+        });
+    };
+
+    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (suggestions.length === 0) return;
+        if (e.key === "ArrowDown") { e.preventDefault(); setHighlightIndex((i) => Math.min(i + 1, suggestions.length - 1)); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); setHighlightIndex((i) => Math.max(i - 1, 0)); }
+        else if (e.key === "Enter") { e.preventDefault(); addFromSuggestion(suggestions[highlightIndex]); }
+        else if (e.key === "Escape") { setSearchFocused(false); }
+    };
+
     const handleSearchChange = (value: string) => {
         setSearchQuery(value);
+        setHighlightIndex(0);
         if (searchDebounce.current) clearTimeout(searchDebounce.current);
         searchDebounce.current = setTimeout(() => {
             startTransition(async () => {
@@ -163,13 +204,17 @@ export default function ProductGrid() {
             <OrderSwitcher />
 
             {/* Search bar */}
-            <div className="relative mb-4">
+            <div ref={searchBoxRef} className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                     type="text"
+                    role="combobox"
+                    aria-expanded={searchFocused && suggestions.length > 0}
                     placeholder="Buscar en todo el catálogo..."
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
+                    onFocus={() => setSearchFocused(true)}
+                    onKeyDown={handleSearchKeyDown}
                     className="w-full h-10 pl-9 pr-9 rounded-xl bg-muted/50 border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all"
                 />
                 {searchQuery && (
@@ -179,6 +224,40 @@ export default function ProductGrid() {
                     >
                         <X className="w-4 h-4" />
                     </button>
+                )}
+
+                {/* Autocomplete dropdown — type + Enter (or tap) adds the product
+                    straight to the cart, no scrolling through the grid needed. */}
+                {searchFocused && suggestions.length > 0 && (
+                    <div className="absolute z-30 mt-1.5 w-full max-h-72 overflow-y-auto rounded-xl border border-border bg-card shadow-2xl py-1.5 animate-in fade-in zoom-in-95 duration-150">
+                        {suggestions.map((p, i) => (
+                            <button
+                                key={p.id}
+                                type="button"
+                                disabled={p.stock <= 0}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => addFromSuggestion(p)}
+                                onMouseEnter={() => setHighlightIndex(i)}
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${i === highlightIndex ? "bg-primary/10" : "hover:bg-muted"}`}
+                            >
+                                <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center overflow-hidden shrink-0">
+                                    {p.imageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- small catalog thumbnail
+                                        <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="text-sm opacity-30">📦</span>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold truncate">{p.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {p.stock <= 0 ? "Agotado" : `${p.stock} en stock`}
+                                    </p>
+                                </div>
+                                <span className="text-sm font-bold text-primary shrink-0">${p.price.toLocaleString()}</span>
+                            </button>
+                        ))}
+                    </div>
                 )}
             </div>
 
