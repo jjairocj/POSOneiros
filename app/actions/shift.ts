@@ -9,7 +9,7 @@
 
 import prisma from "../../lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireSession, roleAtLeast } from "@/lib/auth";
+import { requireSession, requirePermission, roleAtLeast } from "@/lib/auth";
 import { fail, ok, toUserMessage, type ActionResult } from "@/lib/result";
 import { LIVE_SHIFT_STATUSES } from "@/lib/shift-status";
 import { businessHour } from "@/app/lib/time";
@@ -114,6 +114,36 @@ export async function openShift(baseAmount: number, registerId: string): Promise
     } catch (err) {
         console.error("[openShift]", err);
         return fail(toUserMessage(err, "No se pudo abrir el turno."));
+    }
+}
+
+export interface OpenShiftSummary {
+    id: string;
+    registerName: string;
+    userName: string;
+    startTime: string;
+}
+
+/** Every shift currently OPEN/CLOSING, across every cashier — feeds the "ver
+ * turno abierto" filter on Ventas e Ingresos, so a manager can pick any
+ * live shift, not just their own. */
+export async function getOpenShifts(): Promise<OpenShiftSummary[]> {
+    try {
+        await requirePermission("VIEW_REPORTS");
+        const shifts = await prisma.shift.findMany({
+            where: { status: { in: LIVE_SHIFT_STATUSES } },
+            include: { register: true, user: { select: { name: true } } },
+            orderBy: { startTime: "desc" },
+        });
+        return shifts.map((s) => ({
+            id: s.id,
+            registerName: s.register?.name ?? "Caja",
+            userName: s.user?.name ?? "—",
+            startTime: s.startTime.toISOString(),
+        }));
+    } catch (error) {
+        console.error("[getOpenShifts]", error);
+        return [];
     }
 }
 

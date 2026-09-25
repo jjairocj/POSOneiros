@@ -1,26 +1,36 @@
 import { Metadata } from 'next';
 import { getSalesAnalytics, getSalesHistoryList } from '@/app/actions/report';
-import { subDays } from 'date-fns';
+import { getOpenShifts } from '@/app/actions/shift';
+import { startOfMonth } from 'date-fns';
 import { businessDayKey } from '@/app/lib/time';
 import { Receipt, AreaChart as ChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab, type DashboardData } from './components/DashboardTab';
 import { HistoryTab } from './components/HistoryTab';
 import { ExportButton } from './components/ExportButton';
+import { SalesFilters } from './components/SalesFilters';
 
 export const metadata: Metadata = {
     title: "Oneiros Admin | Ventas y Reportes",
 };
 
-export default async function SalesPage() {
-    // Default filter: Last 30 days
-    const endDate = new Date();
-    const startDate = subDays(endDate, 30);
+interface SalesPageProps {
+    searchParams: Promise<{ from?: string; to?: string; shift?: string }>;
+}
+
+export default async function SalesPage({ searchParams }: SalesPageProps) {
+    const params = await searchParams;
+    const shiftId = params.shift || undefined;
+
+    // Default filter: current calendar month (not shown when a live shift is selected).
+    const endDate = params.to ? new Date(`${params.to}T23:59:59`) : new Date();
+    const startDate = params.from ? new Date(`${params.from}T00:00:00`) : startOfMonth(new Date());
 
     // Fetch data concurrently
-    const [analytics, history] = await Promise.all([
-        getSalesAnalytics({ startDate, endDate }),
-        getSalesHistoryList({ startDate, endDate })
+    const [analytics, history, openShifts] = await Promise.all([
+        getSalesAnalytics(shiftId ? { shiftId } : { startDate, endDate }),
+        getSalesHistoryList(shiftId ? { shiftId } : { startDate, endDate }),
+        getOpenShifts(),
     ]);
 
     return (
@@ -33,11 +43,22 @@ export default async function SalesPage() {
                     </div>
                     <div>
                         <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight">Ventas e Ingresos</h1>
-                        <p className="text-muted-foreground mt-1 text-sm md:text-lg">Analíticas y registro histórico de transacciones.</p>
+                        <p className="text-muted-foreground mt-1 text-sm md:text-lg">
+                            {shiftId
+                                ? "Mostrando solo el turno seleccionado."
+                                : "Analíticas y registro histórico de transacciones."}
+                        </p>
                     </div>
                 </div>
                 <ExportButton from={businessDayKey(startDate)} to={businessDayKey(endDate)} />
             </header>
+
+            <SalesFilters
+                from={businessDayKey(startDate)}
+                to={businessDayKey(endDate)}
+                activeShiftId={shiftId}
+                openShifts={openShifts}
+            />
 
             {/* Content Tabs */}
             <Tabs defaultValue="dashboard" className="space-y-6">
