@@ -11,6 +11,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   SortingState,
+  PaginationState,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -21,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Printer, ReceiptText, Ban } from "lucide-react";
+import { ArrowUpDown, Printer, ReceiptText, Ban, Eye } from "lucide-react";
 
 const METHOD_LABEL: Record<string, string> = { CASH: "Efectivo", CARD: "Tarjeta", TRANSFER: "Transferencia" };
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ import { printReceipt } from "@/app/pos/components/Checkout/SaleSuccess";
 import { getSaleForPrint } from "@/app/actions/report";
 import { cancelSale } from "@/app/actions/sale";
 import { CancelSaleDialog } from "./CancelSaleDialog";
+import { ViewReceiptModal } from "./ViewReceiptModal";
 
 interface HistoryData {
     id: string;
@@ -46,10 +48,17 @@ interface HistoryData {
 
 export function HistoryTab({ data }: { data: HistoryData[] }) {
     const [sorting, setSorting] = useState<SortingState>([]);
+    // Controlled pagination: cancelling a sale calls router.refresh(), which
+    // hands this table a new `data` array reference — with table-internal
+    // pagination state, react-table's autoResetPageIndex snaps that back to
+    // page 1. Controlling it ourselves + disabling that auto-reset keeps the
+    // admin on the page they were reviewing.
+    const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
     const [printingSale, setPrintingSale] = useState<ReceiptSale | null>(null);
     const [isPrinting, setIsPrinting] = useState(false);
     const [cancelTarget, setCancelTarget] = useState<HistoryData | null>(null);
     const [cancelling, setCancelling] = useState(false);
+    const [viewingSale, setViewingSale] = useState<HistoryData | null>(null);
     const router = useRouter();
 
     const handleCancel = async (reason: string) => {
@@ -170,6 +179,9 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                 const sale = row.original;
                 return (
                     <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Ver comprobante" onClick={() => setViewingSale(sale)}>
+                            <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" title="Reimprimir" onClick={() => handleReprint(sale.id)}>
                             <Printer className="h-4 w-4" />
                         </Button>
@@ -191,10 +203,23 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
         getPaginationRowModel: getPaginationRowModel(),
         onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
+        onPaginationChange: setPagination,
+        autoResetPageIndex: false,
         state: {
             sorting,
+            pagination,
         },
     });
+
+    // If the current page no longer exists (e.g. the date-range filter above
+    // now matches fewer rows), fall back to the last real page instead of
+    // showing a blank one.
+    const pageCount = table.getPageCount();
+    React.useEffect(() => {
+        if (pageCount > 0 && pagination.pageIndex > pageCount - 1) {
+            setPagination((p) => ({ ...p, pageIndex: pageCount - 1 }));
+        }
+    }, [pageCount, pagination.pageIndex]);
 
     return (
         <div className="space-y-4">
@@ -235,25 +260,30 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
             </div>
 
             {/* Pagination Desktop */}
-            <div className="hidden md:flex items-center justify-end space-x-2 py-4">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                    className="rounded-xl"
-                >
-                    Anterior
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                    className="rounded-xl"
-                >
-                    Siguiente
-                </Button>
+            <div className="hidden md:flex items-center justify-end gap-3 py-4">
+                <p className="text-sm text-muted-foreground">
+                    Página {pageCount === 0 ? 0 : pagination.pageIndex + 1} de {pageCount}
+                </p>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                        className="rounded-xl"
+                    >
+                        Anterior
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                        className="rounded-xl"
+                    >
+                        Siguiente
+                    </Button>
+                </div>
             </div>
 
             {/* Mobile Cards (Responsive) */}
@@ -302,6 +332,9 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                                 </div>
 
                                 <div className="pt-2 border-t mt-1 flex justify-end gap-2">
+                                    <Button variant="outline" className="rounded-xl flex items-center gap-2" onClick={() => setViewingSale(sale)}>
+                                        <Eye className="w-4 h-4" /> Ver
+                                    </Button>
                                     <Button variant="secondary" className="flex-1 rounded-xl flex items-center gap-2" onClick={() => handleReprint(sale.id)}>
                                         <Printer className="w-4 h-4" /> Reimprimir
                                     </Button>
@@ -346,6 +379,16 @@ export function HistoryTab({ data }: { data: HistoryData[] }) {
                 </div>
             </div>
             
+            {viewingSale && (
+                <ViewReceiptModal
+                    saleId={viewingSale.id}
+                    shortId={viewingSale.shortId}
+                    canCancel={viewingSale.status !== "CANCELLED"}
+                    onClose={() => setViewingSale(null)}
+                    onRequestCancel={() => { setCancelTarget(viewingSale); setViewingSale(null); }}
+                />
+            )}
+
             {cancelTarget && (
                 <CancelSaleDialog
                     saleLabel={cancelTarget.shortId}

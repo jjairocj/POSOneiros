@@ -196,7 +196,10 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
             status: sale.status,
             sellerName: sale.shift?.user?.name || "Desconocido",
             shiftId: sale.shiftId,
-            payments: sale.payments.map((p) => p.method).join(", ")
+            // A split bill can have several payments of the SAME method (e.g. two
+            // people both paying cash) — dedupe so the badge list shows each
+            // method once instead of "Efectivo, Efectivo".
+            payments: [...new Set(sale.payments.map((p) => p.method))].join(", ")
         }));
 
     } catch (err) {
