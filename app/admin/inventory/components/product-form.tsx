@@ -14,9 +14,15 @@ import {
     DialogTitle,
     DialogTrigger
 } from "@/components/ui/dialog";
-import { PackagePlus, Save, Loader2, Star, Image as ImageIcon, Upload, Search } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+    PackagePlus, Save, Loader2, Star, Image as ImageIcon, Upload, Search,
+    Info, DollarSign, Boxes, SlidersHorizontal,
+} from "lucide-react";
 import { uploadProductImageAction } from "@/app/actions/upload";
 import { ProductColumn } from "./columns";
+import { StockMovementModal } from "./StockMovementModal";
+import { Combobox } from "./Combobox";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Hint, HintDialogDescription } from "@/app/components/TutorialMode";
@@ -26,10 +32,18 @@ interface ProductFormProps {
     trigger?: React.ReactNode;
 }
 
+const TABS = [
+    { value: "basico", label: "Básico", icon: Info },
+    { value: "precio", label: "Precio", icon: DollarSign },
+    { value: "inventario", label: "Inventario", icon: Boxes },
+    { value: "imagen", label: "Imagen", icon: ImageIcon },
+] as const;
+
 export function ProductForm({ product, trigger }: ProductFormProps) {
     const isEditing = !!product;
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [tab, setTab] = useState<string>("basico");
     const [imageUrl, setImageUrl] = useState(product?.imageUrl || "");
     const [imageFailed, setImageFailed] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -44,9 +58,15 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
     const [trackingMode, setTrackingMode] = useState<string>(product?.trackingMode ?? "SIMPLE");
     const [rawMaterials, setRawMaterials] = useState<{ id: string; name: string }[]>([]);
     const [rawMaterialId, setRawMaterialId] = useState<string>(product?.rawMaterial?.id ?? "none");
+    const [adjustOpen, setAdjustOpen] = useState(false);
+    // Local mirror of stock so "Ajustar inventario" (which registers a real
+    // StockMovement and updates the DB on its own) can reflect the new number
+    // here without needing to close/reopen this dialog.
+    const [currentStock, setCurrentStock] = useState<number>(product?.stock ?? 0);
 
     useEffect(() => {
         if (!open) return;
+        setTab("basico");
         getCategories().then((c) => setCategories(c.map(({ id, name }) => ({ id, name })))).catch(() => setCategories([]));
         getProductFamilies().then(setFamilies).catch(() => setFamilies([]));
         getRawMaterials().then((rows) => setRawMaterials(rows.map(({ id, name }) => ({ id, name })))).catch(() => setRawMaterials([]));
@@ -119,178 +139,79 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         {isEditing ? "Editar Producto" : "Nuevo Producto"}
                     </DialogTitle>
                     <HintDialogDescription>
-                        Completa la información del inventario. Los campos de impuestos son porcentajes (Ej: 19 para 19%).
+                        {isEditing ? `Editando "${product.name}".` : "Completa lo básico para crear el producto — lo demás tiene valores por defecto razonables."}
                     </HintDialogDescription>
                 </DialogHeader>
 
-                <form action={handleAction} className="space-y-6 mt-4">
-                    <div className="space-y-6">
-                        {/* Basic Info */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">Código / SKU</label>
-                                <Input
-                                    name="code"
-                                    required
-                                    defaultValue={product?.code}
-                                    className="rounded-xl h-12 bg-muted/50"
-                                    placeholder="Ej: CHC-001"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">Nombre</label>
-                                <Input
-                                    name="name"
-                                    required
-                                    defaultValue={product?.name}
-                                    onChange={(e) => setNameValue(e.target.value)}
-                                    className="rounded-xl h-12 bg-muted/50"
-                                    placeholder="Ej: Chocoramo"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Category and status */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label htmlFor="categoryId" className="text-sm font-semibold ml-1">Categoría</label>
-                                <select
-                                    id="categoryId"
-                                    name="categoryId"
-                                    value={categoryId}
-                                    onChange={(e) => setCategoryId(e.target.value)}
-                                    className="w-full h-12 rounded-xl bg-muted/50 border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                <form action={handleAction} className="mt-4">
+                    <Tabs value={tab} onValueChange={setTab}>
+                        <TabsList className="flex gap-1 bg-muted/40 backdrop-blur-sm p-1.5 rounded-2xl w-full h-auto border border-border/50">
+                            {TABS.map(({ value, label, icon: Icon }) => (
+                                <TabsTrigger
+                                    key={value}
+                                    value={value}
+                                    title={label}
+                                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-semibold text-muted-foreground transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md hover:text-foreground"
                                 >
-                                    <option value="none">Sin categoría</option>
-                                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">Disponible en caja</label>
-                                <div className="h-12 flex items-center gap-3 px-3 rounded-xl bg-muted/50 border border-border">
-                                    <Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} />
-                                    <label htmlFor="isActive" className="text-sm text-muted-foreground">{isActive ? "Se puede vender" : "Oculto en el POS"}</label>
-                                    <input type="hidden" name="isActive" value={isActive ? "true" : "false"} />
+                                    <Icon className="w-4 h-4 shrink-0" />
+                                    <span className="hidden sm:inline">{label}</span>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+
+                        {/* forceMount + hidden (not conditional rendering): every field across every
+                            tab must stay mounted so a single native form submit collects all of them,
+                            regardless of which tab is showing when the user hits "Guardar". */}
+
+                        {/* ── Básico ──────────────────────────────────────────────────────── */}
+                        <TabsContent value="basico" forceMount hidden={tab !== "basico"} className="space-y-5 mt-5 m-0 outline-none">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold ml-1">Código / SKU</label>
+                                    <Input
+                                        name="code"
+                                        required
+                                        defaultValue={product?.code}
+                                        className="rounded-xl h-12 bg-muted/50"
+                                        placeholder="Ej: CHC-001"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold ml-1">Nombre</label>
+                                    <Input
+                                        name="name"
+                                        required
+                                        defaultValue={product?.name}
+                                        onChange={(e) => setNameValue(e.target.value)}
+                                        className="rounded-xl h-12 bg-muted/50"
+                                        placeholder="Ej: Chocoramo"
+                                    />
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="space-y-1.5">
-                            <label htmlFor="familyName" className="text-sm font-semibold ml-1">
-                                Familia <span className="font-normal text-muted-foreground">(opcional, para promociones)</span>
-                            </label>
-                            <Input
-                                id="familyName"
-                                name="familyName"
-                                list="family-options"
-                                value={familyName}
-                                onChange={(e) => setFamilyName(e.target.value)}
-                                className="rounded-xl h-11 bg-muted/50"
-                                placeholder="Ej: Buldak — agrupa sus sabores para las promos"
-                            />
-                            <datalist id="family-options">
-                                {families.map((f) => <option key={f.id} value={f.name} />)}
-                            </datalist>
-                            <Hint className="text-xs text-muted-foreground ml-1">
-                                Escribe un nombre nuevo o elige uno existente de la lista. Deja vacío si este producto no participa en ninguna promoción.
-                            </Hint>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <label htmlFor="trackingMode" className="text-sm font-semibold ml-1">Seguimiento de inventario</label>
-                            <select
-                                id="trackingMode"
-                                name="trackingMode"
-                                value={trackingMode}
-                                onChange={(e) => setTrackingMode(e.target.value)}
-                                className="w-full h-12 rounded-xl bg-muted/50 border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                            >
-                                <option value="SIMPLE">Simple — solo cantidad en existencia</option>
-                                <option value="LOT">Por lote — exige lote/vencimiento al recibir mercancía</option>
-                                <option value="NONE">Sin inventario — no se cuenta (ej. café, helado soft)</option>
-                            </select>
-                            <Hint className="text-xs text-muted-foreground ml-1">
-                                {trackingMode === "LOT"
-                                    ? "La entrada de mercancía se hace desde \"Recibir lote\" en la tabla de inventario, no aquí."
-                                    : trackingMode === "NONE"
-                                        ? "Este producto se podrá vender siempre, sin descontar existencias."
-                                        : "Como hoy: un número de existencias, sin lote."}
-                            </Hint>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <label htmlFor="rawMaterialId" className="text-sm font-semibold ml-1">
-                                Insumo consumido <span className="font-normal text-muted-foreground">(opcional)</span>
-                            </label>
-                            <select
-                                id="rawMaterialId"
-                                name="rawMaterialId"
-                                value={rawMaterialId}
-                                onChange={(e) => setRawMaterialId(e.target.value)}
-                                className="w-full h-12 rounded-xl bg-muted/50 border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                            >
-                                <option value="none">Ninguno</option>
-                                {rawMaterials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
-                            <Hint className="text-xs text-muted-foreground ml-1">
-                                Ej: “Café Americano” hecho con el insumo “Café en grano” — permite reportar qué se vendió mientras duró cada lote. Los insumos se crean en la pestaña “Insumos”.
-                            </Hint>
-                        </div>
-
-                        {/* Image URL and Favorite */}
-                        <div className="space-y-3">
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1 flex items-center gap-1.5">
-                                    <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                                    URL de la Imagen
-                                    <span className="text-xs font-normal text-muted-foreground">(Opcional)</span>
-                                </label>
-                                <div className="flex items-center gap-3">
-                                    <Input
-                                        name="imageUrl"
-                                        value={imageUrl}
-                                        onChange={(e) => { setImageUrl(e.target.value); setImageFailed(false); }}
-                                        className="rounded-xl h-11 bg-muted/50"
-                                        placeholder="https://ejemplo.com/imagen.jpg"
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label htmlFor="categoryId" className="text-sm font-semibold ml-1">Categoría</label>
+                                    <Combobox
+                                        id="categoryId"
+                                        name="categoryId"
+                                        value={categoryId}
+                                        onChange={setCategoryId}
+                                        emptyOption={{ value: "none", label: "Sin categoría" }}
+                                        options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                                        placeholder="Buscar categoría..."
                                     />
-                                    <label className={`shrink-0 h-11 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors ${uploading ? "opacity-60 pointer-events-none" : "hover:border-primary hover:text-primary"}`}>
-                                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                                        Subir
-                                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelect} disabled={uploading} />
-                                    </label>
-                                    <button
-                                        type="button"
-                                        disabled={!nameValue.trim()}
-                                        onClick={() => window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(nameValue.trim())}`, "_blank", "noopener,noreferrer")}
-                                        title={nameValue.trim() ? undefined : "Escribe primero el nombre del producto"}
-                                        className="shrink-0 h-11 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                        Buscar en Google
-                                    </button>
-                                    <div className="shrink-0 w-11 h-11 rounded-xl border bg-muted/30 flex items-center justify-center overflow-hidden">
-                                        {imageUrl && !imageFailed ? (
-                                            // eslint-disable-next-line @next/next/no-img-element -- external product photo, unknown size
-                                            <img
-                                                src={imageUrl}
-                                                alt="Vista previa"
-                                                className="w-full h-full object-cover"
-                                                onLoad={() => setImageFailed(false)}
-                                                onError={() => setImageFailed(true)}
-                                            />
-                                        ) : (
-                                            <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                                        )}
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold ml-1">Disponible en caja</label>
+                                    <div className="h-12 flex items-center gap-3 px-3 rounded-xl bg-muted/50 border border-border">
+                                        <Switch id="isActive" checked={isActive} onCheckedChange={setIsActive} />
+                                        <label htmlFor="isActive" className="text-sm text-muted-foreground">{isActive ? "Se puede vender" : "Oculto en el POS"}</label>
+                                        <input type="hidden" name="isActive" value={isActive ? "true" : "false"} />
                                     </div>
                                 </div>
-                                {uploadError && <p className="text-xs text-destructive ml-1">{uploadError}</p>}
-                                {imageUrl && imageFailed && (
-                                    <p className="text-xs text-destructive ml-1">No se pudo cargar esta imagen. Revisa la URL o prueba con otra.</p>
-                                )}
-                                <Hint className="text-xs text-muted-foreground ml-1">
-                                    "Buscar en Google" abre una pestaña con imágenes de "{nameValue.trim() || "el nombre del producto"}" — clic derecho → copiar dirección de la imagen, pégala arriba. "Subir" guarda la imagen en tu almacenamiento propio (MinIO).
-                                </Hint>
                             </div>
+
                             <div className="flex items-center gap-3 h-11 px-4 rounded-xl border bg-muted/30 w-fit">
                                 <Switch
                                     id="isFavorite"
@@ -306,76 +227,64 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     Marcar como Favorito en POS
                                 </label>
                             </div>
-                        </div>
+                        </TabsContent>
 
-                        {/* Costing Engine */}
-                        <div className="bg-primary/5 p-5 rounded-2xl border border-primary/10 space-y-4">
-                            <h3 className="font-bold text-primary">Calculadora de Precios</h3>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Costo Base ($)</label>
-                                    <Input
-                                        name="cost"
-                                        type="number"
-                                        step="0.01"
-                                        required
-                                        value={cost}
-                                        onChange={(e) => setCost(Number(e.target.value))}
-                                        className="rounded-xl h-11 bg-background border-primary/20"
-                                    />
+                        {/* ── Precio ──────────────────────────────────────────────────────── */}
+                        <TabsContent value="precio" forceMount hidden={tab !== "precio"} className="space-y-5 mt-5 m-0 outline-none">
+                            <div className="bg-primary/5 p-5 rounded-2xl border border-primary/10 space-y-4">
+                                <h3 className="font-bold text-primary">Calculadora de Precios</h3>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Costo Base ($)</label>
+                                        <Input
+                                            name="cost"
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            value={cost}
+                                            onChange={(e) => setCost(Number(e.target.value))}
+                                            className="rounded-xl h-11 bg-background border-primary/20"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Margen (%)</label>
+                                        <Input
+                                            type="number"
+                                            step="0.1"
+                                            value={expectedMargin}
+                                            onChange={(e) => setExpectedMargin(Number(e.target.value))}
+                                            className="rounded-xl h-11 bg-background border-primary/20 text-primary font-bold"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Precio Final ($)</label>
+                                        <Input
+                                            name="price"
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            value={price}
+                                            onChange={(e) => setPrice(Number(e.target.value))}
+                                            className="rounded-xl h-11 bg-background border-primary/20 font-bold"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Margen (%)</label>
-                                    <Input
-                                        type="number"
-                                        step="0.1"
-                                        value={expectedMargin}
-                                        onChange={(e) => setExpectedMargin(Number(e.target.value))}
-                                        className="rounded-xl h-11 bg-background border-primary/20 text-primary font-bold"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold ml-1 text-muted-foreground uppercase tracking-wide">Precio Final ($)</label>
-                                    <Input
-                                        name="price"
-                                        type="number"
-                                        step="0.01"
-                                        required
-                                        value={price}
-                                        onChange={(e) => setPrice(Number(e.target.value))}
-                                        className="rounded-xl h-11 bg-background border-primary/20 font-bold"
-                                    />
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-3 pt-1 text-sm">
-                                <div className="bg-background p-3 rounded-xl border border-border flex justify-between items-center">
-                                    <span className="text-muted-foreground">Precio Sugerido:</span>
-                                    <span className="font-mono font-bold text-lg">${suggestedPrice.toFixed(0)}</span>
-                                </div>
-                                <div className={`p-3 rounded-xl border flex justify-between items-center ${realMarginPercent >= expectedMargin ? 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400'}`}>
-                                    <span className="font-semibold">Margen Real:</span>
-                                    <div className="text-right">
-                                        <div className="font-bold text-lg">{realMarginPercent.toFixed(1)}%</div>
-                                        <div className="text-xs opacity-80">+${realMarginValue.toFixed(0)}</div>
+                                <div className="grid grid-cols-2 gap-3 pt-1 text-sm">
+                                    <div className="bg-background p-3 rounded-xl border border-border flex justify-between items-center">
+                                        <span className="text-muted-foreground">Precio Sugerido:</span>
+                                        <span className="font-mono font-bold text-lg">${suggestedPrice.toFixed(0)}</span>
+                                    </div>
+                                    <div className={`p-3 rounded-xl border flex justify-between items-center ${realMarginPercent >= expectedMargin ? 'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-700 dark:text-orange-400'}`}>
+                                        <span className="font-semibold">Margen Real:</span>
+                                        <div className="text-right">
+                                            <div className="font-bold text-lg">{realMarginPercent.toFixed(1)}%</div>
+                                            <div className="text-xs opacity-80">+${realMarginValue.toFixed(0)}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Stock and Taxes */}
-                        <div className="space-y-3">
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold ml-1">Inventario</label>
-                                <Input
-                                    name="stock"
-                                    type="number"
-                                    step="0.01"
-                                    required
-                                    defaultValue={product?.stock ?? 0}
-                                    className="rounded-xl h-11 bg-muted/50"
-                                />
-                            </div>
                             <div>
                                 <p className="text-sm font-semibold ml-1 mb-2">Impuestos</p>
                                 <div className="grid grid-cols-3 gap-3">
@@ -411,10 +320,172 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </TabsContent>
 
-                    <div className="pt-4 flex gap-3">
+                        {/* ── Inventario ──────────────────────────────────────────────────── */}
+                        <TabsContent value="inventario" forceMount hidden={tab !== "inventario"} className="space-y-5 mt-5 m-0 outline-none">
+                            <div className="space-y-1.5">
+                                <label htmlFor="trackingMode" className="text-sm font-semibold ml-1">Seguimiento de inventario</label>
+                                <Combobox
+                                    id="trackingMode"
+                                    name="trackingMode"
+                                    value={trackingMode}
+                                    onChange={setTrackingMode}
+                                    placeholder="Buscar modo..."
+                                    options={[
+                                        { value: "SIMPLE", label: "Simple — solo cantidad en existencia" },
+                                        { value: "LOT", label: "Por lote — exige lote/vencimiento al recibir mercancía" },
+                                        { value: "NONE", label: "Sin inventario — no se cuenta (ej. café, helado soft)" },
+                                    ]}
+                                />
+                                <Hint className="text-xs text-muted-foreground ml-1">
+                                    {trackingMode === "LOT"
+                                        ? "La entrada de mercancía se hace desde \"Recibir lote\" en la tabla de inventario, no aquí."
+                                        : trackingMode === "NONE"
+                                            ? "Este producto se podrá vender siempre, sin descontar existencias."
+                                            : "Como hoy: un número de existencias, sin lote."}
+                                </Hint>
+                            </div>
+
+                            {/* Create: a starting count is reasonable to type in directly. Edit: the
+                                only path to change stock is "Ajustar inventario" (StockMovementModal),
+                                which records a real StockMovement — editing this number in place used
+                                to silently change stock with zero audit trail. */}
+                            {isEditing ? (
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold ml-1">Inventario actual</label>
+                                    <div className="flex items-center gap-3 h-12 px-4 rounded-xl bg-muted/50 border border-border">
+                                        <span className="font-bold text-lg flex-1">{currentStock}</span>
+                                        <Button type="button" size="sm" variant="outline" className="rounded-lg h-8 gap-1.5" onClick={() => setAdjustOpen(true)}>
+                                            <SlidersHorizontal className="w-3.5 h-3.5" />
+                                            Ajustar inventario
+                                        </Button>
+                                    </div>
+                                    <Hint className="text-xs text-muted-foreground ml-1">
+                                        El stock ya no se edita aquí directamente — cada cambio queda registrado en el Kardex (Entrada / Merma / Ajuste).
+                                    </Hint>
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold ml-1">Stock inicial</label>
+                                    <Input
+                                        name="stock"
+                                        type="number"
+                                        step="0.01"
+                                        required
+                                        defaultValue={0}
+                                        className="rounded-xl h-11 bg-muted/50"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="space-y-1.5">
+                                <label htmlFor="rawMaterialId" className="text-sm font-semibold ml-1">
+                                    Insumo consumido <span className="font-normal text-muted-foreground">(opcional)</span>
+                                </label>
+                                <Combobox
+                                    id="rawMaterialId"
+                                    name="rawMaterialId"
+                                    value={rawMaterialId}
+                                    onChange={setRawMaterialId}
+                                    emptyOption={{ value: "none", label: "Ninguno" }}
+                                    options={rawMaterials.map((m) => ({ value: m.id, label: m.name }))}
+                                    placeholder="Buscar insumo..."
+                                />
+                                <Hint className="text-xs text-muted-foreground ml-1">
+                                    Ej: “Café Americano” hecho con el insumo “Café en grano” — permite reportar qué se vendió mientras duró cada lote. Los insumos se crean en la pestaña “Insumos”.
+                                </Hint>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label htmlFor="familyName" className="text-sm font-semibold ml-1">
+                                    Familia <span className="font-normal text-muted-foreground">(opcional, para promociones)</span>
+                                </label>
+                                <Input
+                                    id="familyName"
+                                    name="familyName"
+                                    list="family-options"
+                                    value={familyName}
+                                    onChange={(e) => setFamilyName(e.target.value)}
+                                    className="rounded-xl h-11 bg-muted/50"
+                                    placeholder="Ej: Buldak — agrupa sus sabores para las promos"
+                                />
+                                <datalist id="family-options">
+                                    {families.map((f) => <option key={f.id} value={f.name} />)}
+                                </datalist>
+                                <Hint className="text-xs text-muted-foreground ml-1">
+                                    Escribe un nombre nuevo o elige uno existente de la lista. Deja vacío si este producto no participa en ninguna promoción.
+                                </Hint>
+                            </div>
+                        </TabsContent>
+
+                        {/* ── Imagen ──────────────────────────────────────────────────────── */}
+                        <TabsContent value="imagen" forceMount hidden={tab !== "imagen"} className="space-y-4 mt-5 m-0 outline-none">
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold ml-1 flex items-center gap-1.5">
+                                    <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                                    Imagen del producto
+                                    <span className="text-xs font-normal text-muted-foreground">(Opcional)</span>
+                                </label>
+
+                                {/* Big preview — the tiny 44px swatch this used to be made it
+                                    impossible to tell if an image actually looked right. */}
+                                <div className="w-full h-44 rounded-2xl border border-dashed border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+                                    {imageUrl && !imageFailed ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- external product photo, unknown size
+                                        <img
+                                            src={imageUrl}
+                                            alt="Vista previa"
+                                            className="w-full h-full object-contain p-2"
+                                            onLoad={() => setImageFailed(false)}
+                                            onError={() => setImageFailed(true)}
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
+                                            <ImageIcon className="w-7 h-7" />
+                                            <span className="text-xs">Sin imagen todavía</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <Input
+                                    name="imageUrl"
+                                    value={imageUrl}
+                                    onChange={(e) => { setImageUrl(e.target.value); setImageFailed(false); }}
+                                    className="rounded-xl h-11 bg-muted/50"
+                                    placeholder="https://ejemplo.com/imagen.jpg"
+                                />
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className={`h-11 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors ${uploading ? "opacity-60 pointer-events-none" : "hover:border-primary hover:text-primary hover:bg-primary/5"}`}>
+                                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                        Subir imagen
+                                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelect} disabled={uploading} />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        disabled={!nameValue.trim()}
+                                        onClick={() => window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(nameValue.trim())}`, "_blank", "noopener,noreferrer")}
+                                        title={nameValue.trim() ? undefined : "Escribe primero el nombre del producto"}
+                                        className="h-11 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors hover:border-primary hover:text-primary hover:bg-primary/5 disabled:opacity-40 disabled:pointer-events-none"
+                                    >
+                                        <Search className="w-4 h-4" />
+                                        Buscar en Google
+                                    </button>
+                                </div>
+
+                                {uploadError && <p className="text-xs text-destructive ml-1">{uploadError}</p>}
+                                {imageUrl && imageFailed && (
+                                    <p className="text-xs text-destructive ml-1">No se pudo cargar esta imagen. Revisa la URL o prueba con otra.</p>
+                                )}
+                                <Hint className="text-xs text-muted-foreground ml-1">
+                                    "Buscar en Google" abre una pestaña con imágenes de "{nameValue.trim() || "el nombre del producto"}" — clic derecho → copiar dirección de la imagen, pégala arriba. "Subir" guarda la imagen en tu almacenamiento propio (MinIO).
+                                </Hint>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
+
+                    <div className="pt-6 flex gap-3">
                         <Button
                             type="button"
                             variant="outline"
@@ -440,6 +511,16 @@ export function ProductForm({ product, trigger }: ProductFormProps) {
                         </Button>
                     </div>
                 </form>
+
+                {adjustOpen && product && (
+                    <StockMovementModal
+                        product={{ id: product.id, name: product.name, stock: currentStock, cost: product.cost }}
+                        onClose={(newStock) => {
+                            setAdjustOpen(false);
+                            if (typeof newStock === "number") setCurrentStock(newStock);
+                        }}
+                    />
+                )}
             </DialogContent>
         </Dialog>
     );

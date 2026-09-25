@@ -15,7 +15,7 @@ const TYPES: { value: MovementType; label: string; hint: string; icon: React.Rea
     { value: "ADJUSTMENT", label: "Ajuste", hint: "Corrección tras conteo: usa negativo para restar.", icon: <SlidersHorizontal className="w-4 h-4" /> },
 ];
 
-export function StockMovementModal({ product, onClose }: { product: { id: string; name: string; stock: number; cost: number }; onClose: () => void }) {
+export function StockMovementModal({ product, onClose }: { product: { id: string; name: string; stock: number; cost: number }; onClose: (newStock?: number) => void }) {
     const router = useRouter();
     const [type, setType] = useState<MovementType>("PURCHASE");
     const [quantity, setQuantity] = useState("");
@@ -39,7 +39,7 @@ export function StockMovementModal({ product, onClose }: { product: { id: string
             if (!res.success) { setError(res.error ?? "No se pudo registrar."); return; }
             toast.success(`Movimiento registrado. Stock de "${product.name}": ${preview}.`);
             router.refresh();
-            onClose();
+            onClose(preview);
         } catch {
             setError("No se pudo conectar con el servidor.");
         } finally {
@@ -49,9 +49,13 @@ export function StockMovementModal({ product, onClose }: { product: { id: string
 
     const current = TYPES.find((t) => t.value === type)!;
     return createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+            style={{ pointerEvents: "auto" }}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        >
             <form onSubmit={submit} className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl p-7 border border-border relative animate-in zoom-in-95 duration-200 space-y-4">
-                <button type="button" onClick={onClose} aria-label="Cerrar" className="absolute top-5 right-5 text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted p-2 rounded-full transition-colors">
+                <button type="button" onClick={() => onClose()} aria-label="Cerrar" className="absolute top-5 right-5 text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted p-2 rounded-full transition-colors">
                     <X className="w-4 h-4" />
                 </button>
                 <div>
