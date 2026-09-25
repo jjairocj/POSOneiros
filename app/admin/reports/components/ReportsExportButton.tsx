@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, TrendingUp, ChevronDown } from "lucide-react";
+import { Download, TrendingUp, MonitorPlay, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger,
@@ -26,6 +26,9 @@ export function ReportsExportButton({ from, to }: Props) {
                 <DropdownMenuLabel className="text-xs text-muted-foreground">Del {from} al {to}</DropdownMenuLabel>
                 <DropdownMenuItem asChild>
                     <a href={`/api/export/product-ranking${range}`} className="flex items-center gap-2 cursor-pointer"><TrendingUp className="w-4 h-4" /> Rentabilidad de productos (.xlsx)</a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a href={`/api/export/shifts${range}`} className="flex items-center gap-2 cursor-pointer"><MonitorPlay className="w-4 h-4" /> Turnos (.xlsx)</a>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

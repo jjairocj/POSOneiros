@@ -1,9 +1,8 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin, requireSession, requirePermission } from "@/lib/auth";
-import { toCsv, csvResponse } from "@/app/lib/csv";
 import { buildXlsx, buildWorkbook, xlsxResponse } from "@/app/lib/xlsx";
-import { getProductRankingReport, getPromotionUsageReport } from "@/app/actions/report";
+import { getProductRankingReport, getPromotionUsageReport, getShiftsReport } from "@/app/actions/report";
 import { startOfBusinessDay, endOfBusinessDay, BUSINESS_TZ, businessDayKey } from "@/app/lib/time";
 
 const STATUS: Record<string, string> = { COMPLETED: "Completada", CANCELLED: "Anulada", SUSPENDED: "Suspendida" };
@@ -20,9 +19,10 @@ function parseRange(req: NextRequest) {
 }
 
 /**
- * GET /api/export/{sales|sales-detail|inventory|movements|shift|product-ranking|promotion-usage}?from=YYYY-MM-DD&to=YYYY-MM-DD&id=...
- * shift and the report kinds return a formatted .xlsx; the rest a CSV that opens
- * correctly in Excel (UTF-8 BOM, ';' separator).
+ * GET /api/export/{sales|sales-detail|inventory|movements|shifts|shift|product-ranking|promotion-usage}?from=YYYY-MM-DD&to=YYYY-MM-DD&id=...
+ * Every kind returns a styled .xlsx workbook (see app/lib/xlsx.ts) — `shift`
+ * additionally requires `id` (single-shift Z-report); the rest read the
+ * `from`/`to` date range.
  */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: string }> }) {
     const { kind } = await ctx.params;
@@ -60,12 +60,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
             const completed = shift.sales.filter((s) => s.status === "COMPLETED");
             const sumMethod = (m: string) => completed.flatMap((s) => s.payments).filter((p) => p.method === m).reduce((a, p) => a + p.amount, 0);
             const cashSales = sumMethod("CASH"), cardSales = sumMethod("CARD"), transferSales = sumMethod("TRANSFER");
-            const expectedCash = shift.baseAmount + cashSales;
+            // The cashier declares cash separate from the base (which stays in
+            // the drawer) — same reasoning as closeShift() in app/actions/shift.ts.
+            const expectedCash = cashSales;
             // Shifts closed before the breakdown existed only have the cash count.
             const diff = (declared: number | null, expected: number) => (declared == null ? "" : declared - expected);
             const declaredTotal = shift.closeAmount == null ? null : shift.closeAmount + (shift.closeCard ?? 0) + (shift.closeTransfer ?? 0);
             const summaryRows: (string | number | null)[][] = [
-                ["Efectivo (base + ventas)", expectedCash, shift.closeAmount ?? "", diff(shift.closeAmount, expectedCash)],
+                ["Efectivo (ventas, sin la base)", expectedCash, shift.closeAmount ?? "", diff(shift.closeAmount, expectedCash)],
                 ["Tarjeta / Datáfono", cardSales, shift.closeCard ?? "", diff(shift.closeCard, cardSales)],
                 ["Transferencias", transferSales, shift.closeTransfer ?? "", diff(shift.closeTransfer, transferSales)],
                 ["Total", expectedCash + cardSales + transferSales, declaredTotal ?? "", diff(declaredTotal, expectedCash + cardSales + transferSales)],
@@ -134,20 +136,41 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
                 orderBy: { createdAt: "asc" },
             });
             const TYPE: Record<string, string> = { SALE: "Venta", CANCEL: "Anulación", PURCHASE: "Entrada", WASTE: "Merma", ADJUSTMENT: "Ajuste", IMPORT: "Importación" };
-            const csv = toCsv(
-                ["Fecha", "Código", "Producto", "Tipo", "Cantidad", "Stock después", "Costo unit.", "Motivo"],
+            const buffer = await buildXlsx(
+                "Movimientos",
+                ["Fecha", "Código", "Producto", "Tipo", "Cantidad", "Stock después", "Costo unit.$", "Motivo"],
                 rows.map((r) => [fmtDate(r.createdAt), r.product.code, r.product.name, TYPE[r.type] ?? r.type, r.quantity, r.stockAfter, r.unitCost ?? "", r.reason ?? ""])
             );
-            return csvResponse(`movimientos_${tag}.csv`, csv);
+            return xlsxResponse(`movimientos_${tag}.xlsx`, buffer);
         }
 
         if (kind === "inventory") {
             const products = await prisma.product.findMany({ include: { category: true }, orderBy: [{ category: { name: "asc" } }, { name: "asc" }] });
-            const csv = toCsv(
-                ["Código", "Nombre", "Categoría", "Stock", "Costo", "Precio", "IVA %", "ICA %", "Impoconsumo %", "Activo", "Favorito", "Valor inventario (costo)"],
+            const buffer = await buildXlsx(
+                "Inventario",
+                ["Código", "Nombre", "Categoría", "Stock", "Costo$", "Precio$", "IVA %", "ICA %", "Impoconsumo %", "Activo", "Favorito", "Valor inventario (costo)$"],
                 products.map((p) => [p.code, p.name, p.category?.name ?? "", p.stock, p.cost, p.price, p.taxIva, p.taxIca, p.taxImpoConsumo, p.isActive ? "Sí" : "No", p.isFavorite ? "Sí" : "No", Math.round(p.stock * p.cost)])
             );
-            return csvResponse(`inventario_${businessDayKey(new Date())}.csv`, csv);
+            return xlsxResponse(`inventario_${businessDayKey(new Date())}.xlsx`, buffer);
+        }
+
+        if (kind === "shifts") {
+            const { start, end, tag } = parseRange(req);
+            const result = await getShiftsReport({ startDate: start, endDate: end });
+            if (!result.success) return new Response(result.error, { status: 500 });
+            const rows = result.rows.map((s) => [
+                s.registerName, s.userName, fmtDate(new Date(s.startTime)), s.endTime ? fmtDate(new Date(s.endTime)) : "",
+                s.status, s.baseAmount, s.transactionCount, s.totalSales,
+                s.cashSales, s.cardSales, s.transferSales,
+                s.declaredTotal ?? "", s.difference ?? "",
+                s.note ?? "",
+            ]);
+            const buffer = await buildXlsx(
+                "Turnos",
+                ["Caja", "Cajero", "Apertura", "Cierre", "Estado", "Base$", "Transacciones", "Total vendido$", "Efectivo$", "Tarjeta$", "Transferencia$", "Total contado$", "Diferencia$", "Motivo descuadre"],
+                rows
+            );
+            return xlsxResponse(`turnos_${tag}.xlsx`, buffer);
         }
 
         const { start, end, tag } = parseRange(req);
@@ -158,14 +181,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
         });
 
         if (kind === "sales") {
-            const csv = toCsv(
-                ["Fecha", "Comprobante", "Estado", "Caja", "Cajero", "Cliente", "Total", "Efectivo", "Tarjeta", "Transferencia", "Motivo anulación"],
+            const buffer = await buildXlsx(
+                "Ventas",
+                ["Fecha", "Comprobante", "Estado", "Caja", "Cajero", "Cliente", "Total$", "Efectivo$", "Tarjeta$", "Transferencia$", "Motivo anulación"],
                 sales.map((s) => {
                     const by = (m: string) => s.payments.filter((p) => p.method === m).reduce((a, p) => a + p.amount, 0);
                     return [fmtDate(s.createdAt), receiptNo(s), STATUS[s.status] ?? s.status, s.shift.register.name, s.shift.user.name, s.customer?.fullName ?? "", s.total, by("CASH"), by("CARD"), by("TRANSFER"), s.cancelReason ?? ""];
                 })
             );
-            return csvResponse(`ventas_${tag}.csv`, csv);
+            return xlsxResponse(`ventas_${tag}.xlsx`, buffer);
         }
 
         if (kind === "sales-detail") {
@@ -179,8 +203,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
                     ]);
                 }
             }
-            const csv = toCsv(["Fecha", "Comprobante", "Estado", "Caja", "Cajero", "Código", "Producto", "Cantidad", "Precio unit.", "Base", "IVA", "ICA", "Impoconsumo", "Total línea"], rows);
-            return csvResponse(`ventas_detalle_${tag}.csv`, csv);
+            const buffer = await buildXlsx(
+                "Ventas por producto",
+                ["Fecha", "Comprobante", "Estado", "Caja", "Cajero", "Código", "Producto", "Cantidad", "Precio unit.$", "Base$", "IVA$", "ICA$", "Impoconsumo$", "Total línea$"],
+                rows
+            );
+            return xlsxResponse(`ventas_detalle_${tag}.xlsx`, buffer);
         }
 
         return new Response("Tipo de exportación desconocido", { status: 404 });

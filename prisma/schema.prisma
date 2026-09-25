@@ -62,7 +62,7 @@ model Shift {
   registerId    String
   register      Register     @relation(fields: [registerId], references: [id])
   baseAmount    Float        @default(0)
-  closeAmount   Float? // cash counted in the drawer at close (includes the base)
+  closeAmount   Float? // cash from sales counted at close (base excluded — it stays in the drawer)
   closeCard     Float? // datáfono total declared at close
   closeTransfer Float? // transfers total declared at close
   closeNote     String? // required reason whenever any declared amount differs from expected

@@ -83,10 +83,10 @@ describe('GET /api/export/shift', () => {
         await wb.xlsx.load(Buffer.from(await res.arrayBuffer()) as any);
         expect(wb.worksheets.map((w) => w.name)).toEqual(['Resumen', 'Ventas']);
 
-        // Cuadre: base 50000 + cash 10000 = 60000 expected; counted 60000 → 0 diff.
+        // Cuadre: cash sales only (base excluded) = 10000 expected; counted 60000 → +50000 diff.
         const resumen = wb.getWorksheet('Resumen')!;
         expect(resumen.getRow(1).values).toEqual([undefined, 'Concepto', 'Esperado', 'Contado', 'Diferencia']);
-        expect(resumen.getRow(2).values).toEqual([undefined, 'Efectivo (base + ventas)', 60000, 60000, 0]);
+        expect(resumen.getRow(2).values).toEqual([undefined, 'Efectivo (ventas, sin la base)', 10000, 60000, 50000]);
         expect(resumen.getRow(3).values).toEqual([undefined, 'Tarjeta / Datáfono', 15000, 15000, 0]);
         expect(resumen.getRow(4).values).toEqual([undefined, 'Transferencias', 26000, 26000, 0]);
         const text = JSON.stringify(resumen.getSheetValues());

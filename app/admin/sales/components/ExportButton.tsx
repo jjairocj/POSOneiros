@@ -23,12 +23,18 @@ export function ExportButton({ from, to }: Props) {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl min-w-56">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Del {from} al {to}</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Del {from} al {to} — todo en .xlsx</DropdownMenuLabel>
                 <DropdownMenuItem asChild>
                     <a href={`/api/export/sales${range}`} className="flex items-center gap-2 cursor-pointer"><FileText className="w-4 h-4" /> Ventas (una fila por venta)</a>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <a href={`/api/export/sales-detail${range}`} className="flex items-center gap-2 cursor-pointer"><FileText className="w-4 h-4" /> Ventas por producto</a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a href={`/api/export/shifts${range}`} className="flex items-center gap-2 cursor-pointer"><FileText className="w-4 h-4" /> Turnos del periodo</a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a href={`/api/export/movements${range}`} className="flex items-center gap-2 cursor-pointer"><FileText className="w-4 h-4" /> Movimientos de inventario</a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

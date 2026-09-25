@@ -351,3 +351,60 @@ export async function getPromotionUsageReport(filters: AnalyticsFilters = {}) {
         return { success: false, error: toUserMessage(error, "No se pudo generar el reporte.") };
     }
 }
+
+// ─── Shifts report ───────────────────────────────────────────────────────────
+
+export interface ShiftReportRow {
+    shiftId: string;
+    registerName: string;
+    userName: string;
+    startTime: string;
+    endTime: string | null;
+    status: string;
+    baseAmount: number;
+    transactionCount: number;
+    totalSales: number;
+    cashSales: number;
+    cardSales: number;
+    transferSales: number;
+    declaredTotal: number | null;
+    difference: number | null;
+    note: string | null;
+}
+
+/** One row per shift in a date range — the same figures as the per-shift
+ * .xlsx export (app/api/export/[kind]/route.ts, kind=shifts), for an
+ * on-screen table. Cash is compared to sales only, the base excluded (see
+ * closeShift() in app/actions/shift.ts). */
+export async function getShiftsReport(filters: { startDate: Date; endDate: Date }): Promise<{ success: true; rows: ShiftReportRow[] } | { success: false; error: string }> {
+    try {
+        await requirePermission("VIEW_REPORTS");
+        const shifts = await prisma.shift.findMany({
+            where: { startTime: { gte: startOfDay(filters.startDate), lte: endOfDay(filters.endDate) } },
+            include: { register: true, user: true, sales: { include: { payments: true } } },
+            orderBy: { startTime: "desc" },
+        });
+
+        const rows: ShiftReportRow[] = shifts.map((s) => {
+            const completed = s.sales.filter((sale) => sale.status === "COMPLETED");
+            const by = (m: string) => completed.flatMap((sale) => sale.payments).filter((p) => p.method === m).reduce((a, p) => a + p.amount, 0);
+            const cashSales = by("CASH"), cardSales = by("CARD"), transferSales = by("TRANSFER");
+            const declaredTotal = s.closeAmount == null ? null : s.closeAmount + (s.closeCard ?? 0) + (s.closeTransfer ?? 0);
+            const expectedTotal = cashSales + cardSales + transferSales;
+            return {
+                shiftId: s.id, registerName: s.register.name, userName: s.user.name,
+                startTime: s.startTime.toISOString(), endTime: s.endTime?.toISOString() ?? null, status: s.status,
+                baseAmount: s.baseAmount, transactionCount: completed.length,
+                totalSales: completed.reduce((a, sale) => a + sale.total, 0),
+                cashSales, cardSales, transferSales,
+                declaredTotal, difference: declaredTotal == null ? null : declaredTotal - expectedTotal,
+                note: s.closeNote,
+            };
+        });
+
+        return { success: true, rows };
+    } catch (error: unknown) {
+        console.error("Error building shifts report:", error);
+        return { success: false, error: toUserMessage(error, "No se pudo generar el reporte.") };
+    }
+}
