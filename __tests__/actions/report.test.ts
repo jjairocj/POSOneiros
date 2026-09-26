@@ -6,6 +6,7 @@ const mockSaleAggregate = vi.fn();
 const mockSaleFindUnique = vi.fn();
 const mockSaleDetailFindMany = vi.fn();
 const mockRequirePermission = vi.fn();
+const mockRequireAnyPermission = vi.fn();
 
 vi.mock('../../lib/prisma', () => ({
     default: {
@@ -18,7 +19,15 @@ vi.mock('../../lib/prisma', () => ({
         saleDetail: { findMany: (...a: any[]) => mockSaleDetailFindMany(...a) },
     },
 }));
-vi.mock('@/lib/auth', () => ({ requirePermission: (...a: any[]) => mockRequirePermission(...a) }));
+vi.mock('@/lib/auth', () => ({
+    requirePermission: (...a: any[]) => mockRequirePermission(...a),
+    // getSaleForPrint's own-shift fallback (VIEW_REPORTS missing) is covered
+    // separately in __tests__/actions/shift-actions-like reprint tests; here
+    // it's an ADMIN, which short-circuits that check.
+    requireAnyPermission: (...a: any[]) => mockRequireAnyPermission(...a),
+    getEffectivePermissions: async () => 'ALL',
+    hasPermission: (permissions: unknown, key: string) => permissions === 'ALL' || (Array.isArray(permissions) && permissions.includes(key)),
+}));
 
 import { getSalesAnalytics, getSalesHistoryList, getSaleForPrint, getProductRankingReport, getPromotionUsageReport } from '../../app/actions/report';
 
@@ -34,6 +43,7 @@ function sale(overrides: object = {}) {
 beforeEach(() => {
     vi.clearAllMocks();
     mockRequirePermission.mockResolvedValue({ id: 'u1', role: 'ADMIN' });
+    mockRequireAnyPermission.mockResolvedValue({ id: 'u1', role: 'ADMIN' });
     mockSaleFindFirst.mockResolvedValue(null);
     mockSaleAggregate.mockResolvedValue({ _sum: { total: 0 } });
 });
@@ -156,7 +166,7 @@ describe('getSaleForPrint', () => {
             payments: [], shift: null, customer: null,
         });
         const result: any = await getSaleForPrint('s1');
-        expect(mockRequirePermission).toHaveBeenCalledWith('VIEW_REPORTS');
+        expect(mockRequireAnyPermission).toHaveBeenCalledWith(['VIEW_REPORTS', 'REPRINT_SALES']);
         expect(result.success).toBe(true);
         expect(typeof result.sale.createdAt).toBe('string');
         expect(typeof result.sale.details[0].createdAt).toBe('string');
