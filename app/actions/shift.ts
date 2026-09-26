@@ -122,11 +122,15 @@ export interface OpenShiftSummary {
     registerName: string;
     userName: string;
     startTime: string;
+    baseAmount: number;
 }
 
 /** Every shift currently OPEN/CLOSING, across every cashier — feeds the "ver
  * turno abierto" filter on Ventas e Ingresos, so a manager can pick any
- * live shift, not just their own. */
+ * live shift, not just their own. Also backs the "turnos abiertos" notice in
+ * ShiftHeader for whoever has VIEW_REPORTS (ShiftClosingModal + closeShift()
+ * already let a SUPERVISOR/ADMIN close a shift that isn't theirs — see
+ * loadShiftForClose below — this just surfaces that the shift exists). */
 export async function getOpenShifts(): Promise<OpenShiftSummary[]> {
     try {
         await requirePermission("VIEW_REPORTS");
@@ -140,6 +144,7 @@ export async function getOpenShifts(): Promise<OpenShiftSummary[]> {
             registerName: s.register?.name ?? "Caja",
             userName: s.user?.name ?? "—",
             startTime: s.startTime.toISOString(),
+            baseAmount: s.baseAmount,
         }));
     } catch (error) {
         console.error("[getOpenShifts]", error);

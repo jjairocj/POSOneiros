@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { differenceInDays } from "date-fns";
 import { startOfBusinessDay as startOfDay, endOfBusinessDay as endOfDay, businessDayKey, businessDayLabel } from "@/app/lib/time";
-import { requirePermission } from "@/lib/auth";
+import { requirePermission, requireAnyPermission, getEffectivePermissions, hasPermission } from "@/lib/auth";
 import { toUserMessage } from "@/lib/result";
 
 interface AnalyticsFilters {
@@ -210,7 +210,7 @@ export async function getSalesHistoryList(filters: AnalyticsFilters = {}) {
 
 export async function getSaleForPrint(saleId: string) {
     try {
-        await requirePermission("VIEW_REPORTS");
+        const user = await requireAnyPermission(["VIEW_REPORTS", "REPRINT_SALES"]);
         const sale = await prisma.sale.findUnique({
             where: { id: saleId },
             include: {
@@ -224,6 +224,15 @@ export async function getSaleForPrint(saleId: string) {
         });
 
         if (!sale) return { success: false, error: "Comprobante no encontrado" };
+
+        // A CASHIER granted only REPRINT_SALES (not VIEW_REPORTS) can reprint
+        // any COMPLETED sale from a shift they ran — not any sale by id.
+        if (user.role !== "ADMIN") {
+            const permissions = await getEffectivePermissions();
+            if (!hasPermission(permissions, "VIEW_REPORTS") && sale.shift?.userId !== user.id) {
+                return { success: false, error: "No tienes permisos para ver este comprobante." };
+            }
+        }
 
         return {
             success: true,
@@ -240,6 +249,62 @@ export async function getSaleForPrint(saleId: string) {
     } catch (err: unknown) {
         console.error(err);
         return { success: false, error: toUserMessage(err, "No se pudo cargar el comprobante.") };
+    }
+}
+
+export interface ShiftInvoiceRow {
+    id: string;
+    shortId: string;
+    createdAt: string;
+    total: number;
+}
+
+const SHIFT_INVOICES_PAGE_SIZE = 10;
+
+/** Paginated, COMPLETED-only sales for the shift-scoped reprint modal in the
+ * POS header — gated by REPRINT_SALES so a business can grant it to CASHIER
+ * without also granting the broader VIEW_REPORTS. */
+export async function getShiftInvoicesPage(shiftId: string, page: number = 1): Promise<
+    { success: true; rows: ShiftInvoiceRow[]; totalCount: number; pageSize: number } | { success: false; error: string }
+> {
+    try {
+        const user = await requirePermission("REPRINT_SALES");
+
+        if (user.role !== "ADMIN") {
+            const permissions = await getEffectivePermissions();
+            if (!hasPermission(permissions, "VIEW_REPORTS")) {
+                const shift = await prisma.shift.findUnique({ where: { id: shiftId }, select: { userId: true } });
+                if (shift?.userId !== user.id) {
+                    return { success: false, error: "No tienes permisos para ver las facturas de este turno." };
+                }
+            }
+        }
+
+        const where: Prisma.SaleWhereInput = { shiftId, status: "COMPLETED" };
+        const [sales, totalCount] = await Promise.all([
+            prisma.sale.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+                skip: (page - 1) * SHIFT_INVOICES_PAGE_SIZE,
+                take: SHIFT_INVOICES_PAGE_SIZE,
+                include: { shift: { include: { register: true } } },
+            }),
+            prisma.sale.count({ where }),
+        ]);
+
+        const rows: ShiftInvoiceRow[] = sales.map((s) => ({
+            id: s.id,
+            shortId: s.number != null
+                ? `${s.shift?.register?.prefix ? s.shift.register.prefix + "-" : ""}${s.number}`
+                : s.id.slice(0, 8).toUpperCase(),
+            createdAt: s.createdAt.toISOString(),
+            total: s.total,
+        }));
+
+        return { success: true, rows, totalCount, pageSize: SHIFT_INVOICES_PAGE_SIZE };
+    } catch (error: unknown) {
+        console.error("Error fetching shift invoices:", error);
+        return { success: false, error: toUserMessage(error, "No se pudieron cargar las facturas del turno.") };
     }
 }
 

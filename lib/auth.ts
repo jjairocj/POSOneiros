@@ -93,6 +93,23 @@ export async function requirePermission(key: PermissionKey): Promise<SessionUser
 }
 
 /**
+ * Same as requirePermission, but passes if the caller has ANY of the given
+ * keys — for actions shared by two features gated behind different
+ * permissions (e.g. getSaleForPrint(), used by both the admin sales history
+ * (VIEW_REPORTS) and the cashier's own-shift reprint (REPRINT_SALES)).
+ */
+export async function requireAnyPermission(keys: PermissionKey[]): Promise<SessionUser> {
+    const user = await requireSession();
+    if (user.role === "ADMIN") return user;
+
+    const role = await prisma.role.findUnique({ where: { name: user.role }, select: { permissions: true } });
+    if (!keys.some((key) => role?.permissions.includes(key))) {
+        throw new AuthError("No tienes permisos para esta acción");
+    }
+    return user;
+}
+
+/**
  * The delegable permissions the current session actually has — "ALL" for
  * ADMIN (it bypasses `Role.permissions` entirely, see requirePermission),
  * otherwise whatever `Role.permissions` says for that role (often none, for

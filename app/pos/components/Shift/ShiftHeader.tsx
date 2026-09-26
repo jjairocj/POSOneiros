@@ -2,10 +2,12 @@
 import { useState } from "react";
 import ShiftClosingModal from "./ShiftClosingModal";
 import ShiftOpeningModal from "./ShiftOpeningModal";
+import ShiftInvoicesModal from "./ShiftInvoicesModal";
+import OpenShiftsNotice from "./OpenShiftsNotice";
 import { Button } from "@/components/ui/button";
 import { LogOut, MonitorPlay, ShoppingBag, Lock } from "lucide-react";
 import POSUserMenu from "../POSUserMenu";
-import type { PermissionKey } from "@/lib/permissions";
+import { hasPermission, type PermissionKey } from "@/lib/permissions";
 
 /** Only what the header needs; the page passes the full Prisma shift. */
 type ActiveShift = { id: string; status?: string; baseAmount?: number; register?: { name: string } | null; _count?: { sales: number } } | null;
@@ -23,6 +25,8 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
     const [closingShiftId, setClosingShiftId] = useState<string | null>(null);
     const [closingBase, setClosingBase] = useState(0);
     const [isOpeningInfo, setIsOpeningInfo] = useState(false);
+    const [showInvoices, setShowInvoices] = useState(false);
+    const canReprint = hasPermission(permissions, "REPRINT_SALES");
 
     return (
         <div className="flex items-center justify-between w-full gap-3">
@@ -41,9 +45,12 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
                   with a semantic token without re-checking contrast at the new opacity.
                 */}
                 {!activeShift ? (
-                    <span className="flex items-center px-2.5 py-1 rounded-full bg-red-500/12 border border-red-500/30 text-red-700 dark:text-red-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                        Sin turno activo
-                    </span>
+                    <>
+                        <span className="flex items-center px-2.5 py-1 rounded-full bg-red-500/12 border border-red-500/30 text-red-700 dark:text-red-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                            Sin turno activo
+                        </span>
+                        {hasPermission(permissions, "VIEW_REPORTS") && <OpenShiftsNotice />}
+                    </>
                 ) : (
                     <>
                         <span className="flex items-center px-2.5 py-1 rounded-full bg-primary/12 border border-primary/30 text-foreground text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">
@@ -65,11 +72,23 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
                                 En cierre
                             </span>
                         )}
-                        <span className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/12 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
-                            <ShoppingBag className="w-3 h-3" />
-                            {(activeShift._count?.sales ?? 0)}{" "}
-                            {(activeShift._count?.sales ?? 0) === 1 ? "venta" : "ventas"}
-                        </span>
+                        {canReprint ? (
+                            <button
+                                type="button"
+                                onClick={() => setShowInvoices(true)}
+                                className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/12 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[10px] sm:text-xs font-bold whitespace-nowrap hover:bg-emerald-500/20 active:scale-95 transition-all"
+                            >
+                                <ShoppingBag className="w-3 h-3" />
+                                {(activeShift._count?.sales ?? 0)}{" "}
+                                {(activeShift._count?.sales ?? 0) === 1 ? "venta" : "ventas"}
+                            </button>
+                        ) : (
+                            <span className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/12 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                                <ShoppingBag className="w-3 h-3" />
+                                {(activeShift._count?.sales ?? 0)}{" "}
+                                {(activeShift._count?.sales ?? 0) === 1 ? "venta" : "ventas"}
+                            </span>
+                        )}
                     </>
                 )}
             </div>
@@ -110,6 +129,9 @@ export default function ShiftHeader({ activeShift, userName, userRole, permissio
                     baseAmount={closingBase}
                     onCancel={() => setClosingShiftId(null)}
                 />
+            )}
+            {showInvoices && activeShift && (
+                <ShiftInvoicesModal shiftId={activeShift.id} onClose={() => setShowInvoices(false)} />
             )}
         </div>
     );

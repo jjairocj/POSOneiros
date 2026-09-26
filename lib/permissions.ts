@@ -20,6 +20,7 @@ export const PERMISSION_KEYS = [
     "RECEIVE_INVENTORY",
     "VOID_SALE",
     "VIEW_REPORTS",
+    "REPRINT_SALES",
 ] as const;
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
 
@@ -29,6 +30,7 @@ export const PERMISSION_LABEL: Record<PermissionKey, string> = {
     RECEIVE_INVENTORY: "Recibir mercancía (lotes, insumos, entradas/mermas)",
     VOID_SALE: "Anular una venta",
     VIEW_REPORTS: "Ver reportes e historial de ventas",
+    REPRINT_SALES: "Reimprimir facturas del turno activo",
 };
 
 export function hasPermission(permissions: PermissionKey[] | "ALL", key: PermissionKey): boolean {
