@@ -62,7 +62,6 @@ export default function ShiftInvoicesModal({ shiftId, onClose }: { shiftId: stri
                                         <tr className="text-left text-muted-foreground text-xs uppercase tracking-wide">
                                             <th className="px-2 py-2 font-semibold">Factura</th>
                                             <th className="px-2 py-2 font-semibold">Fecha y hora</th>
-                                            <th className="px-2 py-2 font-semibold text-right">Valor</th>
                                             <th className="px-2 py-2 font-semibold text-right">&nbsp;</th>
                                         </tr>
                                     </thead>
@@ -76,7 +75,6 @@ export default function ShiftInvoicesModal({ shiftId, onClose }: { shiftId: stri
                                                         hour: "2-digit", minute: "2-digit",
                                                     })}
                                                 </td>
-                                                <td className="px-2 py-2 text-right font-semibold">{money(row.total)}</td>
                                                 <td className="px-2 py-2 text-right">
                                                     <Button
                                                         type="button"
@@ -126,7 +124,7 @@ export default function ShiftInvoicesModal({ shiftId, onClose }: { shiftId: stri
                     shortId={rows.find((r) => r.id === printingSaleId)?.shortId ?? ""}
                     canCancel={false}
                     onClose={() => setPrintingSaleId(null)}
-                    onRequestCancel={() => {}}
+                    onRequestCancel={() => { }}
                 />
             )}
         </>
