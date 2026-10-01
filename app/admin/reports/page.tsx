@@ -1,11 +1,12 @@
 import { Metadata } from 'next';
 import { startOfMonth } from 'date-fns';
-import { getProductRankingReport, getShiftsReport } from '@/app/actions/report';
+import { getProductRankingReport, getShiftsReport, getDianSalesReport } from '@/app/actions/report';
 import { businessDayKey } from '@/app/lib/time';
-import { BarChart3, TrendingUp, MonitorPlay } from 'lucide-react';
+import { BarChart3, TrendingUp, MonitorPlay, FileSpreadsheet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductRankingTab } from './components/ProductRankingTab';
 import { ShiftsReportTab } from './components/ShiftsReportTab';
+import { DianReportTab } from './components/DianReportTab';
 import { ReportsExportButton } from './components/ReportsExportButton';
 import { SalesFilters } from '../sales/components/SalesFilters';
 
@@ -23,9 +24,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     const endDate = params.to ? new Date(`${params.to}T23:59:59`) : new Date();
     const startDate = params.from ? new Date(`${params.from}T00:00:00`) : startOfMonth(new Date());
 
-    const [ranking, shifts] = await Promise.all([
+    const [ranking, shifts, dian] = await Promise.all([
         getProductRankingReport({ startDate, endDate }),
         getShiftsReport({ startDate, endDate }),
+        getDianSalesReport({ startDate, endDate }),
     ]);
 
     return (
@@ -53,6 +55,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                     <TabsTrigger value="shifts" className="rounded-xl px-6 font-bold flex items-center gap-2">
                         <MonitorPlay className="w-4 h-4" /> Turnos
                     </TabsTrigger>
+                    <TabsTrigger value="dian" className="rounded-xl px-6 font-bold flex items-center gap-2">
+                        <FileSpreadsheet className="w-4 h-4" /> Ventas DIAN
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="ranking" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
@@ -71,6 +76,16 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                     ) : (
                         <div className="text-destructive font-bold p-6 bg-destructive/10 rounded-2xl border border-destructive/20">
                             Error cargando el reporte: {shifts.error}
+                        </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="dian" className="animate-in fade-in slide-in-from-bottom-4 duration-500 m-0 border-none p-0 outline-none">
+                    {dian.success ? (
+                        <DianReportTab rows={dian.rows} totals={dian.totals} />
+                    ) : (
+                        <div className="text-destructive font-bold p-6 bg-destructive/10 rounded-2xl border border-destructive/20">
+                            Error cargando el reporte: {dian.error}
                         </div>
                     )}
                 </TabsContent>

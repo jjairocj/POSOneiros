@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin, requireSession, requirePermission } from "@/lib/auth";
 import { buildXlsx, buildWorkbook, xlsxResponse } from "@/app/lib/xlsx";
-import { getProductRankingReport, getPromotionUsageReport, getShiftsReport } from "@/app/actions/report";
+import { getProductRankingReport, getPromotionUsageReport, getShiftsReport, getDianSalesReport } from "@/app/actions/report";
 import { startOfBusinessDay, endOfBusinessDay, BUSINESS_TZ, businessDayKey } from "@/app/lib/time";
 
 const STATUS: Record<string, string> = { COMPLETED: "Completada", CANCELLED: "Anulada", SUSPENDED: "Suspendida" };
@@ -124,6 +124,28 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
                 result.rows.map((r) => [r.promotionName, r.timesUsed, r.totalDiscount, r.totalRevenue])
             );
             return xlsxResponse(`uso_promociones_${tag}.xlsx`, buffer);
+        }
+
+        if (kind === "dian") {
+            await requirePermission("VIEW_REPORTS");
+            const { start, end, tag } = parseRange(req);
+            const result = await getDianSalesReport({ startDate: start, endDate: end });
+            if (!result.success) return new Response(result.error, { status: 500 });
+            const rows = result.rows.map((r) => [
+                fmtDate(new Date(r.date)), r.receiptNumber, r.documentId, r.customerName,
+                "Contado", r.paymentMethod, r.base, r.iva, r.ica, r.impoConsumo, r.total,
+            ]);
+            rows.push([]);
+            rows.push([
+                "", "", "", "", "", "TOTALES", result.totals.base, result.totals.iva,
+                result.totals.ica, result.totals.impoConsumo, result.totals.total,
+            ]);
+            const buffer = await buildXlsx(
+                "Ventas DIAN",
+                ["Fecha", "Factura", "Documento", "Nombre / Razón social", "Forma de pago", "Medio de pago", "Base$", "IVA$", "ICA$", "INC$", "Total$"],
+                rows
+            );
+            return xlsxResponse(`ventas_dian_${tag}.xlsx`, buffer);
         }
 
         await requireAdmin();

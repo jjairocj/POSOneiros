@@ -547,3 +547,96 @@ export async function getShiftDetail(shiftId: string): Promise<{ success: true; 
         return { success: false, error: toUserMessage(error, "No se pudo cargar el detalle del turno.") };
     }
 }
+
+// ─── DIAN report (manual upload to the e-invoicing portal) ──────────────────
+
+/** Placeholder used on the printed receipt and here for a final consumer who
+ * gave no document — the standard Colombian practice. Keep in sync with
+ * GENERIC_CONSUMER_ID in app/pos/components/Checkout/Receipt.tsx. */
+const GENERIC_CONSUMER_ID = "222222222";
+
+export interface DianReportRow {
+    saleId: string;
+    date: string; // ISO
+    receiptNumber: string;
+    documentId: string;
+    customerName: string;
+    paymentMethod: string; // joined, deduped method labels
+    base: number;
+    iva: number;
+    ica: number;
+    impoConsumo: number;
+    total: number;
+}
+
+export interface DianReportTotals {
+    count: number;
+    base: number;
+    iva: number;
+    ica: number;
+    impoConsumo: number;
+    total: number;
+}
+
+/**
+ * One row per COMPLETED sale, shaped for manually re-typing into the DIAN
+ * e-invoicing portal: date, consecutive, buyer document/name, payment
+ * method, and the tax breakdown DIAN's invoice form asks for. CANCELLED
+ * sales are excluded — those need a DIAN credit note, not a new invoice
+ * entry, so they'd be misleading here.
+ */
+export async function getDianSalesReport(filters: { startDate: Date; endDate: Date }): Promise<
+    { success: true; rows: DianReportRow[]; totals: DianReportTotals } | { success: false; error: string }
+> {
+    try {
+        await requirePermission("VIEW_REPORTS");
+        const sales = await prisma.sale.findMany({
+            where: {
+                status: "COMPLETED",
+                createdAt: { gte: startOfDay(filters.startDate), lte: endOfDay(filters.endDate) },
+            },
+            include: {
+                details: true,
+                payments: true,
+                customer: { select: { fullName: true, documentId: true } },
+                shift: { include: { register: { select: { prefix: true } } } },
+            },
+            orderBy: { createdAt: "asc" },
+        });
+
+        const rows: DianReportRow[] = sales.map((s) => {
+            const iva = s.details.reduce((a, d) => a + d.taxIvaAmount, 0);
+            const ica = s.details.reduce((a, d) => a + d.taxIcaAmount, 0);
+            const impoConsumo = s.details.reduce((a, d) => a + d.taxImpoConsumoAmount, 0);
+            return {
+                saleId: s.id,
+                date: s.createdAt.toISOString(),
+                receiptNumber: s.number != null
+                    ? `${s.shift?.register?.prefix ? s.shift.register.prefix + "-" : ""}${s.number}`
+                    : s.id.slice(0, 8).toUpperCase(),
+                documentId: s.customer?.documentId || GENERIC_CONSUMER_ID,
+                customerName: s.customer?.fullName || "Consumidor final",
+                paymentMethod: [...new Set(s.payments.map((p) => p.method))]
+                    .map((m) => ({ CASH: "Efectivo", CARD: "Tarjeta", TRANSFER: "Transferencia" } as Record<string, string>)[m] ?? m)
+                    .join(" + "),
+                base: s.total - iva - ica - impoConsumo,
+                iva, ica, impoConsumo,
+                total: s.total,
+            };
+        });
+
+        const totals = rows.reduce<DianReportTotals>((acc, r) => ({
+            count: acc.count + 1,
+            base: acc.base + r.base,
+            iva: acc.iva + r.iva,
+            ica: acc.ica + r.ica,
+            impoConsumo: acc.impoConsumo + r.impoConsumo,
+            total: acc.total + r.total,
+        }), { count: 0, base: 0, iva: 0, ica: 0, impoConsumo: 0, total: 0 });
+
+        return { success: true, rows, totals };
+    } catch (error: unknown) {
+        console.error("Error building DIAN report:", error);
+        return { success: false, error: toUserMessage(error, "No se pudo generar el reporte.") };
+    }
+}
