@@ -38,7 +38,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         setTimeout(() => setAdded(false), 600);
     };
 
-    const isOutOfStock = product.stock <= 0;
+    // "NONE"-tracked products (coffee-by-the-cup, soft-serve) sell freely —
+    // their `stock` is never maintained, so it can't be what gates them.
+    const isOutOfStock = product.trackingMode !== "NONE" && product.stock <= 0;
 
     return (
         <div
@@ -86,7 +88,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                         <Badge variant="destructive" className="text-[9px] font-bold shadow px-1.5 py-0">Agotado</Badge>
                     </div>
                 )}
-                {!isOutOfStock && product.stock <= 5 && (
+                {!isOutOfStock && product.trackingMode !== "NONE" && product.stock <= 5 && (
                     <Badge variant="destructive" className="absolute top-1 right-1 shadow-sm z-10 text-[8px] px-1 py-0">
                         Poco Stock
                     </Badge>

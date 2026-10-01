@@ -134,7 +134,7 @@ export default function ProductGrid() {
     const suggestions = searchQuery.trim() ? products.slice(0, 6) : [];
 
     const addFromSuggestion = (product: CatalogProduct) => {
-        if (product.stock <= 0) return;
+        if (product.trackingMode !== "NONE" && product.stock <= 0) return;
         addItem(product);
         setSearchQuery("");
         setHighlightIndex(0);
@@ -234,7 +234,7 @@ export default function ProductGrid() {
                             <button
                                 key={p.id}
                                 type="button"
-                                disabled={p.stock <= 0}
+                                disabled={p.trackingMode !== "NONE" && p.stock <= 0}
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => addFromSuggestion(p)}
                                 onMouseEnter={() => setHighlightIndex(i)}
@@ -251,7 +251,7 @@ export default function ProductGrid() {
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold truncate">{p.name}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {p.stock <= 0 ? "Agotado" : `${p.stock} en stock`}
+                                        {p.trackingMode === "NONE" ? "Sin inventario" : p.stock <= 0 ? "Agotado" : `${p.stock} en stock`}
                                     </p>
                                 </div>
                                 <span className="text-sm font-bold text-primary shrink-0">${p.price.toLocaleString()}</span>

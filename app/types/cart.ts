@@ -5,6 +5,9 @@ export interface CatalogProduct extends ProductInput {
     isFavorite: boolean;
     isActive: boolean;
     category?: { id: string; name: string } | null;
+    /** "NONE" = not stock-tracked (coffee-by-the-cup, soft-serve) — sells
+     * freely regardless of `stock`, which is meaningless for it. */
+    trackingMode?: string;
 }
 
 export interface CatalogCategory {
