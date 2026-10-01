@@ -355,10 +355,10 @@ export default function CheckoutModal({
                                 without scrolling on a small-height screen. */}
                             <div className="space-y-2">
                                 {[
-                                    { label: "Efectivo", placeholder: "0", icon: <Banknote className="w-5 h-5 text-green-600 dark:text-green-500 shrink-0" />, value: cash, set: setCash },
-                                    { label: "Transferencia", placeholder: "0 · Nequi/Daviplata", icon: <ArrowRightLeft className="w-5 h-5 text-purple-600 dark:text-purple-500 shrink-0" />, value: transfer, set: setTransfer },
-                                    { label: "Tarjeta", placeholder: "0 · Datáfono", icon: <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-500 shrink-0" />, value: card, set: setCard },
-                                ].map(({ label, placeholder, icon, value, set }) => (
+                                    { label: "Efectivo", placeholder: "0", icon: <Banknote className="w-5 h-5 text-green-600 dark:text-green-500 shrink-0" />, value: cash, set: setCash, autofill: false },
+                                    { label: "Transferencia", placeholder: "0 · Nequi/Daviplata", icon: <ArrowRightLeft className="w-5 h-5 text-purple-600 dark:text-purple-500 shrink-0" />, value: transfer, set: setTransfer, autofill: true },
+                                    { label: "Tarjeta", placeholder: "0 · Datáfono", icon: <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-500 shrink-0" />, value: card, set: setCard, autofill: true },
+                                ].map(({ label, placeholder, icon, value, set, autofill }) => (
                                     <div key={label} className="bg-accent/30 p-2.5 rounded-2xl border border-border flex items-center gap-2.5">
                                         <label className="text-sm font-semibold flex items-center gap-1.5 text-foreground w-[8.5rem] shrink-0 leading-tight whitespace-nowrap">
                                             {icon}{label}
@@ -369,6 +369,11 @@ export default function CheckoutModal({
                                                 onChange={set}
                                                 placeholder={placeholder}
                                                 className="h-10 text-lg rounded-xl bg-background border-transparent shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all"
+                                                // No vuelto en pagos electrónicos: lo normal es cobrar exacto, así
+                                                // que al enfocar vacío se autocompleta con lo que falta por cubrir
+                                                // (el total si es el primer método) — sigue siendo editable para
+                                                // un pago combinado.
+                                                onFocus={(e) => { if (autofill && value === 0 && remaining > 0) set(remaining); e.target.select(); }}
                                             />
                                         </div>
                                     </div>
