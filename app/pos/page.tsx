@@ -1,3 +1,4 @@
+import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]/route";
@@ -7,6 +8,10 @@ import ShiftHeader from "./components/Shift/ShiftHeader";
 import ProductGrid from "./components/Catalog/ProductGrid";
 import CartDrawer from "./components/Catalog/CartDrawer";
 import MobileCartBar from "./components/MobileCartBar";
+
+export const metadata: Metadata = {
+  title: "Punto de Venta",
+};
 
 export default async function POSPage() {
   // Same reasoning as admin/layout.tsx: getServerSession() re-runs the jwt

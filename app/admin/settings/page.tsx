@@ -10,7 +10,7 @@ import { SlidersHorizontal, Settings2, ShieldCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const metadata: Metadata = {
-  title: "Oneiros Admin | Ajustes del Sistema",
+  title: "Ajustes",
 };
 
 

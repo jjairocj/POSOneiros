@@ -13,7 +13,7 @@ import { businessDayKey } from "@/app/lib/time";
 import { PromotionsExportButton } from "./components/PromotionsExportButton";
 
 export const metadata: Metadata = {
-    title: "Oneiros Admin | Promociones",
+    title: "Promociones",
 };
 
 /**

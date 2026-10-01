@@ -11,7 +11,7 @@ import { ExportButton } from './components/ExportButton';
 import { SalesFilters } from './components/SalesFilters';
 
 export const metadata: Metadata = {
-    title: "Oneiros Admin | Ventas y Reportes",
+    title: "Ventas e Ingresos",
 };
 
 interface SalesPageProps {

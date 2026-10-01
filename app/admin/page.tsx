@@ -15,7 +15,7 @@ import {
 import { Hint } from "@/app/components/TutorialMode";
 
 export const metadata = {
-    title: "Oneiros Admin | Resumen",
+    title: "Resumen",
 };
 
 const METHOD_LABELS: Record<string, string> = {

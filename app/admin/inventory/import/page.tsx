@@ -8,7 +8,7 @@ import { ArrowLeft, FileSpreadsheet } from "lucide-react";
 import ImportWizard from "./components/ImportWizard";
 
 export const metadata: Metadata = {
-    title: "Oneiros Admin | Importar desde Siigo",
+    title: "Importar desde Siigo",
 };
 
 

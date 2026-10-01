@@ -12,7 +12,7 @@ import { UsersTable } from "./components/UsersTable";
 import { RegistersTable } from "./components/RegistersTable";
 
 export const metadata: Metadata = {
-    title: "Oneiros Admin | Usuarios y Cajas",
+    title: "Usuarios y Cajas",
 };
 
 

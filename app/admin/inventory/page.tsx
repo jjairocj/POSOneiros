@@ -18,7 +18,7 @@ import { SuppliersTable } from './components/SuppliersTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const metadata: Metadata = {
-    title: "Oneiros Admin | Inventario",
+    title: "Inventario",
 };
 
 export default async function InventoryPage() {

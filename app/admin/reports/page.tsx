@@ -10,7 +10,7 @@ import { ReportsExportButton } from './components/ReportsExportButton';
 import { SalesFilters } from '../sales/components/SalesFilters';
 
 export const metadata: Metadata = {
-    title: "Oneiros Admin | Reportes",
+    title: "Reportes",
 };
 
 interface ReportsPageProps {
