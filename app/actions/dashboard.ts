@@ -74,14 +74,17 @@ export async function getDashboardData(): Promise<DashboardData> {
                 orderBy: { startTime: "desc" },
             }),
 
-            // 3. Low stock count
+            // 3. Low stock count — "NONE"-tracked products (coffee-by-the-cup,
+            // soft-serve) never carry a real stock number, so they're excluded
+            // here the same way the POS catalog already excludes them from
+            // "out of stock" (see ProductCard.tsx).
             prisma.product.count({
-                where: { stock: { lt: 5 } },
+                where: { stock: { lt: 5 }, trackingMode: { not: "NONE" } },
             }),
 
             // 4. Low stock product list (for actionable panel)
             prisma.product.findMany({
-                where: { stock: { lte: 5 }, isActive: true },
+                where: { stock: { lte: 5 }, isActive: true, trackingMode: { not: "NONE" } },
                 select: { id: true, code: true, name: true, stock: true, price: true },
                 orderBy: { stock: "asc" },
                 take: 20,
